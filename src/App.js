@@ -1,11 +1,12 @@
-import './App.css';
-import Upload from './page/upload';
+// App.js
+import { BrowserRouter as Router } from 'react-router-dom';
+import Routers from './routes/Routers';
 
 function App() {
   return (
-    <>
-      <Upload />
-    </>
+    <Router>
+      <Routers />
+    </Router>
   );
 }
 

@@ -4,21 +4,9 @@ import SparkMD5 from 'spark-md5';
 import * as XLSX from 'xlsx';
 import ApiBase from '../service/ApiBase';
 import {
-  Box,
-  Button,
-  Typography,
-  Container,
-  Paper,
-  CircularProgress,
-  Stepper,
-  Step,
-  StepLabel,
-  Alert,
-  Snackbar,
-  LinearProgress,
-  useMediaQuery,
-  useTheme,
-  Tooltip
+  Box, Button, Typography, Container, Paper, CircularProgress,
+  Stepper, Step, StepLabel, Alert, Snackbar, LinearProgress,
+  useMediaQuery, useTheme, Tooltip
 } from '@mui/material';
 import {
   CloudUpload as CloudUploadIcon,
@@ -26,6 +14,67 @@ import {
   Description as DescriptionIcon,
   TableChart as TableChartIcon
 } from '@mui/icons-material';
+
+// Mapeamento manual para labels mais "bonitos"
+const PRETTY_LABELS = {
+  UF:         'Estado',
+  MUNIC:      'Município',
+  /*Regiao:     'Região',
+  DATA:       'Data',
+  DURACAO:    'Duração',
+  HORA_INICIO:'Hora Início',
+  HORA_FIM:   'Hora Fim',
+  MUNIC:      'Município',
+  CIR:        'Capital ou Interior',
+  P1:  'Como você avalia o desempenho do Governo Federal?',
+  P2:  'Na sua avaliação o desempenho do Governo Federal é mais positivo ou mais negativo?',
+  P3:  'Como você avalia o desempenho do Presidente da República?',
+  P4:  'Você avalia o desempenho do Presidente como mais positivo ou mais negativo?',
+  PF1: 'Sexo',
+  PF2_faixas: 'Faixa etária',
+  PF3:  'Escolaridade',
+  PF4:  'Trabalho remunerado',
+  PF5:  'Tipo de emprego',
+  PF6:  'Vínculo formal',
+  PF7:  'Possui CNPJ?',
+  PF8:  'Situação ocupacional',
+  PF9:  'Procurou emprego nos últimos 30 dias?',
+  PF12: 'Recebe Bolsa Família?',
+  PF13: 'Renda individual',
+  PF14: 'Renda familiar',
+  PF15: 'Religião',*/
+
+};
+
+const LABEL_OVERRIDES = [
+  { pattern: /cor(?: ou )?ra[çc]a/i,      label: 'Cor/Raça' },
+  { pattern: /quantos anos/i,             label: 'Idade' },
+  { pattern: /qual o seu grau de escolaridade/i, label: 'Escolaridade' },
+  { pattern: /desempenha algum trabalho remunerado/i,       label: 'Trabalho remunerado' },
+  { pattern: /capital/i,           label: 'Capital ou Interior' },
+  { pattern: /dataatualizacao/i,           label: 'Data' },
+  { pattern: /duracao/i,           label: 'Duração' },
+  { pattern: /horainicio/i,           label: 'Hora Início' },
+  { pattern: /horafim/i,           label: 'Hora Fim' },
+  { pattern: /avalia o desempenho do Governo/i,           label: 'Como você avalia o desempenho do Governo Federal?' },
+  { pattern: /sexo/i,           label: 'Sexo' },
+  { pattern: /classifica esse trabalho/i,           label: 'Tipo de emprego' },
+  { pattern: /possui cnpj/i,           label: 'Possui CNPJ?' },
+  { pattern: /voce e aposentado/i,           label: 'Situação ocupacional' },
+  { pattern: /trinta dias/i,           label: 'Procurou emprego nos últimos 30 dias?' },
+  { pattern: /bolsa familia/i,           label: 'Recebe Bolsa Família?' },
+  { pattern: /religiao/i,           label: 'Religião' },
+  { pattern: /considerando seus ganhos/i,           label: 'Renda individual' },
+  { pattern: /somando a sua renda com a renda/i,           label: 'Renda Familiar' },
+  { pattern: /vinculo formal/i,           label: 'CLT' },
+  { pattern: /weights/i,           label: 'Peso' },
+  { pattern: /uf/i,           label: 'Estado' },
+  { pattern: /regiao/i,           label: 'Região' },
+  { pattern: /e como voce avalia o desempenho do presidente/i,           label: 'E como voce avalia o desempenho do Presidente da Republica?' },
+  { pattern: /na sua avaliacao, o desempenho/i,           label: 'E na sua avaliacao, o desempenho do Governo Federal e regular mais para positivo ou regular mais para negativo?'},
+  { pattern: /e voce aprova ou desaprova o desempenho do governo federal/i,           label: 'E voce aprova ou desaprova o desempenho do governo federal?' },
+  // …adicione aqui quantos quiser, usando regex para “case‑insensitive”
+];
 
 function Upload() {
   const theme = useTheme();
@@ -42,26 +91,21 @@ function Upload() {
   const simulateProgress = () => {
     setProgress(0);
     const timer = setInterval(() => {
-      setProgress((old) => Math.min(old + Math.random() * 5, 100));
+      setProgress(old => Math.min(old + Math.random() * 5, 100));
       if (progress >= 100) clearInterval(timer);
     }, 200);
     return timer;
   };
 
-  const computeFileHash = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsArrayBuffer(file);
-      reader.onload = e => {
-        const hash = SparkMD5.ArrayBuffer.hash(e.target.result);
-        resolve(hash);
-      };
-      reader.onerror = reject;
-    });
-  };
+  const computeFileHash = file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsArrayBuffer(file);
+    reader.onload = e => resolve(SparkMD5.ArrayBuffer.hash(e.target.result));
+    reader.onerror = reject;
+  });
 
   const showAlert = (severity, message) => setAlert({ open: true, severity, message });
-  const handleCloseAlert = () => setAlert((a) => ({ ...a, open: false }));
+  const handleCloseAlert = () => setAlert(a => ({ ...a, open: false }));
 
   const truncateFileName = (fileName, maxLength = 25) => {
     if (fileName.length <= maxLength) return fileName;
@@ -71,73 +115,117 @@ function Upload() {
     return `${base.substring(0, maxLength - ext.length - 4)}...${ext}`;
   };
 
-  // Substitua sua função readExcel antiga por esta:
+  // Leitura de dados Excel (inalterada)
+  const readExcel = file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsBinaryString(file);
+    reader.onload = e => {
+      const wb = XLSX.read(e.target.result, { type: 'binary' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      const headerIdx = rows.findIndex(r => r.includes('idEntrevista'));
+      if (headerIdx < 0) return reject(new Error("Cabeçalho 'idEntrevista' não encontrado"));
+      const header = rows[headerIdx].map(h => String(h).trim());
+      const data = rows.slice(headerIdx + 1).map(r => {
+        const obj = {};
+        header.forEach((key,i) => key && (obj[key] = r[i]));
+        return obj;
+      });
+      resolve(data);
+    };
+    reader.onerror = reject;
+  });
 
-  const readExcel = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsBinaryString(file);
-      reader.onload = (e) => {
-        const wb    = XLSX.read(e.target.result, { type: 'binary' });
-        const ws    = wb.Sheets[wb.SheetNames[0]];
-        const rows  = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        // 1) encontra a linha de cabeçalho real (que contém "idEntrevista")
-        const headerIdx = rows.findIndex(r => r.includes('idEntrevista'));
-        if (headerIdx < 0) return reject(new Error("Cabeçalho 'idEntrevista' não encontrado"));
-        // 2) mapeia e limpa cada título
-        const header = rows[headerIdx].map(h => String(h).trim());
-        // 3) monta objeto para cada linha subsequente
-        const data = rows.slice(headerIdx + 1).map(r => {
-          const obj = {};
-          header.forEach((key, i) => {
-            if (key) obj[key] = r[i];
-          });
-          return obj;
+  // Helpers de normalização
+  const strip = s =>
+    String(s || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .trim();
+
+  const normalize = s =>
+    String(s || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toLowerCase();
+
+  // Leitura do dicionário com engenharia reversa para variáveis e valores
+  const readDictFile = file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsBinaryString(file);
+    reader.onload = e => {
+      const wb   = XLSX.read(e.target.result, { type: 'binary' });
+      const ws   = wb.Sheets[wb.SheetNames[0]];               // só a primeira sheet
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  
+      // 1) Encontrar cabeçalho de PERGUNTAS (Variável | Rótulo | Nível de medição)
+      const headerInfoIdx = rows.findIndex(row => {
+        const norm = row.map(strip);
+        return norm.some(c => /^variavel$/i.test(c))
+            && norm.some(c => /^rotulo$/i.test(c))
+            && norm.some(c => /^nivel.*medicao$/i.test(c));
+      });
+      if (headerInfoIdx < 0) {
+        return reject(new Error("Cabeçalho de PERGUNTAS não encontrado na primeira sheet"));
+      }
+      const hdrInfo = rows[headerInfoIdx].map(strip);
+      const varIdx  = hdrInfo.findIndex(h => /^variavel$/i.test(h));
+      const rotIdx  = hdrInfo.findIndex(h => /^rotulo$/i.test(h));
+      const medIdx  = hdrInfo.findIndex(h => /^nivel.*medicao$/i.test(h));
+      const posIdx  = hdrInfo.findIndex(h => /^posicao$/i.test(h));
+  
+      const questionMap = {};
+      rows
+        .slice(headerInfoIdx + 1)
+        .map(r => r.map(strip))
+        .filter(cells =>
+          cells[varIdx] && !isNaN(Number(cells[posIdx])) && cells[medIdx]
+        )
+        .forEach(cells => {
+          const key       = cells[varIdx];
+          const origLabel = cells[rotIdx] || key;
+          let lab       = origLabel;
+          //  a) aplicação do PRETTY_LABELS (por key)
+          if (PRETTY_LABELS[key]) {
+            lab = PRETTY_LABELS[key];
+          }
+          //  b) aplicação dos LABEL_OVERRIDES (por texto)
+          for (const { pattern, label: pretty } of LABEL_OVERRIDES) {
+            if (pattern.test(origLabel)) {
+              lab = pretty;
+              break;
+            }
+          }
+          questionMap[key] = { label: lab, type: cells[medIdx] || 'text' };
         });
-        resolve(data);
-      };
-      reader.onerror = reject;
-    });
-  };
-  // Função readDictFile atualizada
-  const readDictFile = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsBinaryString(file);
-      reader.onload = (e) => {
-        const wb   = XLSX.read(e.target.result, { type: 'binary' });
-        const ws   = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
-        // Procurar linha que contenha Variável, Rótulo e Nível de medição
-        const headerIdx = rows.findIndex(
-          r => r.includes('Variável') && r.includes('Rótulo') && r.includes('Nível de medição')
-        );
-        if (headerIdx < 0)
-          return reject(new Error("Cabeçalho 'Variável'/'Rótulo' não encontrado"));
-
-        const header = rows[headerIdx];
-        const varIdx = header.indexOf('Variável');
-        const rotIdx = header.indexOf('Rótulo');
-        const medIdx = header.indexOf('Nível de medição');
-
-        const map = {};
-        rows.slice(headerIdx + 1)
-          // manter só as linhas de definição (onde Nível de medição não é vazio)
-          .filter(r => r[varIdx])
-          .forEach(r => {
-            map[String(r[varIdx]).trim()] = {
-              label: String(r[rotIdx]).trim(),
-              type:  medIdx >= 0 && r[medIdx] ? String(r[medIdx]).trim() : 'text'
-            };
+  
+      // 2) Encontrar cabeçalho de VALORES (Valor | Rótulo)
+      const headerValIdx = rows.findIndex(row => {
+        const norm = row.map(strip).map(c => c.toLowerCase());
+        return norm.includes('valor') && norm.includes('rotulo');
+      });
+      const valueToVar = {};
+      if (headerValIdx >= 0) {
+        let currVar = null;
+        rows
+          .slice(headerValIdx + 1)
+          .map(r => r.map(strip))
+          .forEach(cells => {
+            const first = cells[0];
+            if (first && isNaN(Number(first))) {
+              currVar = first;
+            } else if (currVar) {
+              const valLab = cells[2];
+              if (valLab) valueToVar[ normalize(valLab) ] = currVar;
+            }
           });
-
-        resolve(map);
-      };
-      reader.onerror = reject;
-    });
-  };
-
+      }
+  
+      resolve({ questionMap, valueToVar });
+    };
+    reader.onerror = reject;
+  });
 
   const handleDataFile = (e) => {
     const file = e.target.files[0];
@@ -156,55 +244,60 @@ function Upload() {
   };
 
   const handleSubmit = async () => {
-    if (!dataFile || !dictFile) {
-      showAlert('error', 'Por favor, selecione os dois arquivos.');
-      return;
-    }
+    if(!dataFile||!dictFile){ showAlert('error','...'); return; }
     try {
-
-      // 0) calcula hash do arquivo de dados
-     const fileHash = await computeFileHash(dataFile);
-      setLoading(true);
-      setActiveStep(1);
+      const fileHash = await computeFileHash(dataFile);
+      setLoading(true); setActiveStep(1);
       const progressTimer = simulateProgress();
 
-      // 1) lê arquivos
       const dataJson = await readExcel(dataFile);
-      const dictMap = await readDictFile(dictFile);
+      const { questionMap, valueToVar } = await readDictFile(dictFile);
 
-      // 2) renomeia cada campo com todas as melhorias:
-      const combinedData = dataJson.map(row =>
-        Object.fromEntries(
-          Object.entries(row).map(([col, val]) => {
-            const varName = col.trim();
-            let label = dictMap[varName]?.label || varName;
-            label = label
-              .replace(/['"]/g, '')
-              .replace(/\s*\([^)]*\)/g, '')
-              .replace(/Entrevistador:.*/gi, '')
-              .trim();
-            return [ varName, { label, value: val } ];
+      // 2) renomeia cada campo e garante todas as variáveis
+      const combinedData = dataJson.map(row => {
+        // primeiro, mapeia cada coluna bruta para a chave final usando valueToVar
+        const rowMap = {};
+        Object.entries(row).forEach(([col, val]) => {
+          const normVal = normalize(String(val));
+          const key = valueToVar[normVal] || col.trim();
+          rowMap[key] = val;
+        });
+
+        // depois, para cada variável do dicionário, garante presença no objeto
+        return Object.fromEntries(
+          Object.keys(questionMap).map(key => {
+            const q = questionMap[key];
+            const value = Object.prototype.hasOwnProperty.call(rowMap, key)
+              ? rowMap[key]
+              : null;
+            return [key, { label: q.label, value }];
           })
-        )
-      ); 
-
-      
+        );
+      }); 
       // 3) extrai array de variables para o Survey
-      const variables = Object.entries(dictMap).map(([key, info]) => ({
+      const variables = Object.entries(questionMap).map(([key, info]) => ({
         key,
-        label: info.label.trim(),
-        type: info.type || 'text'
+        label: info.label,
+        type: info.type
       }));
 
       // 4) monta surveyInfo (nome, mês, ano e variables)
       const surveyName = dictFile.name.replace(/\.[^.]+$/, '');
       const m = surveyName.match(/Tracking\s+(\w+)(?:\s+(\d{4}))?/i);
       const month = m?.[1] || null;
-      const year  = m?.[2] ? Number(m[2]) : new Date().getFullYear();
+      let year;
+      const firstDate = combinedData[0]?.DATA?.value;
+      if (firstDate) {
+        const parts = String(firstDate).split('/');
+        year = parts.length === 3 ? Number(parts[2]) : new Date().getFullYear();
+      } else {
+        year = new Date().getFullYear();
+      }
       const surveyInfo = { name: surveyName, month, year, variables, fileHash };
 
       // 5) monta payload completo
       const payload = { surveyInfo, data: combinedData };
+      console.log(payload)
 
       setActiveStep(2);
       const response = await ApiBase.put('/api/data', payload);
