@@ -127,10 +127,17 @@ function Upload() {
       if (headerIdx < 0) return reject(new Error("Cabeçalho 'idEntrevista' não encontrado"));
       const header = rows[headerIdx].map(h => String(h).trim());
       const data = rows.slice(headerIdx + 1).map(r => {
-        const obj = {};
-        header.forEach((key,i) => key && (obj[key] = r[i]));
-        return obj;
-      });
+        const obj = {}
+        header.forEach((key,i) => {
+          let cell = r[i]
+          // se vier '' ou '#NULL!' (ou '#NULL') trate como null
+          if (cell === '' || /^#null!?$/i.test(String(cell))) {
+            cell = null
+          }
+          obj[key] = cell
+        })
+        return obj
+      })
       resolve(data);
     };
     reader.onerror = reject;
@@ -251,29 +258,19 @@ function Upload() {
       const progressTimer = simulateProgress();
 
       const dataJson = await readExcel(dataFile);
-      const { questionMap, valueToVar } = await readDictFile(dictFile);
+      const { questionMap } = await readDictFile(dictFile);
 
-      // 2) renomeia cada campo e garante todas as variáveis
+      // 2) para cada linha, monte o objeto direto pelo header key → row[key]
       const combinedData = dataJson.map(row => {
-        // primeiro, mapeia cada coluna bruta para a chave final usando valueToVar
-        const rowMap = {};
-        Object.entries(row).forEach(([col, val]) => {
-          const normVal = normalize(String(val));
-          const key = valueToVar[normVal] || col.trim();
-          rowMap[key] = val;
-        });
-
-        // depois, para cada variável do dicionário, garante presença no objeto
         return Object.fromEntries(
           Object.keys(questionMap).map(key => {
-            const q = questionMap[key];
-            const value = Object.prototype.hasOwnProperty.call(rowMap, key)
-              ? rowMap[key]
-              : null;
-            return [key, { label: q.label, value }];
+            const q        = questionMap[key]
+            // se row[key] for undefined, cai em null; se já foi normalizado pra null, mantém
+            const value    = row[key] !== undefined ? row[key] : null
+            return [ key, { label: q.label, value } ]
           })
-        );
-      }); 
+        )
+      })
       // 3) extrai array de variables para o Survey
       const variables = Object.entries(questionMap).map(([key, info]) => ({
         key,
