@@ -1,29 +1,39 @@
-import { Box, Typography, Chip } from "@mui/material"
+"use client"
+import { Badge, Button } from "react-bootstrap"
+import { X } from "react-bootstrap-icons"
+import "./ActiveFilters.css"
 
-const ActiveFilters = ({ filters, availableDemographics, onRemoveFilter }) => {
+const ActiveFilters = ({ filters, demographics, onRemoveFilter, onClearFilters }) => {
   if (Object.keys(filters).length === 0) return null
 
   return (
-    <Box sx={{ mt: 2, display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 1 }}>
-      <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
-        Filtros ativos:
-      </Typography>
-      {Object.entries(filters).map(([key, values]) => {
-        if (values.length === 0) return null
+    <div className="active-filters">
+      <div className="d-flex align-items-center mb-2">
+        <h5 className="active-filters-title me-2">Filtros Ativos:</h5>
+        <Button variant="link" size="sm" className="clear-all-btn p-0" onClick={onClearFilters}>
+          Limpar todos
+        </Button>
+      </div>
 
-        const demographic = availableDemographics.find((d) => d.key === key)
-        return (
-          <Chip
-            key={key}
-            size="small"
-            label={`${demographic?.label || key}: ${values.length} selecionado${values.length > 1 ? "s" : ""}`}
-            color="primary"
-            variant="outlined"
-            onDelete={() => onRemoveFilter(key)}
-          />
-        )
-      })}
-    </Box>
+      <div className="filter-badges">
+        {Object.entries(filters).map(([key, values]) => {
+          if (values.length === 0) return null
+
+          const demographic = demographics.find((d) => d.key === key)
+          const label = demographic?.label || key
+
+          return (
+            <Badge key={key} bg="light" text="dark" className="filter-badge">
+              <span className="filter-name">{label}:</span>
+              <span className="filter-values">{values.join(", ")}</span>
+              <Button variant="link" size="sm" className="remove-filter-btn" onClick={() => onRemoveFilter(key)}>
+                <X size={14} />
+              </Button>
+            </Badge>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

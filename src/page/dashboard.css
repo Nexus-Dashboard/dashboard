@@ -1,0 +1,70 @@
+/* Dashboard.css */
+
+.dashboard {
+  padding: 2rem;
+  background-color: #fff;
+  min-height: 100vh;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.filters-panel {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.filters-panel .form-label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.filters-panel .row > [class^="col-"] {
+  margin-bottom: 1rem;
+}
+
+/* Select styling */
+.form-select {
+  border-radius: 0.25rem;
+  border: 1px solid #ced4da;
+  height: calc(2.25rem + 2px);
+}
+
+/* Button styling */
+.btn-outline-primary {
+  border-radius: 0.25rem;
+  border-width: 1px;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+  background-color: #e2e6ea;
+}
+
+/* Chart container overrides */
+.recharts-surface {
+  background-color: #fff;
+}
+
+/* Responsive tweaks */
+@media (max-width: 767.98px) {
+  .dashboard {
+    padding: 1rem;
+  }
+
+  .filters-panel {
+    padding: 0.75rem;
+  }
+
+  .filters-panel .row > [class^="col-"] {
+    margin-bottom: 0.75rem;
+  }
+}

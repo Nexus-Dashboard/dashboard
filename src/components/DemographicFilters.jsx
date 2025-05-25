@@ -1,99 +1,53 @@
 "use client"
-import {
-  Box,
-  Typography,
-  Divider,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Checkbox,
-  FormGroup,
-  FormControlLabel,
-  Button,
-  Chip,
-  Grid,
-  useTheme,
-} from "@mui/material"
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
-import { alpha } from "@mui/material/styles"
+import { Row, Col, Form, Button, Card, Badge } from "react-bootstrap"
+import "./DemographicFilters.css"
 
 const DemographicFilters = ({ availableDemographics, filters, onFilterChange, onClearFilters }) => {
-  const theme = useTheme()
-
-  const handleFilterChange = (demographicKey, value, checked) => {
-    onFilterChange(demographicKey, value, checked)
-  }
-
   return (
-    <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-        <Typography variant="h6" fontWeight="bold" color="primary.dark">
-          Filtros Demográficos
-        </Typography>
-        <Button variant="text" color="primary" onClick={onClearFilters} disabled={Object.keys(filters).length === 0}>
+    <div className="demographic-filters">
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h4 className="filter-title m-0">Filtros Demográficos</h4>
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={onClearFilters}
+          disabled={Object.keys(filters).length === 0}
+        >
           Limpar Filtros
         </Button>
-      </Box>
+      </div>
 
-      <Divider sx={{ mb: 2 }} />
-
-      <Grid container spacing={2}>
+      <Row>
         {availableDemographics.map((demographic) => (
-          <Grid item xs={12} md={6} lg={4} key={demographic.key}>
-            <Accordion
-              disableGutters
-              elevation={0}
-              sx={{
-                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                "&:before": { display: "none" },
-                borderRadius: 1,
-                mb: 1,
-                overflow: "hidden",
-              }}
-            >
-              <AccordionSummary
-                expandIcon={<ExpandMoreIcon />}
-                sx={{
-                  bgcolor: alpha(theme.palette.primary.main, 0.05),
-                  "&.Mui-expanded": {
-                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                  },
-                }}
-              >
-                <Typography fontWeight="medium">
-                  {demographic.label}
-                  {filters[demographic.key]?.length > 0 && (
-                    <Chip
-                      size="small"
-                      label={filters[demographic.key].length}
-                      color="primary"
-                      sx={{ ml: 1, height: 20 }}
-                    />
-                  )}
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ maxHeight: 200, overflow: "auto", p: 1 }}>
-                <FormGroup>
+          <Col key={demographic.key} md={6} lg={4} className="mb-3">
+            <Card className="filter-group-card">
+              <Card.Header className="d-flex justify-content-between align-items-center">
+                <span>{demographic.label}</span>
+                {filters[demographic.key]?.length > 0 && (
+                  <Badge bg="primary" pill>
+                    {filters[demographic.key].length}
+                  </Badge>
+                )}
+              </Card.Header>
+              <Card.Body className="filter-options">
+                <Form>
                   {demographic.values.map((value) => (
-                    <FormControlLabel
-                      key={value}
-                      control={
-                        <Checkbox
-                          size="small"
-                          checked={(filters[demographic.key] || []).includes(value)}
-                          onChange={(e) => handleFilterChange(demographic.key, value, e.target.checked)}
-                        />
-                      }
-                      label={<Typography variant="body2">{value}</Typography>}
+                    <Form.Check
+                      key={`${demographic.key}-${value}`}
+                      type="checkbox"
+                      id={`${demographic.key}-${value}`}
+                      label={value}
+                      checked={(filters[demographic.key] || []).includes(value)}
+                      onChange={(e) => onFilterChange(demographic.key, value, e.target.checked)}
                     />
                   ))}
-                </FormGroup>
-              </AccordionDetails>
-            </Accordion>
-          </Grid>
+                </Form>
+              </Card.Body>
+            </Card>
+          </Col>
         ))}
-      </Grid>
-    </Box>
+      </Row>
+    </div>
   )
 }
 

@@ -1,0 +1,103 @@
+.survey-dashboard {
+  background-color: #f8f9fa;
+  min-height: 100vh;
+}
+
+.dashboard-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard-subtitle {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 0;
+}
+
+.question-select {
+  font-size: 1rem;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid #ced4da;
+}
+
+.toggle-filters-btn,
+.toggle-demographic-btn {
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+}
+
+.filter-card,
+.question-card,
+.chart-card {
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.question-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0;
+  color: #333;
+}
+
+.chart-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0;
+  color: #333;
+}
+
+.chart-container {
+  margin-top: 1rem;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .dashboard-title {
+    font-size: 1.5rem;
+  }
+
+  .dashboard-subtitle {
+    font-size: 1rem;
+  }
+
+  .toggle-filters-btn,
+  .toggle-demographic-btn {
+    margin-top: 1rem;
+    width: 100%;
+  }
+}
+
+.demographic-comparisons h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.toggle-filters-btn,
+.toggle-demographic-btn {
+  margin-left: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .toggle-filters-btn,
+  .toggle-demographic-btn {
+    margin-top: 0.5rem;
+    margin-left: 0;
+    width: 100%;
+  }
+}

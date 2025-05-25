@@ -1,15 +1,14 @@
-// routes/Routers.jsx
-import React from "react";
-import { Routes, Route } from "react-router-dom";
-import Dashboard from "../page/Dashboard";
-import Upload from "../page/upload";
+import { Routes, Route } from "react-router-dom"
+import SurveyDashboard from "../components/SurveyDashboard"
+import Upload from "../page/upload"
+import TimelinePage from "../page/TimelinePage"
 
 const Routers = () => (
   <Routes>
+    <Route path="/" element={<SurveyDashboard />} />
     <Route path="/upload" element={<Upload />} />
-    <Route path="/dashboard" element={<Dashboard />} />
-    <Route path="*" element={<Dashboard />} />
+    <Route path="/teste" element={<TimelinePage />} />
   </Routes>
-);
+)
 
-export default Routers;
+export default Routers
