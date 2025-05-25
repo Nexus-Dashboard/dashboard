@@ -8,6 +8,7 @@ import ApiBase from "../service/ApiBase"
 import { normalizeAnswer, getResponseColor, sortChartData, extractWeight, RESPONSE_ORDER } from "../utils/chartUtils"
 import LoadingState from "../components/LoadingState"
 import ChartDownloadButton from "../components/ChartDownloadButton"
+import BrazilMap from "../components/BrazilMap"
 import { List } from "react-bootstrap-icons"
 import "./TimelinePage.css"
 
@@ -23,6 +24,7 @@ const TimelinePage = () => {
   const [availableDemographics, setAvailableDemographics] = useState([])
   const [activeFilters, setActiveFilters] = useState({})
   const [showOffcanvas, setShowOffcanvas] = useState(false)
+  const [selectedState, setSelectedState] = useState(null)
 
   // Fetch surveys and responses
   useEffect(() => {
@@ -71,6 +73,26 @@ const TimelinePage = () => {
               values: extractUniqueValues(responsesMap, v.key),
             }))
             .filter((d) => d.values.length > 0)
+
+          // Adicionar UF e Região como opções de filtro
+          const regionValues = extractUniqueValues(responsesMap, "Regiao")
+          const stateValues = extractUniqueValues(responsesMap, "UF")
+
+          if (regionValues.length > 0) {
+            demographics.push({
+              key: "Regiao",
+              label: "Região",
+              values: regionValues,
+            })
+          }
+
+          if (stateValues.length > 0) {
+            demographics.push({
+              key: "UF",
+              label: "Estado",
+              values: stateValues,
+            })
+          }
 
           setAvailableDemographics(demographics)
         }
@@ -140,6 +162,7 @@ const TimelinePage = () => {
   const handleQuestionSelect = (e) => {
     const [type, key, label] = e.target.value.split("||")
     setSelectedQuestion({ type, key, label })
+    setSelectedState(null) // Reset selected state when changing question
   }
 
   // Handle filter changes
@@ -165,6 +188,7 @@ const TimelinePage = () => {
   // Clear all filters
   const handleClearFilters = () => {
     setFilters({})
+    setSelectedState(null)
   }
 
   // Remove a specific filter
@@ -174,6 +198,37 @@ const TimelinePage = () => {
       delete newFilters[key]
       return newFilters
     })
+
+    if (key === "UF") {
+      setSelectedState(null)
+    }
+  }
+
+  // Handle state click on map
+  const handleStateClick = (state) => {
+    if (selectedState === state) {
+      // If clicking the same state, remove the filter
+      setSelectedState(null)
+      setFilters((prevFilters) => {
+        const newFilters = { ...prevFilters }
+        delete newFilters["UF"]
+        return newFilters
+      })
+    } else {
+      // Set the new state filter
+      setSelectedState(state)
+
+      // Encontrar o nome completo do estado a partir da sigla
+      const stateFullName =
+        Object.entries(availableDemographics.find((d) => d.key === "UF")?.values || {}).find(
+          ([_, value]) => value.includes(state) || state.includes(value),
+        )?.[1] || state
+
+      setFilters((prevFilters) => ({
+        ...prevFilters,
+        UF: [stateFullName],
+      }))
+    }
   }
 
   // Filter responses based on selected demographic filters
@@ -194,6 +249,11 @@ const TimelinePage = () => {
 
     return filtered
   }, [allResponses, filters])
+
+  // Get all responses as a flat array for the map
+  const allResponsesFlat = useMemo(() => {
+    return Object.values(filteredResponses).flat()
+  }, [filteredResponses])
 
   // Calculate timeline data
   const timelineData = useMemo(() => {
@@ -677,9 +737,9 @@ const TimelinePage = () => {
                 </Row>
               )}
 
-              {/* Timeline Chart */}
+              {/* Timeline Chart and Brazil Map */}
               <Row className="mb-4">
-                <Col>
+                <Col lg={6}>
                   <Card className="chart-card">
                     <Card.Body>
                       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -840,6 +900,18 @@ const TimelinePage = () => {
                     </Card.Body>
                   </Card>
                 </Col>
+
+                {/* Brazil Map */}
+                <Col lg={6}>
+                  {selectedQuestion.key && (
+                    <BrazilMap
+                      responses={allResponsesFlat}
+                      selectedQuestion={selectedQuestion}
+                      onStateClick={handleStateClick}
+                      selectedState={selectedState}
+                    />
+                  )}
+                </Col>
               </Row>
 
               {/* Demographic Comparison Charts */}
@@ -886,15 +958,9 @@ const TimelinePage = () => {
                               groupMode="stacked"
                               valueScale={{
                                 type: "linear",
-                                // Escala dinâmica: 10% a mais que o valor máximo ou 100%, o que for menor
-                                max: Math.min(
-                                  100,
-                                  Math.ceil(
-                                    Math.max(
-                                      ...data.flatMap((item) => uniqueAnswers.map((answer) => item[answer] || 0)),
-                                    ) * 1.1,
-                                  ),
-                                ),
+                                // Escala fixa em 100%
+                                max: 100,
+                                min: 0,
                               }}
                               indexScale={{ type: "band", round: true }}
                               colors={(bar) => getResponseColor(bar.id)}
