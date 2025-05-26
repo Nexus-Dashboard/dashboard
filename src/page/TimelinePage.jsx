@@ -22,7 +22,6 @@ const TimelinePage = () => {
   const [totalRespondents, setTotalRespondents] = useState(0)
   const [filters, setFilters] = useState({})
   const [availableDemographics, setAvailableDemographics] = useState([])
-  const [activeFilters, setActiveFilters] = useState({})
   const [showOffcanvas, setShowOffcanvas] = useState(false)
   const [selectedState, setSelectedState] = useState(null)
 
