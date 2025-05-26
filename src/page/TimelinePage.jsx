@@ -767,6 +767,7 @@ const TimelinePage = () => {
                           <ResponsiveLine
                             data={sortChartData(lineChartData)}
                             margin={{ top: 50, right: 110, bottom: 50, left: 60 }}
+                            colors={(serie) => getResponseColor(serie.id)}
                             xScale={{ type: "point" }}
                             yScale={{
                               type: "linear",

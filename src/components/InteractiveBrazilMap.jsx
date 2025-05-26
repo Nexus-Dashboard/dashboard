@@ -125,7 +125,16 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
             count,
             percentage: Math.round((count / stateData.total) * 100),
           }))
-          .sort((a, b) => b.percentage - a.percentage)
+          .sort((a, b) => {
+            // Ordenar responses usando RESPONSE_ORDER
+            const indexA = RESPONSE_ORDER.indexOf(a.response)
+            const indexB = RESPONSE_ORDER.indexOf(b.response)
+
+            if (indexA >= 0 && indexB >= 0) return indexA - indexB
+            if (indexA >= 0) return -1
+            if (indexB >= 0) return 1
+            return b.percentage - a.percentage
+          })
         stateData.totalResponses = stateData.total
       }
     })
@@ -205,13 +214,14 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       })
       .on("mouseout", function () {
         setHoveredState(null)
-        setTooltip((prev) => ({ ...prev, visible: false }))
+        setTooltip((prev) => ({ ...prev, visible: false, data: null })) // Limpar data também
         d3.select(this).attr("opacity", 1)
       })
       .on("click", (event, d) => {
         const stateId = d.properties.sigla
+        const stateFullName = ABBR_TO_STATE_NAMES[stateId] || stateId
         if (onStateClick) {
-          onStateClick(stateId)
+          onStateClick(stateFullName) // Passar o nome completo do estado
         }
       })
 
@@ -237,7 +247,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .text((d) => d.properties.sigla)
   }, [geoData, mapData, hoveredState, selectedState])
 
-  // Generate legend data
+  // Generate legend data - com ordem correta
   const legendData = useMemo(() => {
     const responseSet = new Set()
     mapData.forEach((stateData) => {
@@ -299,7 +309,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
               style={{ background: "#f8f9fa", borderRadius: "8px" }}
             />
 
-            {/* Tooltip */}
+            {/* Tooltip - só aparece quando tooltip.visible é true */}
             {tooltip.visible && tooltip.data && (
               <div
                 style={{
