@@ -652,7 +652,7 @@ const TimelinePage = () => {
 
               {/* Metric Cards */}
               <Row className="mb-4">
-                <Col md={4}>
+                <Col md={3}>
                   <Card className="metric-card orange-accent">
                     <Card.Body>
                       <div className="metric-title">Total de Entrevistados</div>
@@ -670,7 +670,7 @@ const TimelinePage = () => {
                     </Card.Body>
                   </Card>
                 </Col>
-                <Col md={4}>
+                <Col md={3}>
                   <Card className="metric-card orange-accent">
                     <Card.Body>
                       <div className="metric-title">Pesquisas Realizadas</div>
@@ -683,12 +683,23 @@ const TimelinePage = () => {
                     </Card.Body>
                   </Card>
                 </Col>
-                <Col md={4}>
+                <Col md={3}>
                   <Card className="metric-card orange-accent">
                     <Card.Body>
                       <div className="metric-title">Perguntas Disponíveis</div>
                       <div className="metric-value">{questionGroups.historic.length}</div>
                       <div className="metric-subtitle">Com histórico comparativo</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={3}>
+                  <Card className="metric-card orange-accent">
+                    <Card.Body>
+                      <div className="metric-title">Filtros Ativos</div>
+                      <div className="metric-value">{Object.keys(filters).length}</div>
+                      <div className="metric-subtitle">
+                        {Object.keys(filters).length === 0 ? "Nenhum filtro aplicado" : "Filtros aplicados"}
+                      </div>
                     </Card.Body>
                   </Card>
                 </Col>
