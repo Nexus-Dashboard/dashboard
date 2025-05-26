@@ -8,7 +8,7 @@ import ApiBase from "../service/ApiBase"
 import { normalizeAnswer, getResponseColor, sortChartData, extractWeight, RESPONSE_ORDER } from "../utils/chartUtils"
 import LoadingState from "../components/LoadingState"
 import ChartDownloadButton from "../components/ChartDownloadButton"
-import BrazilMap from "../components/BrazilMap"
+import InteractiveBrazilMap from "../components/InteractiveBrazilMap"
 import { List } from "react-bootstrap-icons"
 import "./TimelinePage.css"
 
@@ -904,11 +904,12 @@ const TimelinePage = () => {
                 {/* Brazil Map */}
                 <Col lg={6}>
                   {selectedQuestion.key && (
-                    <BrazilMap
-                      responses={allResponsesFlat}
-                      selectedQuestion={selectedQuestion}
-                      onStateClick={handleStateClick}
-                      selectedState={selectedState}
+                    <InteractiveBrazilMap
+                        responses={allResponsesFlat}
+                        selectedQuestion={selectedQuestion}
+                        onStateClick={handleStateClick}
+                        selectedState={selectedState}
+                        filters={filters}
                     />
                   )}
                 </Col>
