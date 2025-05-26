@@ -1,7 +1,7 @@
 import axios from "axios"
 
 const ApiBase = axios.create({
-  baseURL: "http://localhost:4000" || "http://localhost:3000",
+  baseURL: "https://api-phi-one-99.vercel.app" || "http://localhost:4000",
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
