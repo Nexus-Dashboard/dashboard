@@ -1,4 +1,4 @@
-// Ordem fixa para as respostas
+// Ordem correta para as respostas (do melhor para o pior)
 export const RESPONSE_ORDER = [
   "Ótimo",
   "Bom",
@@ -13,32 +13,33 @@ export const RESPONSE_ORDER = [
   "Não respondeu",
 ]
 
-// Mapas de cores para diferentes tipos de respostas - Cores padronizadas
+// Mapas de cores CORRETOS
 export const responseColorMap = {
-  // Respostas positivas (cores frias)
-  Ótimo: "#0088FE", // Azul forte
-  Bom: "#00C49F", // Verde-água
-  "Regular mais para positivo": "#4CAF50", // Verde
+  // Respostas positivas - VERDE
+  Ótimo: "#28a745",
+  Bom: "#28a745",
+  "Regular mais para positivo": "#ffc107",
 
-  // Respostas neutras
-  Regular: "#FFBB28", // Amarelo
+  // Respostas neutras - AMARELO
+  Regular: "#ffc107",
 
-  // Respostas negativas (cores quentes)
-  "Regular mais para negativo": "#FF9800", // Laranja
-  Ruim: "#FF5722", // Laranja escuro
-  Péssimo: "#F44336", // Vermelho
+  // Respostas negativas - VERMELHO
+  "Regular mais para negativo": "#dc3545",
+  Ruim: "#dc3545",
+  Péssimo: "#dc3545",
 
-  // Outros
-  "Não sabe": "#9E9E9E", // Cinza
-  "Não respondeu": "#607D8B", // Azul acinzentado
+  // Outros - CINZA
+  "Não sabe": "#6c757d",
+  "Não respondeu": "#6c757d",
 
-  Aprova: "#3F51B5", // Azul índigo (positivo)
-  Desaprova: "#E91E63", // Rosa (negativo)
+  // Aprovação
+  Aprova: "#28a745",
+  Desaprova: "#dc3545",
 }
 
 // Função para obter cor com base na resposta
 export const getResponseColor = (response) => {
-  return responseColorMap[response] || "#9c27b0" // Roxo para respostas não mapeadas
+  return responseColorMap[response] || "#6c757d"
 }
 
 // Função para normalizar respostas
@@ -55,42 +56,36 @@ export const sortChartData = (chartData) => {
     const indexA = RESPONSE_ORDER.indexOf(a.id)
     const indexB = RESPONSE_ORDER.indexOf(b.id)
 
-    // Se ambos estão na lista de ordem, usar essa ordem
     if (indexA >= 0 && indexB >= 0) {
       return indexA - indexB
     }
 
-    // Se apenas um está na lista, priorizar o que está
     if (indexA >= 0) return -1
     if (indexB >= 0) return 1
 
-    // Se nenhum está na lista, manter a ordem alfabética
     return a.id.localeCompare(b.id)
   })
 }
 
 // Função para extrair o peso de uma resposta
 export const extractWeight = (response) => {
-  // Busca uma chave que contenha 'weights' ou 'weight'
   const weightKey = Object.keys(response).find((key) => key.includes("weights") || key.includes("weight"))
 
   if (weightKey && response[weightKey]) {
     const weight = Number.parseFloat(response[weightKey])
-    return isNaN(weight) ? 1 : weight // Valor padrão 1 se não puder ser convertido
+    return isNaN(weight) ? 1 : weight
   }
 
-  return 1 // Padrão se não encontrar peso
+  return 1
 }
 
 // Função para formatar o título da pesquisa
 export const formatSurveyTitle = (survey) => {
   const { name, month, year } = survey
 
-  // Extrair número da pesquisa do nome, se existir
   const surveyNumberMatch = name?.match(/\b(?:survey|pesquisa)\s*(\d+)/i)
   const surveyNumber = surveyNumberMatch ? surveyNumberMatch[1] : ""
 
-  // Formatar como "Survey X Month Year"
   if (surveyNumber && month && year) {
     return `Pesquisa ${surveyNumber} ${month} ${year}`
   } else if (month && year) {
@@ -100,4 +95,58 @@ export const formatSurveyTitle = (survey) => {
   } else {
     return `Pesquisa ${survey._id.substring(0, 6)}`
   }
+}
+
+// Função para agrupar respostas
+export const groupResponses = (response) => {
+  const normalized = normalizeAnswer(response)
+
+  if (["Ótimo", "Bom"].includes(normalized)) {
+    return "Ótimo/Bom"
+  }
+
+  if (["Regular", "Regular mais para positivo", "Regular mais para negativo"].includes(normalized)) {
+    return "Regular"
+  }
+
+  if (["Ruim", "Péssimo"].includes(normalized)) {
+    return "Ruim/Péssimo"
+  }
+
+  if (["Não sabe", "Não respondeu"].includes(normalized)) {
+    return "NS/NR"
+  }
+
+  return normalized
+}
+
+// Função para verificar se uma pergunta deve usar agrupamento
+export const shouldGroupResponses = (responses) => {
+  const uniqueResponses = new Set(responses.map((r) => normalizeAnswer(r)))
+  const groupableResponses = ["Ótimo", "Bom", "Regular", "Ruim", "Péssimo", "Não sabe", "Não respondeu"]
+
+  const hasGroupableResponses = groupableResponses.filter((r) => uniqueResponses.has(r)).length >= 4
+
+  return hasGroupableResponses
+}
+
+// Cores para respostas agrupadas - CORRETAS
+export const groupedResponseColorMap = {
+  "Ótimo/Bom": "#28a745", // Verde
+  Regular: "#ffc107", // Amarelo
+  "Ruim/Péssimo": "#dc3545", // Vermelho
+  "NS/NR": "#6c757d", // Cinza
+  Aprova: "#28a745", // Verde
+  Desaprova: "#dc3545", // Vermelho
+}
+
+// Ordem para respostas agrupadas (do melhor para o pior)
+export const GROUPED_RESPONSE_ORDER = ["Ótimo/Bom", "Regular", "Ruim/Péssimo", "NS/NR", "Aprova", "Desaprova"]
+
+// Função para agregar respostas (mantida para compatibilidade)
+export const aggregateResponses = (answer) => {
+  if (["Ótimo", "Bom"].includes(answer)) return "Ótimo/Bom"
+  if (["Ruim", "Péssimo"].includes(answer)) return "Ruim/Péssimo"
+  if (["Não sabe", "Não respondeu"].includes(answer)) return "NS/NR"
+  return answer
 }

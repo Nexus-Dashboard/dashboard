@@ -411,3 +411,138 @@
     height: 300px !important;
   }
 }
+
+/* Minimal Timeline Page Styles */
+.timeline-page-minimal {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+/* Simple Header */
+.simple-header {
+  background-color: white;
+  border-bottom: 1px solid #e9ecef;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Discrete Stats */
+.discrete-stats {
+  font-size: 0.875rem;
+}
+
+/* Question Selection Minimal */
+.question-selection-minimal {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid var(--bs-primary);
+}
+
+.question-select-minimal {
+  border: 1px solid #ced4da;
+  font-size: 1rem;
+}
+
+.question-select-minimal:focus {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Main Content Row */
+.main-content-row {
+  margin: 0;
+}
+
+/* Chart Column */
+.chart-column {
+  padding-right: 15px;
+}
+
+.chart-container-minimal {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  height: 100%;
+}
+
+.chart-header-minimal {
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+}
+
+.chart-title-minimal {
+  color: #495057;
+  font-weight: 600;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* Map Column */
+.map-column {
+  padding-left: 15px;
+}
+
+/* Empty State */
+.empty-state {
+  background-color: white;
+  border-radius: 8px;
+  margin: 40px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 991.98px) {
+  .chart-column,
+  .map-column {
+    padding-left: 15px;
+    padding-right: 15px;
+    margin-bottom: 20px;
+  }
+
+  .main-content-row {
+    flex-direction: column;
+  }
+
+  .discrete-stats {
+    flex-direction: column;
+    align-items: flex-end !important;
+  }
+
+  .discrete-stats small {
+    margin-bottom: 2px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .simple-header .d-flex {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+
+  .discrete-stats {
+    margin-top: 10px;
+    align-self: flex-start !important;
+  }
+
+  .question-selection-minimal {
+    padding: 15px;
+  }
+
+  .chart-container-minimal {
+    padding: 15px;
+  }
+}
+
+/* Override some existing styles for minimal version */
+.timeline-page-minimal .chart-card {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.timeline-page-minimal .chart-card .card-body {
+  padding: 0;
+}

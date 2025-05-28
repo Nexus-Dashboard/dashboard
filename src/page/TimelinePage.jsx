@@ -1,18 +1,32 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import { Container, Row, Col, Card, Form, Button, Badge, Accordion, Offcanvas } from "react-bootstrap"
+import { useState, useEffect, useMemo, useRef } from "react"
+import { Container, Row, Col, Form, Button, Badge, Collapse } from "react-bootstrap"
 import { ResponsiveLine } from "@nivo/line"
-import { ResponsiveBar } from "@nivo/bar"
 import ApiBase from "../service/ApiBase"
-import { normalizeAnswer, getResponseColor, sortChartData, extractWeight, RESPONSE_ORDER } from "../utils/chartUtils"
+import {
+  normalizeAnswer,
+  getResponseColor,
+  extractWeight,
+  RESPONSE_ORDER,
+  groupResponses,
+  shouldGroupResponses,
+  groupedResponseColorMap,
+  GROUPED_RESPONSE_ORDER,
+} from "../utils/chartUtils"
 import LoadingState from "../components/LoadingState"
-import ChartDownloadButton from "../components/ChartDownloadButton"
 import InteractiveBrazilMap from "../components/InteractiveBrazilMap"
-import { List } from "react-bootstrap-icons"
+import OffcanvasNavigation from "../components/OffcanvasNavigation"
+import ExportButtons from "../components/ExportButtons"
+import { List, BarChart } from "react-bootstrap-icons"
+import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 import "./TimelinePage.css"
+import DemographicCharts from "../components/DemographicCharts"
 
 const TimelinePage = () => {
+  const chartRef = useRef(null)
+
   // State variables
   const [surveys, setSurveys] = useState([])
   const [allResponses, setAllResponses] = useState({})
@@ -24,6 +38,8 @@ const TimelinePage = () => {
   const [availableDemographics, setAvailableDemographics] = useState([])
   const [showOffcanvas, setShowOffcanvas] = useState(false)
   const [selectedState, setSelectedState] = useState(null)
+  const [dateRange, setDateRange] = useState(null)
+  const [showDemographicCharts, setShowDemographicCharts] = useState(false)
 
   // Fetch surveys and responses
   useEffect(() => {
@@ -188,6 +204,12 @@ const TimelinePage = () => {
   const handleClearFilters = () => {
     setFilters({})
     setSelectedState(null)
+    setDateRange(null)
+  }
+
+  // Handle date range changes
+  const handleDateRangeChange = (range) => {
+    setDateRange(range)
   }
 
   // Remove a specific filter
@@ -230,31 +252,66 @@ const TimelinePage = () => {
     }
   }
 
-  // Filter responses based on selected demographic filters
+  // Filter responses based on selected demographic filters and date range
   const filteredResponses = useMemo(() => {
-    if (Object.keys(filters).length === 0) {
-      return allResponses
+    let filtered = { ...allResponses }
+
+    // Apply date range filter first
+    if (dateRange) {
+      const filteredSurveys = surveys.filter((survey) => {
+        const month = survey.month || ""
+        const year = survey.year || ""
+        if (month && year) {
+          const monthMap = {
+            Janeiro: "01",
+            Fevereiro: "02",
+            Março: "03",
+            Abril: "04",
+            Maio: "05",
+            Junho: "06",
+            Julho: "07",
+            Agosto: "08",
+            Setembro: "09",
+            Outubro: "10",
+            Novembro: "11",
+            Dezembro: "12",
+          }
+          const monthNum = monthMap[month] || "01"
+          const surveyDate = `${year}-${monthNum}-01`
+          return surveyDate >= dateRange.start && surveyDate <= dateRange.end
+        }
+        return true
+      })
+
+      // Keep only responses from filtered surveys
+      const filteredSurveyIds = new Set(filteredSurveys.map((s) => s._id))
+      filtered = Object.fromEntries(Object.entries(filtered).filter(([id]) => filteredSurveyIds.has(id)))
     }
 
-    const filtered = {}
+    // Apply demographic filters
+    if (Object.keys(filters).length === 0) {
+      return filtered
+    }
 
-    Object.entries(allResponses).forEach(([surveyId, responses]) => {
-      filtered[surveyId] = responses.filter((response) => {
+    const result = {}
+
+    Object.entries(filtered).forEach(([surveyId, responses]) => {
+      result[surveyId] = responses.filter((response) => {
         return Object.entries(filters).every(([key, values]) => {
           return values.includes(response[key])
         })
       })
     })
 
-    return filtered
-  }, [allResponses, filters])
+    return result
+  }, [allResponses, filters, dateRange, surveys])
 
   // Get all responses as a flat array for the map
   const allResponsesFlat = useMemo(() => {
     return Object.values(filteredResponses).flat()
   }, [filteredResponses])
 
-  // Calculate timeline data
+  // Calculate timeline data with grouping logic
   const timelineData = useMemo(() => {
     if (!selectedQuestion.key || !selectedQuestion.label) return []
 
@@ -265,8 +322,37 @@ const TimelinePage = () => {
 
     if (relevantSurveys.length === 0) return []
 
+    // Apply date range filter to surveys
+    let filteredSurveys = relevantSurveys
+    if (dateRange) {
+      filteredSurveys = relevantSurveys.filter((survey) => {
+        const month = survey.month || ""
+        const year = survey.year || ""
+        if (month && year) {
+          const monthMap = {
+            Janeiro: "01",
+            Fevereiro: "02",
+            Março: "03",
+            Abril: "04",
+            Maio: "05",
+            Junho: "06",
+            Julho: "07",
+            Agosto: "08",
+            Setembro: "09",
+            Outubro: "10",
+            Novembro: "11",
+            Dezembro: "12",
+          }
+          const monthNum = monthMap[month] || "01"
+          const surveyDate = `${year}-${monthNum}-01`
+          return surveyDate >= dateRange.start && surveyDate <= dateRange.end
+        }
+        return true
+      })
+    }
+
     // Sort surveys by date
-    const sortedSurveys = [...relevantSurveys].sort((a, b) => {
+    const sortedSurveys = [...filteredSurveys].sort((a, b) => {
       // First by year
       if (a.year !== b.year) return a.year - b.year
 
@@ -292,6 +378,20 @@ const TimelinePage = () => {
       return aMonth - bMonth
     })
 
+    // Check if we should use response grouping
+    const allActualResponses = new Set()
+    sortedSurveys.forEach((survey) => {
+      const responses = filteredResponses[survey._id] || []
+      responses.forEach((resp) => {
+        const answer = normalizeAnswer(resp[selectedQuestion.key])
+        if (answer) {
+          allActualResponses.add(answer)
+        }
+      })
+    })
+
+    const useGrouping = shouldGroupResponses(Array.from(allActualResponses))
+
     // Process each survey individually
     const surveyResults = sortedSurveys.map((survey) => {
       const responses = filteredResponses[survey._id] || []
@@ -305,18 +405,20 @@ const TimelinePage = () => {
         if (!answer) return
 
         const weight = extractWeight(response)
-        counts[answer] = (counts[answer] || 0) + weight
+
+        // Apply grouping if needed
+        const finalAnswer = useGrouping ? groupResponses(answer) : answer
+
+        counts[finalAnswer] = (counts[finalAnswer] || 0) + weight
         totalWeight += weight
       })
 
       // Calculate percentages
       const result = {
         surveyId: survey._id,
-        // Usar o nome da pesquisa ou criar um identificador único para cada pesquisa
         surveyTitle: survey.name
           ? survey.name.replace("Dicionário de variáveis - ", "")
           : `${survey.month || ""} ${survey.year || ""}`.trim(),
-        // Criar um identificador único para o eixo X que inclua o nome da pesquisa
         date: survey.name
           ? survey.name.replace("Dicionário de variáveis - ", "")
           : `${survey.month || ""} ${survey.year || ""}`.trim(),
@@ -330,9 +432,9 @@ const TimelinePage = () => {
     })
 
     return surveyResults
-  }, [selectedQuestion, surveys, filteredResponses])
+  }, [selectedQuestion, surveys, filteredResponses, dateRange])
 
-  // Prepare line chart data
+  // Prepare line chart data with CORRECT colors and order
   const lineChartData = useMemo(() => {
     if (!timelineData.length) return []
 
@@ -346,99 +448,67 @@ const TimelinePage = () => {
       })
     })
 
-    // Create series for each option
-    const chartData = Array.from(allOptions).map((option) => ({
-      id: option,
-      color: getResponseColor(option),
-      data: timelineData.map((dataPoint) => ({
-        x: dataPoint.date,
-        y: dataPoint[option] || 0,
-        exactValue: dataPoint[option] || 0,
-      })),
-    }))
+    // Determine if we should use grouped colors
+    const useGroupedColors = Array.from(allOptions).some((option) =>
+      ["Ótimo/Bom", "Regular", "Ruim/Péssimo", "NS/NR"].includes(option),
+    )
 
-    // Não precisamos chamar sortChartData aqui, pois já estamos chamando na renderização
-    return chartData
+    // Create series for each option with CORRECT colors
+    const chartData = Array.from(allOptions).map((option) => {
+      // APLICAR CORES CORRETAS DIRETAMENTE
+      let color
+      if (useGroupedColors) {
+        color = groupedResponseColorMap[option] || "#6c757d"
+      } else {
+        color = getResponseColor(option)
+      }
+
+      return {
+        id: option,
+        color: color, // Aplicar cor diretamente
+        data: timelineData.map((dataPoint) => ({
+          x: dataPoint.date,
+          y: dataPoint[option] || 0,
+          exactValue: dataPoint[option] || 0,
+        })),
+      }
+    })
+
+    // Sort using appropriate order (ORDEM CORRETA)
+    const orderToUse = useGroupedColors ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
+    return chartData.sort((a, b) => {
+      const indexA = orderToUse.indexOf(a.id)
+      const indexB = orderToUse.indexOf(b.id)
+
+      if (indexA >= 0 && indexB >= 0) {
+        return indexA - indexB
+      }
+
+      if (indexA >= 0) return -1
+      if (indexB >= 0) return 1
+
+      return a.id.localeCompare(b.id)
+    })
   }, [timelineData])
 
-  // Calculate demographic comparison data for stacked bar charts
-  const demographicComparisonData = useMemo(() => {
-    if (!selectedQuestion.key || !selectedQuestion.label || !surveys.length) return {}
+  // Calculate dynamic Y scale max
+  const dynamicYMax = useMemo(() => {
+    if (!lineChartData.length) return 100
 
-    // Get the most recent survey
-    const sortedSurveys = [...surveys].sort((a, b) => {
-      if (a.year !== b.year) return b.year - a.year
-
-      const monthOrder = {
-        Janeiro: 1,
-        Fevereiro: 2,
-        Março: 3,
-        Abril: 4,
-        Maio: 5,
-        Junho: 6,
-        Julho: 7,
-        Agosto: 8,
-        Setembro: 9,
-        Outubro: 10,
-        Novembro: 11,
-        Dezembro: 12,
-      }
-
-      return monthOrder[b.month] || 0 - (monthOrder[a.month] || 0)
+    // Find the maximum value across all data points
+    let maxValue = 0
+    lineChartData.forEach((series) => {
+      series.data.forEach((point) => {
+        if (point.y > maxValue) {
+          maxValue = point.y
+        }
+      })
     })
 
-    const latestSurvey = sortedSurveys[0]
-    if (!latestSurvey) return {}
-
-    const responses = filteredResponses[latestSurvey._id] || []
-    if (!responses.length) return {}
-
-    // Process demographic data
-    const result = {}
-
-    // Process data for each demographic type
-    availableDemographics.forEach((demographic) => {
-      const { key, label } = demographic
-
-      // Group responses by demographic value
-      const groupedByDemographic = {}
-      const totalsByDemographic = {}
-
-      responses.forEach((response) => {
-        const demographicValue = response[key]
-        if (!demographicValue) return
-
-        const answer = normalizeAnswer(response[selectedQuestion.key])
-        if (!answer) return
-
-        const weight = extractWeight(response)
-
-        groupedByDemographic[demographicValue] = groupedByDemographic[demographicValue] || {}
-        groupedByDemographic[demographicValue][answer] = (groupedByDemographic[demographicValue][answer] || 0) + weight
-        totalsByDemographic[demographicValue] = (totalsByDemographic[demographicValue] || 0) + weight
-      })
-
-      // Calculate percentages and format data for stacked bar chart
-      const chartData = []
-
-      Object.entries(groupedByDemographic).forEach(([demographicValue, answers]) => {
-        const dataPoint = { demographicValue }
-
-        Object.entries(answers).forEach(([answer, count]) => {
-          dataPoint[answer] = Math.round((count / totalsByDemographic[demographicValue]) * 1000) / 10
-        })
-
-        chartData.push(dataPoint)
-      })
-
-      result[key] = {
-        label,
-        data: chartData,
-      }
-    })
-
-    return result
-  }, [selectedQuestion, surveys, filteredResponses, availableDemographics])
+    // Add 20% to the max value, but cap at 100 and ensure minimum of 20
+    const dynamicMax = Math.min(100, Math.max(20, Math.ceil(maxValue * 1.2)))
+    return dynamicMax
+  }, [lineChartData])
 
   // Get all unique answers for the selected question
   const uniqueAnswers = useMemo(() => {
@@ -467,6 +537,70 @@ const TimelinePage = () => {
     return count
   }, [filteredResponses])
 
+  // Calculate dashboard stats
+  const dashboardStats = useMemo(() => {
+    return {
+      totalRespondents: totalRespondents,
+      filteredRespondents: filteredRespondentCount,
+      totalSurveys: surveys.length,
+      totalQuestions: questionGroups.historic.length,
+      activeFilters:
+        Object.values(filters).reduce((count, values) => count + values.length, 0) + (selectedState ? 1 : 0),
+    }
+  }, [
+    totalRespondents,
+    filteredRespondentCount,
+    surveys.length,
+    questionGroups.historic.length,
+    filters,
+    selectedState,
+  ])
+
+  // Export to PDF function
+  const exportToPDF = async () => {
+    if (!chartRef.current) return
+
+    try {
+      const pdf = new jsPDF("l", "mm", "a4")
+
+      // Add title
+      pdf.setFontSize(16)
+      pdf.setFont(undefined, "bold")
+      pdf.text("Dashboard de Pesquisas", 20, 20)
+
+      pdf.setFontSize(12)
+      pdf.setFont(undefined, "normal")
+      pdf.text(selectedQuestion.label || "Dashboard", 20, 30)
+
+      // Add current date
+      pdf.setFontSize(10)
+      pdf.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 20, 40)
+
+      // Capture the chart area
+      const canvas = await html2canvas(chartRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+      })
+
+      const imgData = canvas.toDataURL("image/png")
+
+      // Calculate dimensions to fit the page
+      const imgWidth = 250
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      // Add the chart image
+      pdf.addImage(imgData, "PNG", 20, 50, imgWidth, imgHeight)
+
+      // Save the PDF
+      pdf.save(`dashboard_${selectedQuestion.key || "export"}.pdf`)
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error)
+      alert("Erro ao gerar PDF. Tente novamente.")
+    }
+  }
+
   if (loading) {
     return <LoadingState message="Carregando dados das pesquisas..." />
   }
@@ -489,566 +623,204 @@ const TimelinePage = () => {
   }
 
   return (
-    <div className="timeline-page orange-theme">
-      <Container fluid>
-        <Row>
-          {/* Mobile Filter Button */}
-          <div className="d-md-none filter-button-container">
-            <Button variant="orange" className="filter-toggle-btn" onClick={() => setShowOffcanvas(true)}>
-              <List size={20} className="me-2" /> Filtros
-            </Button>
+    <div className="timeline-page-minimal">
+      {/* Offcanvas Navigation */}
+      <OffcanvasNavigation
+        show={showOffcanvas}
+        onHide={() => setShowOffcanvas(false)}
+        availableDemographics={availableDemographics}
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onClearFilters={handleClearFilters}
+      />
+
+      {/* Simple Top Bar */}
+      <div className="simple-header">
+        <Container fluid>
+          <div className="d-flex justify-content-between align-items-center py-2">
+            <div className="d-flex align-items-center">
+              <Button variant="outline-primary" size="sm" onClick={() => setShowOffcanvas(true)} className="me-3">
+                <List />
+              </Button>
+              <h5 className="mb-0 text-primary">Dashboard de Pesquisas</h5>
+            </div>
+
+            {/* Discrete Stats */}
+            <div className="discrete-stats d-flex align-items-center">
+              <small className="text-muted me-3">
+                {dashboardStats.filteredRespondents.toLocaleString()} entrevistados
+              </small>
+              <small className="text-muted me-3">{dashboardStats.totalSurveys} pesquisas</small>
+              {dashboardStats.activeFilters > 0 && (
+                <Badge bg="primary" className="me-2">
+                  {dashboardStats.activeFilters} filtro(s)
+                </Badge>
+              )}
+            </div>
           </div>
+        </Container>
+      </div>
 
-          {/* Mobile Offcanvas */}
-          <Offcanvas
-            show={showOffcanvas}
-            onHide={() => setShowOffcanvas(false)}
-            placement="start"
-            className="sidebar-offcanvas"
-          >
-            <Offcanvas.Header closeButton>
-              <Offcanvas.Title>Filtros</Offcanvas.Title>
-            </Offcanvas.Header>
-            <Offcanvas.Body>
-              <div className="sidebar-content">
-                <div className="sidebar-header">
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={handleClearFilters}
-                    disabled={Object.keys(filters).length === 0}
-                  >
-                    Limpar Filtros
-                  </Button>
+      <Container fluid className="px-4 py-3">
+        {/* Question Selection - Simplified */}
+        <div className="question-selection-minimal mb-4">
+          <Row className="align-items-center">
+            <Col md={10}>
+              <Form.Select
+                value={
+                  selectedQuestion.type && selectedQuestion.key
+                    ? `${selectedQuestion.type}||${selectedQuestion.key}||${selectedQuestion.label}`
+                    : ""
+                }
+                onChange={handleQuestionSelect}
+                size="lg"
+                className="question-select-minimal"
+              >
+                <option value="">Selecione uma pergunta para análise</option>
+                {questionGroups.historic.length > 0 && (
+                  <optgroup label="Perguntas com histórico">
+                    {questionGroups.historic.map((q) => (
+                      <option key={`historic-${q.label}`} value={`historic||${q.entries[0].key}||${q.label}`}>
+                        {q.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </Form.Select>
+            </Col>
+            <Col md={2} className="text-end">
+              <ExportButtons chartData={lineChartData} questionLabel={selectedQuestion.label} chartRef={chartRef} />
+            </Col>
+          </Row>
+        </div>
+
+        {/* Main Content - Chart and Map */}
+        {selectedQuestion.label && (
+          <Row className="main-content-row">
+            {/* Chart - 60% */}
+            <Col lg={7} className="chart-column">
+              <div className="chart-container-minimal">
+                <div className="chart-header-minimal">
+                  <h6 className="chart-title-minimal mb-3">{selectedQuestion.label}</h6>
                 </div>
-
-                <Accordion alwaysOpen={false} className="filter-accordion">
-                  {availableDemographics.map((demographic, index) => (
-                    <Accordion.Item key={demographic.key} eventKey={index.toString()}>
-                      <Accordion.Header>
-                        <span className="filter-group-title">
-                          {demographic.label}
-                          {filters[demographic.key]?.length > 0 && (
-                            <Badge bg="primary" pill className="ms-2">
-                              {filters[demographic.key].length}
-                            </Badge>
-                          )}
-                        </span>
-                      </Accordion.Header>
-                      <Accordion.Body>
-                        <div className="filter-options">
-                          <Form>
-                            {demographic.values.map((value) => (
-                              <Form.Check
-                                key={`${demographic.key}-${value}`}
-                                type="checkbox"
-                                id={`mobile-${demographic.key}-${value}`}
-                                label={value}
-                                checked={(filters[demographic.key] || []).includes(value)}
-                                onChange={(e) => handleFilterChange(demographic.key, value, e.target.checked)}
-                              />
-                            ))}
-                          </Form>
-                        </div>
-                      </Accordion.Body>
-                    </Accordion.Item>
-                  ))}
-                </Accordion>
-              </div>
-            </Offcanvas.Body>
-          </Offcanvas>
-
-          {/* Desktop Sidebar */}
-          <Col md={3} lg={2} className="sidebar-container d-none d-md-block">
-            <div className="sidebar">
-              <div className="sidebar-header">
-                <h4>Filtros</h4>
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={handleClearFilters}
-                  disabled={Object.keys(filters).length === 0}
-                >
-                  Limpar Filtros
-                </Button>
-              </div>
-
-              <Accordion alwaysOpen={false} className="filter-accordion">
-                {availableDemographics.map((demographic, index) => (
-                  <Accordion.Item key={demographic.key} eventKey={index.toString()}>
-                    <Accordion.Header>
-                      <span className="filter-group-title">
-                        {demographic.label}
-                        {filters[demographic.key]?.length > 0 && (
-                          <Badge bg="primary" pill className="ms-2">
-                            {filters[demographic.key].length}
-                          </Badge>
-                        )}
-                      </span>
-                    </Accordion.Header>
-                    <Accordion.Body>
-                      <div className="filter-options">
-                        <Form>
-                          {demographic.values.map((value) => (
-                            <Form.Check
-                              key={`${demographic.key}-${value}`}
-                              type="checkbox"
-                              id={`${demographic.key}-${value}`}
-                              label={value}
-                              checked={(filters[demographic.key] || []).includes(value)}
-                              onChange={(e) => handleFilterChange(demographic.key, value, e.target.checked)}
-                            />
-                          ))}
-                        </Form>
-                      </div>
-                    </Accordion.Body>
-                  </Accordion.Item>
-                ))}
-              </Accordion>
-            </div>
-          </Col>
-
-          <Col md={9} lg={10} className="content-container">
-            <div className="content">
-              <div className="page-header orange-gradient">
-                <h1 className="page-title">Dashboard de Pesquisas</h1>
-                <p className="page-subtitle">Análise de tendências ao longo do tempo</p>
-              </div>
-
-              {/* Active Filters */}
-              {Object.keys(filters).length > 0 && (
-                <div className="active-filters mb-4">
-                  <div className="d-flex align-items-center mb-2">
-                    <h5 className="active-filters-title me-2">Filtros Ativos:</h5>
-                    <Button variant="link" size="sm" className="clear-all-btn p-0" onClick={handleClearFilters}>
-                      Limpar todos
-                    </Button>
-                  </div>
-                  <div className="filter-badges">
-                    {Object.entries(filters).map(([key, values]) => {
-                      if (values.length === 0) return null
-
-                      const demographic = availableDemographics.find((d) => d.key === key)
-                      const label = demographic?.label || key
-
-                      return (
-                        <Badge key={key} bg="light" text="dark" className="filter-badge">
-                          <span className="filter-name">{label}:</span>
-                          <span className="filter-values">{values.join(", ")}</span>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="remove-filter-btn"
-                            onClick={() => handleRemoveFilter(key)}
-                          >
-                            <span aria-hidden="true">&times;</span>
-                          </Button>
-                        </Badge>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Metric Cards */}
-              <Row className="mb-4">
-                <Col md={3}>
-                  <Card className="metric-card orange-accent">
-                    <Card.Body>
-                      <div className="metric-title">Total de Entrevistados</div>
-                      <div className="metric-value">{totalRespondents.toLocaleString()}</div>
-                      <div className="metric-subtitle">
-                        {Object.keys(filters).length > 0 ? (
-                          <>
-                            <span className="filtered-count">{filteredRespondentCount.toLocaleString()}</span> após
-                            filtros
-                          </>
-                        ) : (
-                          "Todas as pesquisas"
-                        )}
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="metric-card orange-accent">
-                    <Card.Body>
-                      <div className="metric-title">Pesquisas Realizadas</div>
-                      <div className="metric-value">{surveys.length}</div>
-                      <div className="metric-subtitle">
-                        {surveys.length > 0
-                          ? `${surveys[0].month} ${surveys[0].year} - ${surveys[surveys.length - 1].month} ${surveys[surveys.length - 1].year}`
-                          : ""}
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="metric-card orange-accent">
-                    <Card.Body>
-                      <div className="metric-title">Perguntas Disponíveis</div>
-                      <div className="metric-value">{questionGroups.historic.length}</div>
-                      <div className="metric-subtitle">Com histórico comparativo</div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={3}>
-                  <Card className="metric-card orange-accent">
-                    <Card.Body>
-                      <div className="metric-title">Filtros Ativos</div>
-                      <div className="metric-value">{Object.keys(filters).length}</div>
-                      <div className="metric-subtitle">
-                        {Object.keys(filters).length === 0 ? "Nenhum filtro aplicado" : "Filtros aplicados"}
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              </Row>
-
-              {/* Question Selection */}
-              <Row className="mb-4">
-                <Col>
-                  <Form.Group>
-                    <Form.Label className="fw-bold">Selecione uma pergunta:</Form.Label>
-                    <Form.Select
-                      value={
-                        selectedQuestion.type && selectedQuestion.key
-                          ? `${selectedQuestion.type}||${selectedQuestion.key}||${selectedQuestion.label}`
-                          : ""
-                      }
-                      onChange={handleQuestionSelect}
-                      className="question-select"
-                    >
-                      <option value="">Selecione uma pergunta</option>
-
-                      {questionGroups.historic.length > 0 && (
-                        <optgroup label="Perguntas com histórico">
-                          {questionGroups.historic.map((q) => (
-                            <option key={`historic-${q.label}`} value={`historic||${q.entries[0].key}||${q.label}`}>
-                              {q.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-              </Row>
-
-              {selectedQuestion.label && (
-                <Row className="mb-3">
-                  <Col>
-                    <Card className="question-card">
-                      <Card.Body>
-                        <h3 className="question-title">{selectedQuestion.label}</h3>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                </Row>
-              )}
-
-              {/* Timeline Chart and Brazil Map */}
-              <Row className="mb-4">
-                <Col lg={6}>
-                  <Card className="chart-card">
-                    <Card.Body>
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <h4 className="chart-title">Evolução Temporal</h4>
-                        {lineChartData.length > 0 && (
-                          <ChartDownloadButton
-                            chartData={lineChartData}
-                            filename={`evolucao-${selectedQuestion.key}`}
-                            questionLabel={selectedQuestion.label}
-                          />
-                        )}
-                      </div>
-                      <div className="chart-container" style={{ height: 400 }}>
-                        {lineChartData.length > 0 ? (
-                          <ResponsiveLine
-                            data={sortChartData(lineChartData)}
-                            margin={{ top: 50, right: 110, bottom: 50, left: 60 }}
-                            colors={(serie) => getResponseColor(serie.id)}
-                            xScale={{ type: "point" }}
-                            yScale={{
-                              type: "linear",
-                              min: 0,
-                              // Escala dinâmica: 10% a mais que o valor máximo ou 100%, o que for menor
-                              max: Math.min(
-                                100,
-                                Math.ceil(
-                                  Math.max(...lineChartData.flatMap((series) => series.data.map((d) => d.y))) * 1.1,
-                                ),
-                              ),
-                              stacked: false,
-                              reverse: false,
-                            }}
-                            yFormat=" >-.1f"
-                            curve="monotoneX"
-                            axisTop={null}
-                            axisRight={null}
-                            axisBottom={{
-                              tickSize: 5,
-                              tickPadding: 5,
-                              tickRotation: -15, // Rotacionar os rótulos para melhor legibilidade
-                              legendOffset: 36,
-                              legendPosition: "middle",
-                            }}
-                            axisLeft={{
-                              tickSize: 5,
-                              tickPadding: 5,
-                              tickRotation: 0,
-                              legend: "Porcentagem (%)",
-                              legendOffset: -40,
-                              legendPosition: "middle",
-                            }}
-                            enableGridX={false}
-                            enableGridY={true}
-                            pointSize={10}
-                            pointColor={{ theme: "background" }}
-                            pointBorderWidth={2}
-                            pointBorderColor={{ from: "serieColor" }}
-                            pointLabelYOffset={-12}
-                            enablePointLabel={true}
-                            pointLabel={(d) => `${d.data.exactValue}%`}
-                            useMesh={true}
-                            legends={[
-                              {
-                                anchor: "right",
-                                direction: "column",
-                                justify: false,
-                                translateX: 100,
-                                translateY: 0,
-                                itemsSpacing: 10,
-                                itemDirection: "left-to-right",
-                                itemWidth: 80,
-                                itemHeight: 20,
-                                itemOpacity: 0.75,
-                                symbolSize: 12,
-                                symbolShape: "circle",
-                                symbolBorderColor: "rgba(0, 0, 0, .5)",
-                                effects: [
-                                  {
-                                    on: "hover",
-                                    style: {
-                                      itemBackground: "rgba(0, 0, 0, .03)",
-                                      itemOpacity: 1,
-                                    },
-                                  },
-                                ],
-                              },
-                            ]}
-                            theme={{
-                              tooltip: {
-                                container: {
-                                  boxShadow: "0 4px 10px rgba(0, 0, 0, 0.15)",
-                                },
-                              },
-                            }}
-                            lineWidth={3}
-                            enableSlices="x"
-                            sliceTooltip={({ slice }) => (
-                              <div
-                                style={{
-                                  background: "white",
-                                  padding: "9px 12px",
-                                  border: "1px solid #ccc",
-                                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                                  borderRadius: "4px",
-                                }}
-                              >
-                                <div style={{ marginBottom: "5px", fontWeight: "bold" }}>{slice.points[0].data.x}</div>
-                                {slice.points.map((point) => (
-                                  <div
-                                    key={point.id}
-                                    style={{
-                                      color: point.serieColor,
-                                      padding: "3px 0",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "space-between",
-                                    }}
-                                  >
-                                    <span style={{ marginRight: "10px" }}>{point.serieId}</span>
-                                    <span style={{ fontWeight: "bold" }}>{point.data.exactValue}%</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            defs={[
-                              {
-                                id: "lineGradient",
-                                type: "linearGradient",
-                                colors: [
-                                  { offset: 0, color: "inherit", opacity: 0.6 },
-                                  { offset: 100, color: "inherit", opacity: 0 },
-                                ],
-                              },
-                            ]}
-                            fill={[{ match: "*", id: "lineGradient" }]}
-                            layers={[
-                              "grid",
-                              "markers",
-                              "axes",
-                              "areas",
-                              "crosshair",
-                              "lines",
-                              "points",
-                              "slices",
-                              "mesh",
-                              "legends",
-                            ]}
-                          />
-                        ) : (
-                          <div className="text-center py-5">
-                            <p className="text-muted">
-                              {selectedQuestion.label
-                                ? "Não há dados suficientes para exibir este gráfico."
-                                : "Selecione uma pergunta para visualizar os dados."}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-
-                {/* Brazil Map */}
-                <Col lg={6}>
-                  {selectedQuestion.key && (
-                    <InteractiveBrazilMap
-                        responses={allResponsesFlat}
-                        selectedQuestion={selectedQuestion}
-                        onStateClick={handleStateClick}
-                        selectedState={selectedState}
-                        filters={filters}
+                <div ref={chartRef} style={{ height: "500px" }}>
+                  {lineChartData.length ? (
+                    <ResponsiveLine
+                      data={lineChartData}
+                      margin={{ top: 50, right: 110, bottom: 50, left: 60 }}
+                      xScale={{ type: "point" }}
+                      yScale={{ type: "linear", min: 0, max: dynamicYMax }}
+                      yFormat=" >-.1f"
+                      curve="monotoneX"
+                      axisBottom={{
+                        tickSize: 5,
+                        tickPadding: 5,
+                        tickRotation: 0,
+                        legend: "Período",
+                        legendOffset: 36,
+                        legendPosition: "middle",
+                      }}
+                      axisLeft={{
+                        tickSize: 5,
+                        tickPadding: 5,
+                        tickRotation: 0,
+                        legend: "Porcentagem (%)",
+                        legendOffset: -40,
+                        legendPosition: "middle",
+                      }}
+                      enableGridX={false}
+                      enableGridY={true}
+                      pointSize={8}
+                      pointColor={{ theme: "background" }}
+                      pointBorderWidth={2}
+                      pointBorderColor={{ from: "serieColor" }}
+                      enablePointLabel={true}
+                      pointLabel={(d) => `${d.data.exactValue}%`}
+                      useMesh={true}
+                      legends={[
+                        {
+                          anchor: "right",
+                          direction: "column",
+                          justify: false,
+                          translateX: 100,
+                          translateY: 0,
+                          itemsSpacing: 8,
+                          itemDirection: "left-to-right",
+                          itemWidth: 80,
+                          itemHeight: 18,
+                          itemOpacity: 0.75,
+                          symbolSize: 10,
+                          symbolShape: "circle",
+                        },
+                      ]}
+                      motionConfig="gentle"
                     />
+                  ) : (
+                    <div className="d-flex justify-content-center align-items-center h-100">
+                      <p className="text-muted">Não há dados suficientes para exibir este gráfico.</p>
+                    </div>
                   )}
-                </Col>
-              </Row>
+                </div>
+              </div>
+            </Col>
 
-              {/* Demographic Comparison Charts */}
-              <h4 className="section-title mb-3">Comparativos Demográficos</h4>
+            {/* Map - 40% */}
+            <Col lg={5} className="map-column">
+              <InteractiveBrazilMap
+                responses={allResponsesFlat}
+                selectedQuestion={selectedQuestion}
+                onStateClick={handleStateClick}
+                selectedState={selectedState}
+                filters={filters}
+              />
+            </Col>
+          </Row>
+        )}
 
-              {Object.entries(demographicComparisonData).map(([key, { label, data }]) => (
-                <Row key={key} className="mb-4">
-                  <Col>
-                    <Card className="chart-card">
-                      <Card.Body>
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                          <h4 className="chart-title">
-                            {selectedQuestion.key} vs {label}
-                          </h4>
-                          <ChartDownloadButton
-                            chartData={data}
-                            filename={`${selectedQuestion.key}-por-${key}`}
-                            questionLabel={selectedQuestion.label}
-                          />
-                        </div>
-                        <div className="chart-container" style={{ height: 400 }}>
-                          {data.length > 0 ? (
-                            <ResponsiveBar
-                              data={data}
-                              keys={uniqueAnswers.sort((a, b) => {
-                                const indexA = RESPONSE_ORDER.indexOf(a)
-                                const indexB = RESPONSE_ORDER.indexOf(b)
+        {/* Demographic Charts Section - Collapsible */}
+        {selectedQuestion.label && (
+          <div className="demographic-charts-section mt-4">
+            <Button
+              variant="outline-secondary"
+              onClick={() => setShowDemographicCharts(!showDemographicCharts)}
+              aria-controls="demographic-charts-collapse"
+              aria-expanded={showDemographicCharts}
+              className="mb-3 d-flex align-items-center"
+            >
+              <BarChart className="me-2" />
+              Análise Demográfica
+              <Badge bg="secondary" className="ms-2">
+                {availableDemographics.filter((d) => d.values.length > 0).length}
+              </Badge>
+            </Button>
 
-                                // Se ambos estão na lista de ordem, usar essa ordem
-                                if (indexA >= 0 && indexB >= 0) {
-                                  return indexA - indexB
-                                }
+            <Collapse in={showDemographicCharts}>
+              <div id="demographic-charts-collapse">
+                {showDemographicCharts && (
+                  <DemographicCharts
+                    selectedQuestion={selectedQuestion}
+                    surveys={surveys}
+                    filteredResponses={filteredResponses}
+                    availableDemographics={availableDemographics}
+                  />
+                )}
+              </div>
+            </Collapse>
+          </div>
+        )}
 
-                                // Se apenas um está na lista, priorizar o que está
-                                if (indexA >= 0) return -1
-                                if (indexB >= 0) return 1
-
-                                // Se nenhum está na lista, manter a ordem alfabética
-                                return a.localeCompare(b)
-                              })}
-                              indexBy="demographicValue"
-                              margin={{ top: 50, right: 130, bottom: 50, left: 60 }}
-                              padding={0.3}
-                              groupMode="stacked"
-                              valueScale={{
-                                type: "linear",
-                                // Escala fixa em 100%
-                                max: 100,
-                                min: 0,
-                              }}
-                              indexScale={{ type: "band", round: true }}
-                              colors={(bar) => getResponseColor(bar.id)}
-                              borderColor={{ from: "color", modifiers: [["darker", 1.6]] }}
-                              axisTop={null}
-                              axisRight={null}
-                              axisBottom={{
-                                tickSize: 5,
-                                tickPadding: 5,
-                                tickRotation: 0,
-                                legend: label,
-                                legendPosition: "middle",
-                                legendOffset: 32,
-                              }}
-                              axisLeft={{
-                                tickSize: 5,
-                                tickPadding: 5,
-                                tickRotation: 0,
-                                legend: "Porcentagem (%)",
-                                legendPosition: "middle",
-                                legendOffset: -40,
-                              }}
-                              labelFormat={(value) => `${value}%`}
-                              labelSkipWidth={12}
-                              labelSkipHeight={12}
-                              labelTextColor={{ from: "color", modifiers: [["darker", 1.6]] }}
-                              legends={[
-                                {
-                                  dataFrom: "keys",
-                                  anchor: "bottom-right",
-                                  direction: "column",
-                                  justify: false,
-                                  translateX: 120,
-                                  translateY: 0,
-                                  itemsSpacing: 2,
-                                  itemWidth: 100,
-                                  itemHeight: 20,
-                                  itemDirection: "left-to-right",
-                                  itemOpacity: 0.85,
-                                  symbolSize: 20,
-                                  effects: [
-                                    {
-                                      on: "hover",
-                                      style: {
-                                        itemOpacity: 1,
-                                      },
-                                    },
-                                  ],
-                                },
-                              ]}
-                              theme={{
-                                tooltip: {
-                                  container: {
-                                    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.15)",
-                                  },
-                                },
-                              }}
-                            />
-                          ) : (
-                            <div className="text-center py-5">
-                              <p className="text-muted">
-                                {selectedQuestion.label
-                                  ? "Não há dados suficientes para exibir este gráfico."
-                                  : "Selecione uma pergunta para visualizar os dados."}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                </Row>
-              ))}
+        {/* Empty state when no question selected */}
+        {!selectedQuestion.label && (
+          <div className="empty-state text-center py-5">
+            <div className="text-muted">
+              <h5>Selecione uma pergunta para começar a análise</h5>
+              <p>
+                Escolha uma pergunta no menu acima para visualizar a evolução temporal e distribuição geográfica dos
+                dados.
+              </p>
             </div>
-          </Col>
-        </Row>
+          </div>
+        )}
       </Container>
     </div>
   )
