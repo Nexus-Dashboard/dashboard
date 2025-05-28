@@ -1,4 +1,4 @@
-// Ordem correta para as respostas (do melhor para o pior)
+// Ordem correta para as respostas (do melhor para o pior) - PARA LEGENDAS
 export const RESPONSE_ORDER = [
   "Ótimo",
   "Bom",
@@ -140,7 +140,7 @@ export const groupedResponseColorMap = {
   Desaprova: "#dc3545", // Vermelho
 }
 
-// Ordem para respostas agrupadas (do melhor para o pior)
+// Ordem para respostas agrupadas (do melhor para o pior) - CORRIGIDA PARA LEGENDAS
 export const GROUPED_RESPONSE_ORDER = ["Ótimo/Bom", "Regular", "Ruim/Péssimo", "NS/NR", "Aprova", "Desaprova"]
 
 // Função para agregar respostas (mantida para compatibilidade)

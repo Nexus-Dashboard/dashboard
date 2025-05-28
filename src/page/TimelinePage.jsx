@@ -446,7 +446,7 @@ const TimelinePage = () => {
           allOptions.add(key)
         }
       })
-    })
+    })   
 
     // Determine if we should use grouped colors
     const useGroupedColors = Array.from(allOptions).some((option) =>
@@ -455,7 +455,7 @@ const TimelinePage = () => {
 
     // Create series for each option with CORRECT colors
     const chartData = Array.from(allOptions).map((option) => {
-      // APLICAR CORES CORRETAS DIRETAMENTE
+      // APLICAR CORES CORRETAS usando as funções do chartUtils
       let color
       if (useGroupedColors) {
         color = groupedResponseColorMap[option] || "#6c757d"
@@ -465,7 +465,7 @@ const TimelinePage = () => {
 
       return {
         id: option,
-        color: color, // Aplicar cor diretamente
+        color: color,
         data: timelineData.map((dataPoint) => ({
           x: dataPoint.date,
           y: dataPoint[option] || 0,
@@ -474,22 +474,60 @@ const TimelinePage = () => {
       }
     })
 
-    // Sort using appropriate order (ORDEM CORRETA)
+    // Sort using appropriate order - APLICAR ORDENAÇÃO CORRETA PARA LEGENDAS
     const orderToUse = useGroupedColors ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
-    return chartData.sort((a, b) => {
-      const indexA = orderToUse.indexOf(a.id)
-      const indexB = orderToUse.indexOf(b.id)
 
-      if (indexA >= 0 && indexB >= 0) {
-        return indexA - indexB
+    // Primeiro, separar os itens que estão na ordem definida dos que não estão
+    const itemsInOrder = []
+    const itemsNotInOrder = []
+
+    chartData.forEach((item) => {
+      const index = orderToUse.indexOf(item.id)
+      if (index !== -1) {
+        itemsInOrder.push({ ...item, orderIndex: index })
+      } else {
+        itemsNotInOrder.push(item)
       }
-
-      if (indexA >= 0) return -1
-      if (indexB >= 0) return 1
-
-      return a.id.localeCompare(b.id)
     })
+
+    // Ordenar os itens que estão na ordem definida
+    itemsInOrder.sort((a, b) => a.orderIndex - b.orderIndex)
+
+    // Ordenar os itens que não estão na ordem alfabeticamente
+    itemsNotInOrder.sort((a, b) => a.id.localeCompare(b.id))
+
+    // Combinar: primeiro os da ordem definida, depois os outros
+    const sortedChartData = [
+      ...itemsInOrder.map((item) => ({ id: item.id, color: item.color, data: item.data })),
+      ...itemsNotInOrder,
+    ]
+
+    console.log("Order used:", orderToUse)
+    console.log(
+      "Items in order:",
+      itemsInOrder.map((d) => ({ id: d.id, orderIndex: d.orderIndex })),
+    )
+    console.log(
+      "Final chart data order:",
+      sortedChartData.map((d, i) => ({
+        position: i,
+        id: d.id,
+        color: d.color,
+      })),
+    )
+
+    return sortedChartData
   }, [timelineData])
+
+  const legendData = useMemo(
+      () =>
+        lineChartData.map(({ id, color }) => ({
+          id,
+          label: id,
+          color,
+        })),
+      [lineChartData]
+    )
 
   // Calculate dynamic Y scale max
   const dynamicYMax = useMemo(() => {
@@ -712,6 +750,7 @@ const TimelinePage = () => {
                       yScale={{ type: "linear", min: 0, max: dynamicYMax }}
                       yFormat=" >-.1f"
                       curve="monotoneX"
+                      colors={(serie) => serie.color}
                       axisBottom={{
                         tickSize: 5,
                         tickPadding: 5,
@@ -739,6 +778,7 @@ const TimelinePage = () => {
                       useMesh={true}
                       legends={[
                         {
+                          data: legendData,       // <-- aqui usamos o array explícito
                           anchor: "right",
                           direction: "column",
                           justify: false,

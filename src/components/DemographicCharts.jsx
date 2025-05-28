@@ -110,6 +110,16 @@ const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, avail
       {Object.entries(demographicComparisonData).map(([key, { label, data }]) => {
         if (!data.length) return null
 
+        // 1) ordena as barras pelo filtro
+        const orderOfValues = availableDemographics
+            .find((d) => d.key === key)
+            .values
+        const sortedData = data.slice().sort(
+            (a, b) =>
+            orderOfValues.indexOf(a.demographicValue) -
+            orderOfValues.indexOf(b.demographicValue)
+        )
+
         // Get all unique answers for consistent colors
         const allAnswers = new Set()
         data.forEach((item) => {
@@ -125,21 +135,40 @@ const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, avail
           ["Ótimo/Bom", "Regular", "Ruim/Péssimo", "NS/NR"].includes(answer),
         )
 
-        // Sort answers using appropriate order (ORDEM CORRETA)
+        // Sort answers using appropriate order - ORDEM CORRETA PARA LEGENDAS
         const orderToUse = useGroupedColors ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
-        const sortedAnswers = Array.from(allAnswers).sort((a, b) => {
-          const indexA = orderToUse.indexOf(a)
-          const indexB = orderToUse.indexOf(b)
 
-          if (indexA >= 0 && indexB >= 0) {
-            return indexA - indexB
+        // Primeiro, separar os itens que estão na ordem definida dos que não estão
+        const itemsInOrder = []
+        const itemsNotInOrder = []
+
+        Array.from(allAnswers).forEach((answer) => {
+          const index = orderToUse.indexOf(answer)
+          if (index !== -1) {
+            itemsInOrder.push({ answer, orderIndex: index })
+          } else {
+            itemsNotInOrder.push(answer)
           }
-
-          if (indexA >= 0) return -1
-          if (indexB >= 0) return 1
-
-          return a.localeCompare(b)
         })
+
+        // Ordenar os itens que estão na ordem definida
+        itemsInOrder.sort((a, b) => a.orderIndex - b.orderIndex)
+
+        // Ordenar os itens que não estão na ordem alfabeticamente
+        itemsNotInOrder.sort((a, b) => a.localeCompare(b))
+
+        // Combinar: primeiro os da ordem definida, depois os outros
+        const sortedAnswers = [
+        ...itemsInOrder.map((item) => item.answer),
+        ...itemsNotInOrder,
+        ]
+        const legendData = sortedAnswers.map((answer) => ({
+        id: answer,
+        label: answer,
+        color: useGroupedColors
+            ? groupedResponseColorMap[answer] || "#6c757d"
+            : getResponseColor(answer),
+        }))
 
         return (
           <Col lg={6} key={key} className="mb-4">
@@ -150,7 +179,7 @@ const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, avail
               <Card.Body>
                 <div style={{ height: "300px" }}>
                   <ResponsiveBar
-                    data={data}
+                    data={sortedData}              // <-- use sortedData
                     keys={sortedAnswers}
                     indexBy="demographicValue"
                     margin={{ top: 20, right: 130, bottom: 50, left: 60 }}
@@ -187,8 +216,8 @@ const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, avail
                     labelSkipHeight={12}
                     labelTextColor={{ from: "color", modifiers: [["darker", 1.6]] }}
                     legends={[
-                      {
-                        dataFrom: "keys",
+                    {
+                        data: legendData,      // <-- usamos o array explícito
                         anchor: "right",
                         direction: "column",
                         justify: false,
@@ -200,7 +229,7 @@ const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, avail
                         itemDirection: "left-to-right",
                         itemOpacity: 0.85,
                         symbolSize: 12,
-                      },
+                    },
                     ]}
                     animate={true}
                     motionStiffness={90}
