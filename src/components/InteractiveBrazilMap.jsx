@@ -214,14 +214,14 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       })
       .on("mouseout", function () {
         setHoveredState(null)
-        setTooltip((prev) => ({ ...prev, visible: false, data: null })) // Limpar data também
+        setTooltip((prev) => ({ ...prev, visible: false, data: null }))
         d3.select(this).attr("opacity", 1)
       })
       .on("click", (event, d) => {
         const stateId = d.properties.sigla
         const stateFullName = ABBR_TO_STATE_NAMES[stateId] || stateId
         if (onStateClick) {
-          onStateClick(stateFullName) // Passar o nome completo do estado
+          onStateClick(stateFullName)
         }
       })
 
@@ -231,7 +231,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
         geoData.features.filter((d) => {
           const bounds = path.bounds(d)
           const area = (bounds[1][0] - bounds[0][0]) * (bounds[1][1] - bounds[0][1])
-          return area > 1000 // Only show labels for larger states
+          return area > 1000
         }),
       )
       .enter()
@@ -245,7 +245,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .attr("fill", "#2c3e50")
       .attr("pointer-events", "none")
       .text((d) => d.properties.sigla)
-  }, [geoData, mapData, hoveredState, selectedState])
+  }, [geoData, mapData, hoveredState, selectedState, onStateClick])
 
   // Generate legend data - com ordem correta
   const legendData = useMemo(() => {

@@ -19,8 +19,6 @@ import InteractiveBrazilMap from "../components/InteractiveBrazilMap"
 import OffcanvasNavigation from "../components/OffcanvasNavigation"
 import ExportButtons from "../components/ExportButtons"
 import { List, BarChart } from "react-bootstrap-icons"
-import jsPDF from "jspdf"
-import html2canvas from "html2canvas"
 import "./TimelinePage.css"
 import DemographicCharts from "../components/DemographicCharts"
 
@@ -208,22 +206,22 @@ const TimelinePage = () => {
   }
 
   // Handle date range changes
-  const handleDateRangeChange = (range) => {
-    setDateRange(range)
-  }
+  // const handleDateRangeChange = (range) => {
+  //   setDateRange(range)
+  // }
 
   // Remove a specific filter
-  const handleRemoveFilter = (key) => {
-    setFilters((prevFilters) => {
-      const newFilters = { ...prevFilters }
-      delete newFilters[key]
-      return newFilters
-    })
+  // const handleRemoveFilter = (key) => {
+  //   setFilters((prevFilters) => {
+  //     const newFilters = { ...prevFilters }
+  //     delete newFilters[key]
+  //     return newFilters
+  //   })
 
-    if (key === "UF") {
-      setSelectedState(null)
-    }
-  }
+  //   if (key === "UF") {
+  //     setSelectedState(null)
+  //   }
+  // }
 
   // Handle state click on map
   const handleStateClick = (state) => {
@@ -446,7 +444,7 @@ const TimelinePage = () => {
           allOptions.add(key)
         }
       })
-    })   
+    })
 
     // Determine if we should use grouped colors
     const useGroupedColors = Array.from(allOptions).some((option) =>
@@ -520,14 +518,14 @@ const TimelinePage = () => {
   }, [timelineData])
 
   const legendData = useMemo(
-      () =>
-        lineChartData.map(({ id, color }) => ({
-          id,
-          label: id,
-          color,
-        })),
-      [lineChartData]
-    )
+    () =>
+      lineChartData.map(({ id, color }) => ({
+        id,
+        label: id,
+        color,
+      })),
+    [lineChartData],
+  )
 
   // Calculate dynamic Y scale max
   const dynamicYMax = useMemo(() => {
@@ -549,22 +547,22 @@ const TimelinePage = () => {
   }, [lineChartData])
 
   // Get all unique answers for the selected question
-  const uniqueAnswers = useMemo(() => {
-    const answers = new Set()
+  // const uniqueAnswers = useMemo(() => {
+  //   const answers = new Set()
 
-    if (selectedQuestion.key) {
-      Object.values(filteredResponses).forEach((responses) => {
-        responses.forEach((response) => {
-          const answer = normalizeAnswer(response[selectedQuestion.key])
-          if (answer) {
-            answers.add(answer)
-          }
-        })
-      })
-    }
+  //   if (selectedQuestion.key) {
+  //     Object.values(filteredResponses).forEach((responses) => {
+  //       responses.forEach((response) => {
+  //         const answer = normalizeAnswer(response[selectedQuestion.key])
+  //         if (answer) {
+  //           answers.add(answer)
+  //         }
+  //       })
+  //     })
+  //   }
 
-    return Array.from(answers)
-  }, [selectedQuestion, filteredResponses])
+  //   return Array.from(answers)
+  // }, [selectedQuestion, filteredResponses])
 
   // Calculate filtered respondent count
   const filteredRespondentCount = useMemo(() => {
@@ -595,49 +593,49 @@ const TimelinePage = () => {
   ])
 
   // Export to PDF function
-  const exportToPDF = async () => {
-    if (!chartRef.current) return
+  // const exportToPDF = async () => {
+  //   if (!chartRef.current) return
 
-    try {
-      const pdf = new jsPDF("l", "mm", "a4")
+  //   try {
+  //     const pdf = new jsPDF("l", "mm", "a4")
 
-      // Add title
-      pdf.setFontSize(16)
-      pdf.setFont(undefined, "bold")
-      pdf.text("Dashboard de Pesquisas", 20, 20)
+  //     // Add title
+  //     pdf.setFontSize(16)
+  //     pdf.setFont(undefined, "bold")
+  //     pdf.text("Dashboard de Pesquisas", 20, 20)
 
-      pdf.setFontSize(12)
-      pdf.setFont(undefined, "normal")
-      pdf.text(selectedQuestion.label || "Dashboard", 20, 30)
+  //     pdf.setFontSize(12)
+  //     pdf.setFont(undefined, "normal")
+  //     pdf.text(selectedQuestion.label || "Dashboard", 20, 30)
 
-      // Add current date
-      pdf.setFontSize(10)
-      pdf.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 20, 40)
+  //     // Add current date
+  //     pdf.setFontSize(10)
+  //     pdf.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 20, 40)
 
-      // Capture the chart area
-      const canvas = await html2canvas(chartRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
-      })
+  //     // Capture the chart area
+  //     const canvas = await html2canvas(chartRef.current, {
+  //       scale: 2,
+  //       useCORS: true,
+  //       allowTaint: true,
+  //       backgroundColor: "#ffffff",
+  //     })
 
-      const imgData = canvas.toDataURL("image/png")
+  //     const imgData = canvas.toDataURL("image/png")
 
-      // Calculate dimensions to fit the page
-      const imgWidth = 250
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
+  //     // Calculate dimensions to fit the page
+  //     const imgWidth = 250
+  //     const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-      // Add the chart image
-      pdf.addImage(imgData, "PNG", 20, 50, imgWidth, imgHeight)
+  //     // Add the chart image
+  //     pdf.addImage(imgData, "PNG", 20, 50, imgWidth, imgHeight)
 
-      // Save the PDF
-      pdf.save(`dashboard_${selectedQuestion.key || "export"}.pdf`)
-    } catch (error) {
-      console.error("Erro ao gerar PDF:", error)
-      alert("Erro ao gerar PDF. Tente novamente.")
-    }
-  }
+  //     // Save the PDF
+  //     pdf.save(`dashboard_${selectedQuestion.key || "export"}.pdf`)
+  //   } catch (error) {
+  //     console.error("Erro ao gerar PDF:", error)
+  //     alert("Erro ao gerar PDF. Tente novamente.")
+  //   }
+  // }
 
   if (loading) {
     return <LoadingState message="Carregando dados das pesquisas..." />
@@ -778,7 +776,7 @@ const TimelinePage = () => {
                       useMesh={true}
                       legends={[
                         {
-                          data: legendData,       // <-- aqui usamos o array explícito
+                          data: legendData, // <-- aqui usamos o array explícito
                           anchor: "right",
                           direction: "column",
                           justify: false,

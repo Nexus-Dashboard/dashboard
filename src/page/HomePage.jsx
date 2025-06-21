@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Container, Row, Col, Card } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
 import { BarChart3, Users, Heart, GraduationCap, Shield, Building2, TrendingUp, FileText } from "lucide-react"
@@ -59,14 +59,7 @@ const TEMAS_PESQUISA = [
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const [temas, setTemas] = useState(TEMAS_PESQUISA)
-  const [loading, setLoading] = useState(false)
-
-  // No futuro, buscar temas da API
-  useEffect(() => {
-    // TODO: Implementar busca da API
-    // fetchTemasFromAPI()
-  }, [])
+  const [temas] = useState(TEMAS_PESQUISA)
 
   const handleTemaClick = (tema) => {
     // Por enquanto, redireciona para o dashboard atual
