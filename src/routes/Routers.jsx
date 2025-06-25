@@ -61,9 +61,7 @@ const Routers = () => (
     <Route
       path="/dashboard"
       element={
-        <ProtectedRoute>
           <TimelinePage />
-        </ProtectedRoute>
       }
     />
     <Route
