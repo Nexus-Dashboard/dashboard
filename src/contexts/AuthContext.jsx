@@ -8,7 +8,9 @@ const AuthContext = createContext(undefined)
 // Emails específicos autorizados
 const AUTHORIZED_EMAILS = [  
   "vitor.checkmedia@gmail.com",
-  "marcosvitor1994@gmail.com"
+  "marcosvitor1994@gmail.com",
+  "enzo.ferrari.sd@gmail.com",
+  "flavio.melo@presidencia.gov.br"
 ]
 
 // Domínios autorizados (permite qualquer email desses domínios)
