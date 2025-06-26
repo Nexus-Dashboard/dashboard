@@ -106,22 +106,108 @@ const ExportButtons = ({ chartData, questionLabel, chartRef }) => {
     }
   }
 
+  const buttonStyles = {
+    container: {
+      display: 'flex',
+      gap: '8px',
+      alignItems: 'center'
+    },
+    csvButton: {
+      background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+      border: 'none',
+      borderRadius: '8px',
+      padding: '8px 16px',
+      color: '#ffffff',
+      fontSize: '14px',
+      fontWeight: '500',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      transition: 'all 0.3s ease',
+      boxShadow: '0 2px 8px rgba(40, 167, 69, 0.25)',
+      cursor: 'pointer'
+    },
+    pdfButton: {
+      background: 'linear-gradient(135deg, #dc3545 0%, #fd7e14 100%)',
+      border: 'none',
+      borderRadius: '8px',
+      padding: '8px 16px',
+      color: '#ffffff',
+      fontSize: '14px',
+      fontWeight: '500',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      transition: 'all 0.3s ease',
+      boxShadow: '0 2px 8px rgba(220, 53, 69, 0.25)',
+      cursor: 'pointer'
+    },
+    icon: {
+      fontSize: '16px'
+    }
+  }
+
+  const customTooltipStyle = {
+    backgroundColor: '#2c3e50',
+    color: '#ffffff',
+    fontSize: '12px',
+    borderRadius: '6px',
+    padding: '6px 10px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+  }
+
   return (
-    <ButtonGroup size="sm">
-      <OverlayTrigger placement="top" overlay={<Tooltip>Exportar dados em CSV</Tooltip>}>
-        <Button variant="outline-primary" onClick={downloadCSV}>
-          <Download className="me-1" />
-          CSV
-        </Button>
+    <div style={buttonStyles.container}>
+      <OverlayTrigger 
+        placement="top" 
+        overlay={
+          <Tooltip style={customTooltipStyle}>
+            Exportar dados em formato CSV
+          </Tooltip>
+        }
+      >
+        <button
+          style={buttonStyles.csvButton}
+          onClick={downloadCSV}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-2px)'
+            e.target.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.35)'
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0)'
+            e.target.style.boxShadow = '0 2px 8px rgba(40, 167, 69, 0.25)'
+          }}
+        >
+          <Download style={buttonStyles.icon} />
+          <span>Exportar CSV</span>
+        </button>
       </OverlayTrigger>
 
-      <OverlayTrigger placement="top" overlay={<Tooltip>Exportar gráfico em PDF</Tooltip>}>
-        <Button variant="outline-danger" onClick={downloadPDF}>
-          <FileEarmarkPdf className="me-1" />
-          PDF
-        </Button>
+      <OverlayTrigger 
+        placement="top" 
+        overlay={
+          <Tooltip style={customTooltipStyle}>
+            Exportar gráfico em formato PDF
+          </Tooltip>
+        }
+      >
+        <button
+          style={buttonStyles.pdfButton}
+          onClick={downloadPDF}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-2px)'
+            e.target.style.boxShadow = '0 4px 12px rgba(220, 53, 69, 0.35)'
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0)'
+            e.target.style.boxShadow = '0 2px 8px rgba(220, 53, 69, 0.25)'
+          }}
+        >
+          <FileEarmarkPdf style={buttonStyles.icon} />
+          <span>Exportar PDF</span>
+        </button>
       </OverlayTrigger>
-    </ButtonGroup>
+    </div>
   )
 }
 

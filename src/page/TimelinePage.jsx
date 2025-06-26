@@ -671,27 +671,46 @@ const TimelinePage = () => {
       />
 
       {/* Simple Top Bar */}
-      <div className="simple-header">
+      <div className="modern-header" style={{
+        background: 'linear-gradient(135deg, #000000 0%, #000000 100%)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+        borderBottom: '1px solid rgba(255,255,255,0.1)'
+      }}>
         <Container fluid>
-          <div className="d-flex justify-content-between align-items-center py-2">
+          <div className="d-flex justify-content-between align-items-center py-3">
             <div className="d-flex align-items-center">
-              <Button variant="outline-primary" size="sm" onClick={() => setShowOffcanvas(true)} className="me-3">
+              <Button 
+                variant="outline-light" 
+                size="sm" 
+                onClick={() => setShowOffcanvas(true)} 
+                className="me-3"
+                style={{
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderRadius: '12px',
+                  backdropFilter: 'blur(10px)',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  transition: 'all 0.3s ease'
+                }}
+              >
                 <List />
               </Button>
-              <h5 className="mb-0 text-primary">Dashboard de Pesquisas</h5>
-            </div>
-
-            {/* Discrete Stats */}
-            <div className="discrete-stats d-flex align-items-center">
-              <small className="text-muted me-3">
-                {dashboardStats.filteredRespondents.toLocaleString()} entrevistados
-              </small>
-              <small className="text-muted me-3">{dashboardStats.totalSurveys} pesquisas</small>
-              {dashboardStats.activeFilters > 0 && (
-                <Badge bg="primary" className="me-2">
-                  {dashboardStats.activeFilters} filtro(s)
-                </Badge>
-              )}
+              <div>
+                <h4 className="mb-0" style={{
+                  color: 'white',
+                  fontWeight: '700',
+                  fontSize: '1.5rem',
+                  textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                }}>
+                  Dashboard de Pesquisas
+                </h4>
+                <small style={{
+                  color: 'rgba(255,255,255,0.8)',
+                  fontSize: '0.85rem',
+                  fontWeight: '500'
+                }}>
+                  Análise e Controle de Dados
+                </small>
+              </div>
             </div>
           </div>
         </Container>

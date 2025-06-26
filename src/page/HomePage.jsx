@@ -12,7 +12,7 @@ const TEMAS_PESQUISA = [
     titulo: "Avaliação de Governo",
     descricao: "Aprovação e desempenho governamental",
     icon: Building2,
-    cor: "#1e40af",
+    cor: "#000000",
     rota: "/dashboard/avaliacao-governo",
   },
   {
@@ -20,7 +20,7 @@ const TEMAS_PESQUISA = [
     titulo: "Saúde",
     descricao: "Sistema de saúde e políticas públicas",
     icon: Heart,
-    cor: "#dc2626",
+    cor: "#000000",
     rota: "/dashboard/saude",
   },
   {
@@ -28,7 +28,7 @@ const TEMAS_PESQUISA = [
     titulo: "Educação",
     descricao: "Ensino público e qualidade educacional",
     icon: GraduationCap,
-    cor: "#059669",
+    cor: "#000000",
     rota: "/dashboard/educacao",
   },
   {
@@ -36,7 +36,7 @@ const TEMAS_PESQUISA = [
     titulo: "Segurança",
     descricao: "Segurança pública e criminalidade",
     icon: Shield,
-    cor: "#7c2d12",
+    cor: "#000000",
     rota: "/dashboard/seguranca",
   },
   {
@@ -44,7 +44,7 @@ const TEMAS_PESQUISA = [
     titulo: "Economia",
     descricao: "Situação econômica e emprego",
     icon: TrendingUp,
-    cor: "#7c3aed",
+    cor: "#000000",
     rota: "/dashboard/economia",
   },
   {
@@ -52,7 +52,7 @@ const TEMAS_PESQUISA = [
     titulo: "Perfil Demográfico",
     descricao: "Análise demográfica dos entrevistados",
     icon: Users,
-    cor: "#ea580c",
+    cor: "#000000",
     rota: "/dashboard/demografico",
   },
 ]

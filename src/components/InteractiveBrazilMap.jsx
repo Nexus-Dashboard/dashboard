@@ -169,23 +169,28 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .attr("fill", (d) => {
         const stateData = mapData.get(d.properties.sigla)
         if (!stateData || !stateData.dominantResponse) {
-          return "#e0e0e0"
+          return "#f1f3f4"
         }
         return getResponseColor(stateData.dominantResponse)
       })
       .attr("stroke", (d) => {
         const stateId = d.properties.sigla
-        return selectedState === stateId ? "#2c3e50" : "#ffffff"
+        return selectedState === stateId ? "#4f46e5" : "#ffffff"
       })
       .attr("stroke-width", (d) => {
         const stateId = d.properties.sigla
-        return selectedState === stateId ? 3 : 1
+        return selectedState === stateId ? 3 : 1.5
       })
       .attr("opacity", (d) => {
         const stateId = d.properties.sigla
-        return hoveredState === stateId ? 0.8 : 1
+        return hoveredState === stateId ? 0.85 : 1
       })
       .style("cursor", "pointer")
+      .style("filter", (d) => {
+        const stateId = d.properties.sigla
+        return hoveredState === stateId ? "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" : "none"
+      })
+      .style("transition", "all 0.2s ease")
       .on("mouseover", function (event, d) {
         const stateId = d.properties.sigla
         const stateData = mapData.get(stateId)
@@ -202,7 +207,9 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
           })
         }
 
-        d3.select(this).attr("opacity", 0.8)
+        d3.select(this)
+          .attr("opacity", 0.85)
+          .style("filter", "drop-shadow(0 4px 8px rgba(0,0,0,0.2))")
       })
       .on("mousemove", (event) => {
         const [x, y] = d3.pointer(event, document.body)
@@ -215,7 +222,9 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .on("mouseout", function () {
         setHoveredState(null)
         setTooltip((prev) => ({ ...prev, visible: false, data: null }))
-        d3.select(this).attr("opacity", 1)
+        d3.select(this)
+          .attr("opacity", 1)
+          .style("filter", "none")
       })
       .on("click", (event, d) => {
         const stateId = d.properties.sigla
@@ -240,10 +249,11 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .attr("y", (d) => path.centroid(d)[1])
       .attr("text-anchor", "middle")
       .attr("dominant-baseline", "middle")
-      .attr("font-size", "12px")
-      .attr("font-weight", "bold")
-      .attr("fill", "#2c3e50")
+      .attr("font-size", "11px")
+      .attr("font-weight", "600")
+      .attr("fill", "#374151")
       .attr("pointer-events", "none")
+      .style("text-shadow", "0 1px 2px rgba(255,255,255,0.8)")
       .text((d) => d.properties.sigla)
   }, [geoData, mapData, hoveredState, selectedState, onStateClick])
 
@@ -280,67 +290,210 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
   }
 
   return (
-    <Card className="chart-card">
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h4 className="chart-title">Mapa Interativo do Brasil</h4>
+    <Card 
+      className="modern-map-card"
+      style={{
+        border: 'none',
+        borderRadius: '16px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+        background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+        overflow: 'hidden'
+      }}
+    >
+      <Card.Body style={{ padding: '24px' }}>
+        {/* Header */}
+        <div 
+          className="d-flex justify-content-between align-items-center mb-4"
+          style={{
+            paddingBottom: '16px',
+            borderBottom: '2px solid #e2e8f0'
+          }}
+        >
+          <div>
+            <h3 
+              className="chart-title mb-1"
+            >Mapa Interativo do Brasil
+            </h3>
+            <p 
+              className="text-muted mb-0"
+              style={{
+                fontSize: '0.9rem',
+                color: '#64748b'
+              }}
+            >
+              Visualização geográfica das respostas por estado
+            </p>
+          </div>
           {selectedState && (
-            <Button variant="outline-secondary" size="sm" onClick={clearSelection}>
-              Limpar Seleção
+            <Button 
+              variant="outline-danger" 
+              size="sm" 
+              onClick={clearSelection}
+              style={{
+                borderRadius: '10px',
+                fontWeight: '500',
+                padding: '8px 16px',
+                border: '2px solid #ef4444',
+                color: '#ef4444',
+                background: 'rgba(239, 68, 68, 0.05)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = '#ef4444'
+                e.target.style.color = 'white'
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(239, 68, 68, 0.05)'
+                e.target.style.color = '#ef4444'
+              }}
+            >
+              ✕ Limpar Seleção
             </Button>
           )}
         </div>
 
+        {/* Selected State Badge */}
         {selectedState && (
-          <div className="mb-3">
-            <Badge bg="primary" className="me-2">
-              Estado Selecionado: {ABBR_TO_STATE_NAMES[selectedState] || selectedState}
+          <div className="mb-4">
+            <Badge 
+              bg="primary" 
+              className="me-2"
+              style={{
+                background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '8px 16px',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)'
+              }}
+            >
+              📍 Estado Selecionado: {ABBR_TO_STATE_NAMES[selectedState] || selectedState}
             </Badge>
           </div>
         )}
 
-        <div className="d-flex">
-          <div className="flex-grow-1" style={{ position: "relative" }}>
+        <div className="d-flex" style={{ gap: '24px' }}>
+          {/* Map Container */}
+          <div 
+            className="flex-grow-1" 
+            style={{ 
+              position: "relative",
+              background: 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)',
+              borderRadius: '16px',
+              padding: '16px',
+              boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.06)'
+            }}
+          >
             <svg
               ref={svgRef}
               width="100%"
               height="500"
               viewBox="0 0 600 500"
-              style={{ background: "#f8f9fa", borderRadius: "8px" }}
+              style={{ 
+                background: "transparent", 
+                borderRadius: "12px",
+                filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.04))'
+              }}
             />
 
-            {/* Tooltip - só aparece quando tooltip.visible é true */}
+            {/* Enhanced Tooltip */}
             {tooltip.visible && tooltip.data && (
               <div
                 style={{
                   position: "fixed",
                   left: tooltip.x,
                   top: tooltip.y,
-                  background: "white",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  padding: "12px",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  background: "linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)",
+                  border: "none",
+                  borderRadius: "16px",
+                  padding: "16px",
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.15), 0 8px 24px rgba(0,0,0,0.1)",
                   fontSize: "14px",
                   zIndex: 1000,
-                  maxWidth: "250px",
+                  maxWidth: "280px",
                   pointerEvents: "none",
+                  backdropFilter: "blur(10px)",
+                  border: "1px solid rgba(255,255,255,0.2)"
                 }}
               >
-                <div style={{ fontWeight: "bold", marginBottom: "8px", color: "#2c3e50" }}>{tooltip.data.name}</div>
-                <div style={{ marginBottom: "4px" }}>
-                  <strong>Resposta dominante:</strong> {tooltip.data.dominantResponse}
+                <div 
+                  style={{ 
+                    fontWeight: "700", 
+                    marginBottom: "12px", 
+                    color: "#1e293b",
+                    fontSize: "16px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}
+                >
+                  🏛️ {tooltip.data.name}
                 </div>
-                <div style={{ marginBottom: "8px" }}>
-                  <strong>Percentual:</strong> {tooltip.data.dominantPercentage}%
+                <div 
+                  style={{ 
+                    marginBottom: "8px",
+                    padding: "8px 12px",
+                    background: "rgba(79, 70, 229, 0.1)",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(79, 70, 229, 0.2)"
+                  }}
+                >
+                  <strong style={{ color: "#4f46e5" }}>Resposta dominante:</strong>
+                  <div style={{ fontWeight: "600", color: "#1e293b", marginTop: "4px" }}>
+                    {tooltip.data.dominantResponse}
+                  </div>
                 </div>
-                <div style={{ fontSize: "12px", color: "#666" }}>
+                <div 
+                  style={{ 
+                    marginBottom: "12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}
+                >
+                  <strong style={{ color: "#374151" }}>Percentual:</strong> 
+                  <span 
+                    style={{ 
+                      fontWeight: "700", 
+                      color: "#059669",
+                      fontSize: "16px"
+                    }}
+                  >
+                    {tooltip.data.dominantPercentage}%
+                  </span>
+                </div>
+                <div 
+                  style={{ 
+                    fontSize: "12px", 
+                    color: "#6b7280",
+                    padding: "8px 0",
+                    borderTop: "1px solid #e5e7eb"
+                  }}
+                >
                   <strong>Total de respostas:</strong> {tooltip.data.totalResponses}
                 </div>
-                <div style={{ marginTop: "8px", fontSize: "12px" }}>
+                <div style={{ marginTop: "12px", fontSize: "12px" }}>
+                  <div style={{ fontWeight: "600", color: "#374151", marginBottom: "8px" }}>
+                    📊 Distribuição:
+                  </div>
                   {tooltip.data.responses.slice(0, 3).map((resp, idx) => (
-                    <div key={idx} style={{ marginBottom: "2px" }}>
-                      {resp.response}: {resp.percentage}%
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        marginBottom: "4px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "4px 8px",
+                        background: idx === 0 ? "rgba(34, 197, 94, 0.1)" : "rgba(156, 163, 175, 0.1)",
+                        borderRadius: "6px"
+                      }}
+                    >
+                      <span style={{ color: "#374151" }}>{resp.response}:</span>
+                      <span style={{ fontWeight: "600", color: idx === 0 ? "#059669" : "#6b7280" }}>
+                        {resp.percentage}%
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -348,9 +501,30 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
             )}
           </div>
 
-          {/* Legend */}
-          <div style={{ width: "200px", paddingLeft: "20px" }}>
-            <h6 style={{ fontWeight: "bold", marginBottom: "15px", color: "#2c3e50" }}>Legenda</h6>
+          {/* Enhanced Legend */}
+          <div 
+            style={{ 
+              width: "240px", 
+              background: "linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)",
+              borderRadius: "16px",
+              padding: "20px",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+              border: "1px solid #e2e8f0"
+            }}
+          >
+            <h5 
+              style={{ 
+                fontWeight: "700", 
+                marginBottom: "20px", 
+                color: "#1e293b",
+                fontSize: "1.1rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+             Legenda
+            </h5>
             <div style={{ fontSize: "14px" }}>
               {legendData.map(({ response, color, count }) => (
                 <div
@@ -358,22 +532,42 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    marginBottom: "8px",
+                    marginBottom: "12px",
+                    padding: "12px",
+                    background: "rgba(255,255,255,0.7)",
+                    borderRadius: "12px",
+                    border: "1px solid #e5e7eb",
+                    transition: "all 0.2s ease",
+                    cursor: "default"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.background = "rgba(255,255,255,1)"
+                    e.target.style.transform = "translateY(-2px)"
+                    e.target.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = "rgba(255,255,255,0.7)"
+                    e.target.style.transform = "translateY(0)"
+                    e.target.style.boxShadow = "none"
                   }}
                 >
                   <div
                     style={{
-                      width: "16px",
-                      height: "16px",
+                      width: "20px",
+                      height: "20px",
                       backgroundColor: color,
-                      marginRight: "8px",
-                      borderRadius: "2px",
-                      border: "1px solid #ddd",
+                      marginRight: "12px",
+                      borderRadius: "6px",
+                      border: "2px solid #ffffff",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                      flexShrink: 0
                     }}
                   />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: "500", color: "#2c3e50" }}>{response}</div>
-                    <div style={{ fontSize: "12px", color: "#666" }}>
+                    <div style={{ fontWeight: "600", color: "#1e293b", marginBottom: "2px" }}>
+                      {response}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#64748b" }}>
                       {count} estado{count !== 1 ? "s" : ""}
                     </div>
                   </div>
@@ -385,21 +579,56 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
               <div
                 style={{
                   textAlign: "center",
-                  color: "#666",
+                  color: "#94a3b8",
                   fontSize: "14px",
-                  marginTop: "20px",
+                  marginTop: "30px",
+                  padding: "20px",
+                  background: "rgba(148, 163, 184, 0.1)",
+                  borderRadius: "12px",
+                  border: "2px dashed #cbd5e1"
                 }}
               >
-                Selecione uma pergunta para visualizar os dados
+                <div style={{ fontSize: "24px", marginBottom: "8px" }}>🤔</div>
+                <div style={{ fontWeight: "500", marginBottom: "4px" }}>Nenhum dado disponível</div>
+                <div style={{ fontSize: "12px" }}>Selecione uma pergunta para visualizar</div>
               </div>
             )}
           </div>
         </div>
 
-        <div className="text-center mt-3">
-          <small className="text-muted">
-            Clique em um estado para filtrar os dados • Passe o mouse para ver detalhes
-          </small>
+        {/* Enhanced Footer */}
+        <div 
+          className="text-center mt-4"
+          style={{
+            paddingTop: "20px",
+            borderTop: "1px solid #e2e8f0"
+          }}
+        >
+          <div
+            style={{
+              background: "linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)",
+              borderRadius: "12px",
+              padding: "12px 20px",
+              display: "inline-block",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+            }}
+          >
+            <small 
+              className="text-muted"
+              style={{
+                color: "#64748b",
+                fontWeight: "500",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "0.85rem"
+              }}
+            >
+              <span>🖱️ Clique em um estado para filtrar</span>
+              <span style={{ color: "#cbd5e1" }}>•</span>
+              <span>👆 Passe o mouse para detalhes</span>
+            </small>
+          </div>
         </div>
       </Card.Body>
     </Card>

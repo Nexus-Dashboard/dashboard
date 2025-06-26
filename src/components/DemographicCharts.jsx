@@ -101,12 +101,105 @@ const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, avail
     return result
   }, [selectedQuestion, surveys, filteredResponses, availableDemographics])
 
+  // Estilos customizados
+  const customStyles = {
+    containerRow: {
+      margin: '0 -8px'
+    },
+    chartColumn: {
+      padding: '8px',
+      marginBottom: '20px'
+    },
+    modernCard: {
+      border: 'none',
+      borderRadius: '16px',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+      background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
+      overflow: 'hidden',
+      transition: 'all 0.3s ease',
+      height: '100%'
+    },
+    cardHeader: {
+      background: 'linear-gradient(135deg, #1d1d1d 0%, #000000 100%)',
+      border: 'none',
+      padding: '16px 20px',
+      position: 'relative',
+      overflow: 'hidden'
+    },
+    cardHeaderOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 100%)',
+      pointerEvents: 'none'
+    },
+    headerTitle: {
+      color: '#ffffff',
+      fontSize: '16px',
+      fontWeight: '600',
+      margin: 0,
+      textShadow: '0 1px 3px rgba(0,0,0,0.2)',
+      position: 'relative',
+      zIndex: 1
+    },
+    cardBody: {
+      padding: '24px 20px',
+      background: '#ffffff',
+      position: 'relative'
+    },
+    chartContainer: {
+      height: '320px',
+      borderRadius: '12px',
+      background: 'linear-gradient(145deg, #f8f9fa 0%, #ffffff 100%)',
+      padding: '16px',
+      border: '1px solid rgba(0,0,0,0.05)',
+      position: 'relative'
+    },
+    chartOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'linear-gradient(135deg, rgba(102,126,234,0.02) 0%, rgba(118,75,162,0.02) 100%)',
+      borderRadius: '12px',
+      pointerEvents: 'none'
+    },
+    emptyState: {
+      textAlign: 'center',
+      padding: '60px 20px',
+      color: '#6c757d'
+    },
+    emptyIcon: {
+      fontSize: '48px',
+      color: '#dee2e6',
+      marginBottom: '16px'
+    },
+    emptyText: {
+      fontSize: '16px',
+      fontWeight: '500',
+      marginBottom: '8px'
+    },
+    emptySubtext: {
+      fontSize: '14px',
+      color: '#adb5bd'
+    }
+  }
+
   if (!Object.keys(demographicComparisonData).length) {
-    return null
+    return (
+      <div style={customStyles.emptyState}>
+        <div style={customStyles.emptyIcon}>📊</div>
+        <div style={customStyles.emptyText}>Nenhum dado demográfico disponível</div>
+        <div style={customStyles.emptySubtext}>Selecione uma pergunta para visualizar os dados</div>
+      </div>
+    )
   }
 
   return (
-    <Row>
+    <Row style={customStyles.containerRow}>
       {Object.entries(demographicComparisonData).map(([key, { label, data }]) => {
         if (!data.length) return null
 
@@ -171,69 +264,143 @@ const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, avail
         }))
 
         return (
-          <Col lg={6} key={key} className="mb-4">
-            <Card>
-              <Card.Header>
-                <h6 className="mb-0">{label}</h6>
+          <Col lg={6} key={key} style={customStyles.chartColumn}>
+            <Card 
+              style={customStyles.modernCard}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.15)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <Card.Header style={customStyles.cardHeader}>
+                <div style={customStyles.cardHeaderOverlay}></div>
+                <h6 style={customStyles.headerTitle}>{label}</h6>
               </Card.Header>
-              <Card.Body>
-                <div style={{ height: "300px" }}>
+              <Card.Body style={customStyles.cardBody}>
+                <div style={customStyles.chartContainer}>
+                  <div style={customStyles.chartOverlay}></div>
                   <ResponsiveBar
-                    data={sortedData}              // <-- use sortedData
+                    data={sortedData}
                     keys={sortedAnswers}
                     indexBy="demographicValue"
-                    margin={{ top: 20, right: 130, bottom: 50, left: 60 }}
-                    padding={0.3}
+                    margin={{ top: 20, right: 140, bottom: 60, left: 70 }}
+                    padding={0.25}
                     layout="vertical"
                     valueScale={{ type: "linear", min: 0, max: 100 }}
                     indexScale={{ type: "band", round: true }}
                     colors={(bar) => {
-                      // APLICAR CORES CORRETAS DIRETAMENTE
                       return useGroupedColors ? groupedResponseColorMap[bar.id] || "#6c757d" : getResponseColor(bar.id)
                     }}
                     borderColor={{ from: "color", modifiers: [["darker", 1.6]] }}
+                    borderWidth={1}
+                    borderRadius={4}
                     axisTop={null}
                     axisRight={null}
                     axisBottom={{
                       tickSize: 5,
-                      tickPadding: 5,
+                      tickPadding: 8,
                       tickRotation: 0,
                       legend: "Porcentagem (%)",
                       legendPosition: "middle",
-                      legendOffset: 32,
+                      legendOffset: 45,
+                      style: {
+                        fontSize: '12px',
+                        fontWeight: '500'
+                      }
                     }}
                     axisLeft={{
                       tickSize: 5,
-                      tickPadding: 5,
+                      tickPadding: 8,
                       tickRotation: 0,
                       legend: label,
                       legendPosition: "middle",
-                      legendOffset: -40,
+                      legendOffset: -55,
+                      style: {
+                        fontSize: '12px',
+                        fontWeight: '500'
+                      }
                     }}
                     enableLabel={true}
                     label={(d) => `${d.value.toFixed(1)}%`}
-                    labelSkipWidth={12}
-                    labelSkipHeight={12}
-                    labelTextColor={{ from: "color", modifiers: [["darker", 1.6]] }}
+                    labelSkipWidth={15}
+                    labelSkipHeight={15}
+                    labelTextColor={{ from: "color", modifiers: [["darker", 2]] }}
                     legends={[
                     {
-                        data: legendData,      // <-- usamos o array explícito
+                        data: legendData,
                         anchor: "right",
                         direction: "column",
                         justify: false,
-                        translateX: 120,
+                        translateX: 130,
                         translateY: 0,
-                        itemsSpacing: 2,
-                        itemWidth: 100,
-                        itemHeight: 20,
+                        itemsSpacing: 4,
+                        itemWidth: 110,
+                        itemHeight: 22,
                         itemDirection: "left-to-right",
-                        itemOpacity: 0.85,
-                        symbolSize: 12,
+                        itemOpacity: 0.9,
+                        symbolSize: 14,
+                        symbolShape: 'circle',
+                        effects: [
+                          {
+                            on: 'hover',
+                            style: {
+                              itemOpacity: 1,
+                              itemTextColor: '#000'
+                            }
+                          }
+                        ]
                     },
                     ]}
                     animate={true}
-                    motionStiffness={90}
-                    motionDamping={15}
+                    motionStiffness={120}
+                    motionDamping={18}
+                    theme={{
+                      background: 'transparent',
+                      textColor: '#495057',
+                      fontSize: 12,
+                      axis: {
+                        domain: {
+                          line: {
+                            stroke: '#dee2e6',
+                            strokeWidth: 1
+                          }
+                        },
+                        legend: {
+                          text: {
+                            fontSize: 13,
+                            fontWeight: 600,
+                            fill: '#495057'
+                          }
+                        },
+                        ticks: {
+                          line: {
+                            stroke: '#dee2e6',
+                            strokeWidth: 1
+                          },
+                          text: {
+                            fontSize: 11,
+                            fill: '#6c757d'
+                          }
+                        }
+                      },
+                      grid: {
+                        line: {
+                          stroke: '#f1f3f4',
+                          strokeWidth: 1
+                        }
+                      },
+                      legends: {
+                        text: {
+                          fontSize: 12,
+                          fontWeight: 500,
+                          fill: '#495057'
+                        }
+                      }
+                    }}
                   />
                 </div>
               </Card.Body>
