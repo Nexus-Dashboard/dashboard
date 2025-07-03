@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useCallback } from "react"
+import { useState, useMemo, useRef, useCallback, useEffect } from "react"
 import { useLocation } from "react-router-dom"
 import ApiBase from "../service/ApiBase"
 import { useQuery } from "@tanstack/react-query"
@@ -17,6 +17,7 @@ import {
   Button,
   Chip,
   alpha,
+  Slider,
 } from "@mui/material"
 import { Download, PictureAsPdf, Assessment } from "@mui/icons-material"
 import MenuIcon from "@mui/icons-material/Menu"
@@ -47,6 +48,7 @@ export default function Dashboard() {
   const [showOffcanvas, setShowOffcanvas] = useState(false)
   const [filters, setFilters] = useState({})
   const [selectedState, setSelectedState] = useState(null)
+  const [timeRange, setTimeRange] = useState([0, 0])
 
   const questionCode = useMemo(() => {
     const params = new URLSearchParams(location.search)
@@ -58,11 +60,10 @@ export default function Dashboard() {
     isLoading,
     isError,
     error,
-    refetch,
   } = useQuery({
     queryKey: ["questionData", questionCode],
     queryFn: () => ApiBase.get(`/api/data/question/${questionCode}/responses`).then((res) => res.data),
-    enabled: !!questionCode, // A query só roda se houver um questionCode
+    enabled: !!questionCode,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   })
@@ -71,75 +72,97 @@ export default function Dashboard() {
     if (!apiData || !apiData.success) {
       return { questionInfo: null, historicalData: [], allFlatResponses: [], availableDemographics: [] }
     }
+    // Sort historical data by period to ensure consistency
+    const sortedHistoricalData = [...apiData.historicalData].sort((a, b) => {
+      // Basic sort, assuming "Month Year" format. This might need improvement for complex date formats.
+      return new Date(a.period) - new Date(b.period)
+    })
+
     return {
       questionInfo: apiData.questionInfo,
-      historicalData: apiData.historicalData,
-      allFlatResponses: apiData.rawResponses || [], // Assumindo que a API retorna os dados brutos para o mapa
+      historicalData: sortedHistoricalData,
+      allFlatResponses: apiData.rawResponses || [],
       availableDemographics: apiData.availableDemographics || [],
     }
   }, [apiData])
 
-  const calculateChartData = useCallback(() => {
-    if (!historicalData || historicalData.length === 0) return []
+  // Effect to set the initial time range for the slider
+  useEffect(() => {
+    if (historicalData.length > 0) {
+      const max = historicalData.length - 1
+      const min = Math.max(0, max - 9) // Show last 10 by default
+      setTimeRange([min, max])
+    }
+  }, [historicalData])
 
-    const allActualResponses = new Set()
-    historicalData.forEach((rodada) => {
-      rodada.distribution.forEach((dist) => allActualResponses.add(dist.response))
-    })
+  const handleTimeRangeChange = (event, newValue) => {
+    setTimeRange(newValue)
+  }
 
-    const useGrouping = shouldGroupResponses(Array.from(allActualResponses))
-    const responseOrder = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
-    const seriesMap = new Map()
+  const visibleHistoricalData = useMemo(() => {
+    if (!historicalData.length) return []
+    return historicalData.slice(timeRange[0], timeRange[1] + 1)
+  }, [historicalData, timeRange])
 
-    historicalData.forEach((rodada) => {
-      // Aplicar filtros aqui se necessário
-      rodada.distribution.forEach((dist) => {
-        const finalResponse = useGrouping ? groupResponses(dist.response) : dist.response
-        if (!finalResponse) return
+  const mapResponses = useMemo(() => {
+    if (!allFlatResponses.length || !historicalData.length) return []
+    const lastTenPeriods = historicalData.slice(-10).map((h) => h.period)
+    const periodSet = new Set(lastTenPeriods)
+    return allFlatResponses.filter((response) => periodSet.has(response.period))
+  }, [allFlatResponses, historicalData])
 
-        if (!seriesMap.has(finalResponse)) {
-          seriesMap.set(finalResponse, { id: finalResponse, data: [] })
-        }
-        seriesMap.get(finalResponse).data.push({
-          x: rodada.period,
-          y: Number.parseFloat(dist.percentage),
-          exactValue: Number.parseFloat(dist.percentage),
+  const calculateChartData = useCallback(
+    (dataToProcess) => {
+      if (!dataToProcess || dataToProcess.length === 0) return []
+
+      const allActualResponses = new Set()
+      dataToProcess.forEach((rodada) => {
+        rodada.distribution.forEach((dist) => allActualResponses.add(dist.response))
+      })
+
+      const useGrouping = shouldGroupResponses(Array.from(allActualResponses))
+      const responseOrder = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
+      const seriesMap = new Map()
+
+      dataToProcess.forEach((rodada) => {
+        rodada.distribution.forEach((dist) => {
+          const finalResponse = useGrouping ? groupResponses(dist.response) : dist.response
+          if (!finalResponse) return
+
+          if (!seriesMap.has(finalResponse)) {
+            seriesMap.set(finalResponse, { id: finalResponse, data: [] })
+          }
+          seriesMap.get(finalResponse).data.push({
+            x: rodada.period,
+            y: Number.parseFloat(dist.percentage),
+            exactValue: Number.parseFloat(dist.percentage),
+          })
         })
       })
-    })
 
-    return Array.from(seriesMap.values()).sort((a, b) => {
-      const indexA = responseOrder.indexOf(a.id)
-      const indexB = responseOrder.indexOf(b.id)
-      if (indexA > -1 && indexB > -1) return indexA - indexB
-      if (indexA > -1) return -1
-      if (indexB > -1) return 1
-      return a.id.localeCompare(b.id)
-    })
-  }, [historicalData, filters, selectedState]) // Adicionar dependências de filtros
-
-  const dashboardStats = useMemo(() => {
-    // Lógica para calcular estatísticas com base em 'allFlatResponses'
-    const filteredFlatResponses = allFlatResponses.filter((response) => {
-      const passesDemo =
-        Object.keys(filters).length === 0 ||
-        Object.entries(filters).every(([key, values]) => !values.length || values.includes(response[key]))
-      const passesState = !selectedState || response.UF === selectedState
-      return passesDemo && passesState
-    })
-
-    return {
-      totalRespondents: filteredFlatResponses.reduce((sum, r) => sum + extractWeight(r), 0),
-      totalSurveys: new Set(historicalData.map((h) => h.period)).size,
-      totalQuestions: 1, // Agora estamos vendo uma pergunta de cada vez
-      activeFilters:
-        Object.values(filters).reduce((count, values) => count + values.length, 0) + (selectedState ? 1 : 0),
-    }
-  }, [allFlatResponses, filters, selectedState, historicalData])
+      return Array.from(seriesMap.values()).sort((a, b) => {
+        const indexA = responseOrder.indexOf(a.id)
+        const indexB = responseOrder.indexOf(b.id)
+        if (indexA > -1 && indexB > -1) return indexA - indexB
+        if (indexA > -1) return -1
+        if (indexB > -1) return 1
+        return a.id.localeCompare(b.id)
+      })
+    },
+    [filters, selectedState],
+  )
 
   const chartData = useMemo(() => {
-    return calculateChartData()
-  }, [calculateChartData])
+    return calculateChartData(visibleHistoricalData)
+  }, [calculateChartData, visibleHistoricalData])
+
+  const allResponsesForGroupingCheck = useMemo(() => {
+    const responses = new Set()
+    historicalData.forEach((rodada) => {
+      rodada.distribution.forEach((dist) => responses.add(dist.response))
+    })
+    return Array.from(responses)
+  }, [historicalData])
 
   if (!questionCode) {
     return (
@@ -177,10 +200,10 @@ export default function Dashboard() {
       <OffcanvasNavigation
         show={showOffcanvas}
         onHide={() => setShowOffcanvas(false)}
-        availableDemographics={[]} // This needs to be adapted if filters are to be used
-        filters={{}}
-        onFilterChange={() => {}}
-        onClearFilters={() => {}}
+        availableDemographics={availableDemographics}
+        filters={filters}
+        onFilterChange={setFilters}
+        onClearFilters={() => setFilters({})}
       />
       <Paper
         square
@@ -214,17 +237,18 @@ export default function Dashboard() {
 
       <Container maxWidth={false} sx={{ py: 3 }}>
         <Grid container spacing={3}>
-          <Grid item xs={12} md={8}>
-            <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-              <Box sx={{ mt: 2, p: 2, bgcolor: alpha(theme.palette.secondary.main, 0.1), borderRadius: 1 }}>
+          {/* Left Column */}
+          <Grid item xs={12} md={4}>
+            <Paper elevation={3} sx={{ p: 2, borderRadius: 2, height: "100%" }}>
+              <Box sx={{ p: 1, bgcolor: alpha(theme.palette.secondary.main, 0.1), borderRadius: 1, mb: 2 }}>
                 <Typography variant="body1" fontWeight="medium" color="secondary.dark">
-                  {questionInfo?.label || "Carregando pergunta..."}
+                  Evolução Temporal
                 </Typography>
               </Box>
-              <Box ref={chartRef} sx={{ height: 450 }}>
+              <Box ref={chartRef} sx={{ height: 400 }}>
                 <ResponsiveLine
                   data={chartData}
-                  margin={{ top: 20, right: 110, bottom: 60, left: 60 }}
+                  margin={{ top: 10, right: 110, bottom: 50, left: 40 }}
                   xScale={{ type: "point" }}
                   yScale={{
                     type: "linear",
@@ -237,21 +261,20 @@ export default function Dashboard() {
                   axisTop={null}
                   axisRight={null}
                   axisBottom={{
-                    orient: "bottom",
-                    tickSize: 5,
-                    tickPadding: 5,
-                    tickRotation: -30,
-                    legend: "Período",
-                    legendOffset: 50,
-                    legendPosition: "middle",
-                  }}
-                  axisLeft={{
-                    orient: "left",
                     tickSize: 5,
                     tickPadding: 5,
                     tickRotation: 0,
-                    legend: "Porcentagem (%)",
-                    legendOffset: -50,
+                    legend: "Período",
+                    legendOffset: 36,
+                    legendPosition: "middle",
+                    format: () => "", // Hide labels to avoid clutter
+                  }}
+                  axisLeft={{
+                    tickSize: 5,
+                    tickPadding: 5,
+                    tickRotation: 0,
+                    legend: " (%)",
+                    legendOffset: -35,
                     legendPosition: "middle",
                   }}
                   pointSize={8}
@@ -260,7 +283,11 @@ export default function Dashboard() {
                   pointBorderColor={{ from: "serieColor" }}
                   pointLabelYOffset={-12}
                   useMesh={true}
-                  colors={(d) => (shouldGroupResponses([]) ? groupedResponseColorMap[d.id] : getResponseColor(d.id))}
+                  colors={(d) =>
+                    shouldGroupResponses(allResponsesForGroupingCheck)
+                      ? groupedResponseColorMap[d.id]
+                      : getResponseColor(d.id)
+                  }
                   legends={[
                     {
                       anchor: "bottom-right",
@@ -275,36 +302,54 @@ export default function Dashboard() {
                       itemOpacity: 0.75,
                       symbolSize: 12,
                       symbolShape: "circle",
-                      effects: [
-                        {
-                          on: "hover",
-                          style: {
-                            itemBackground: "rgba(0, 0, 0, .03)",
-                            itemOpacity: 1,
-                          },
-                        },
-                      ],
                     },
                   ]}
                 />
               </Box>
-            </Paper>
-            <Paper elevation={3} sx={{ p: 2, mt: 2, borderRadius: 2 }}>
-              <Button startIcon={<Assessment />}>Análise Demográfica</Button>
+              {historicalData.length > 1 && (
+                <Box sx={{ px: 3, mt: 2 }}>
+                  <Typography gutterBottom variant="caption">
+                    Controle de Período
+                  </Typography>
+                  <Slider
+                    value={timeRange}
+                    onChange={handleTimeRangeChange}
+                    valueLabelDisplay="auto"
+                    min={0}
+                    max={historicalData.length - 1}
+                    valueLabelFormat={(value) => historicalData[value]?.period}
+                    sx={{
+                      "& .MuiSlider-thumb": {
+                        color: theme.palette.secondary.main,
+                      },
+                      "& .MuiSlider-track": {
+                        color: theme.palette.secondary.light,
+                      },
+                      "& .MuiSlider-rail": {
+                        color: alpha(theme.palette.secondary.light, 0.5),
+                      },
+                    }}
+                  />
+                </Box>
+              )}
+              <Button fullWidth startIcon={<Assessment />} sx={{ mt: 2 }}>
+                Análise Demográfica
+              </Button>
             </Paper>
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          {/* Right Column */}
+          <Grid item xs={12} md={8}>
             <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Mapa Interativo do Brasil
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Visualização geográfica das respostas por estado
+                Visualização geográfica das respostas por estado (últimas 10 rodadas)
               </Typography>
               <InteractiveBrazilMap
-                responses={allFlatResponses} // Passar os dados brutos
-                selectedQuestion={questionInfo} // Passar as informações da pergunta
+                responses={mapResponses}
+                selectedQuestion={questionInfo}
                 onStateClick={setSelectedState}
                 selectedState={selectedState}
                 filters={filters}
