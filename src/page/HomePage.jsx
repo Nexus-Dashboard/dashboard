@@ -1,238 +1,220 @@
 "use client"
 
-import { useState } from "react"
-import { Container, Row, Col, Card } from "react-bootstrap"
+import { useState, useEffect } from "react"
+import { Container, Row, Col, Card, Button, Image, Spinner } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
-import { BarChart3, Users, Heart, GraduationCap, Shield, Building2, TrendingUp, FileText } from "lucide-react"
+import {
+  BarChart3,
+  Users,
+  Heart,
+  GraduationCap,
+  Shield,
+  Building2,
+  TrendingUp,
+  FileText,
+  Globe,
+  CloudSun,
+  Briefcase,
+  Train,
+  Palette,
+  MessageSquare,
+} from "lucide-react"
+import ApiBase from "../service/ApiBase"
+import { useAuth } from "../contexts/AuthContext"
+import "./HomePage.css"
 
-// Dados mockados dos temas - no futuro virão da API
-const TEMAS_PESQUISA = [
-  {
-    id: "avaliacao-governo",
-    titulo: "Avaliação de Governo",
-    descricao: "Aprovação e desempenho governamental",
+// Mapeamento de temas da API para ícones, descrições e títulos personalizados
+const themeConfig = {
+  "Popularidade tracking": {
+    title: "Avaliação de Governo",
+    description: "Aprovação e desempenho governamental",
     icon: Building2,
-    cor: "#000000",
-    rota: "/dashboard/avaliacao-governo",
   },
-  {
-    id: "saude",
-    titulo: "Saúde",
-    descricao: "Sistema de saúde e políticas públicas",
+  Saúde: {
+    title: "Saúde",
+    description: "Sistema de saúde e políticas públicas",
     icon: Heart,
-    cor: "#000000",
-    rota: "/dashboard/saude",
   },
-  {
-    id: "educacao",
-    titulo: "Educação",
-    descricao: "Ensino público e qualidade educacional",
+  Educação: {
+    title: "Educação",
+    description: "Ensino público e qualidade educacional",
     icon: GraduationCap,
-    cor: "#000000",
-    rota: "/dashboard/educacao",
   },
-  {
-    id: "seguranca",
-    titulo: "Segurança",
-    descricao: "Segurança pública e criminalidade",
+  "Segurança e Violência": {
+    title: "Segurança",
+    description: "Segurança pública e criminalidade",
     icon: Shield,
-    cor: "#000000",
-    rota: "/dashboard/seguranca",
   },
-  {
-    id: "economia",
-    titulo: "Economia",
-    descricao: "Situação econômica e emprego",
+  "Economia brasileira": {
+    title: "Economia",
+    description: "Situação econômica e emprego",
     icon: TrendingUp,
-    cor: "#000000",
-    rota: "/dashboard/economia",
   },
-  {
-    id: "demografico",
-    titulo: "Perfil Demográfico",
-    descricao: "Análise demográfica dos entrevistados",
+  "Economia familiar": {
+    title: "Economia Familiar",
+    description: "Análise da situação econômica das famílias",
     icon: Users,
-    cor: "#000000",
-    rota: "/dashboard/demografico",
   },
-]
+  "Programas Sociais e Emprego": {
+    title: "Programas Sociais",
+    description: "Impacto e avaliação de programas sociais",
+    icon: Briefcase,
+  },
+  "Meio Ambiente": {
+    title: "Meio Ambiente",
+    description: "Políticas de sustentabilidade e preservação",
+    icon: CloudSun,
+  },
+  "Relações internacionais": {
+    title: "Relações Internacionais",
+    description: "Cenário e política externa",
+    icon: Globe,
+  },
+  Transporte: {
+    title: "Transporte",
+    description: "Mobilidade urbana e infraestrutura",
+    icon: Train,
+  },
+  "Cultura e Turismo": {
+    title: "Cultura e Turismo",
+    description: "Fomento e acesso à cultura e turismo",
+    icon: Palette,
+  },
+  "Meios de Comunicação e Redes Sociais": {
+    title: "Mídia e Redes Sociais",
+    description: "Consumo de informação e tendências",
+    icon: MessageSquare,
+  },
+  // Adicione outros mapeamentos conforme necessário
+}
+
+const defaultThemeConfig = {
+  title: "Análise de Tema",
+  description: "Explore os dados desta área temática",
+  icon: FileText,
+}
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const [temas] = useState(TEMAS_PESQUISA)
+  const { logout } = useAuth()
+  const [temas, setTemas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const fetchThemes = async () => {
+      try {
+        setLoading(true)
+        const response = await ApiBase.get("/api/data/themes")
+        if (response.data && response.data.success) {
+          const apiThemes = response.data.themes
+
+          // Ordenar para que "Popularidade tracking" venha primeiro
+          apiThemes.sort((a, b) => {
+            if (a.theme === "Popularidade tracking") return -1
+            if (b.theme === "Popularidade tracking") return 1
+            return 0
+          })
+
+          // Mapear e enriquecer os dados dos temas
+          const processedTemas = apiThemes.map((tema) => {
+            const config = themeConfig[tema.theme] || defaultThemeConfig
+            return {
+              id: tema.slug, // Usar o slug como ID
+              slug: tema.slug, // Manter o slug para a rota
+              apiTheme: tema.theme,
+              questionCount: tema.questionCount,
+              ...config,
+            }
+          })
+          setTemas(processedTemas)
+        } else {
+          setError("Não foi possível carregar os temas.")
+        }
+      } catch (err) {
+        setError("Erro de conexão. Verifique sua internet e tente novamente.")
+        console.error("Erro ao buscar temas:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchThemes()
+  }, [])
 
   const handleTemaClick = (tema) => {
-    // Por enquanto, redireciona para o dashboard atual
-    // No futuro, cada tema terá sua própria página
-    navigate("/dashboard")
+    // Navega para a nova página de perguntas, usando o slug do tema
+    navigate(`/theme/${tema.slug}`)
   }
 
-  const cardStyle = {
-    cursor: "pointer",
-    transition: "all 0.3s ease",
-    border: "1px solid rgba(0, 0, 0, 0.08)",
-    borderRadius: "16px",
-    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.08)",
-    overflow: "hidden",
-    height: "280px",
+  const handleLogout = () => {
+    logout()
+    navigate("/login")
   }
-
-  const overlayStyle = (cor) => ({
-    background: `linear-gradient(135deg, ${cor}ee 0%, ${cor}cc 100%)`,
-    color: "white",
-    padding: "24px",
-    height: "100%",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    position: "relative",
-  })
 
   return (
-    <Container fluid className="min-vh-100" style={{ backgroundColor: "#f8f9fa", paddingTop: "40px" }}>
-      {/* Header */}
-      <div className="text-center mb-5">
-        <div className="d-flex justify-content-center align-items-center mb-3">
-          <FileText size={48} className="text-primary me-3" />
-          <h1
-            className="mb-0"
-            style={{
-              fontSize: "2.5rem",
-              fontWeight: "700",
-              color: "#1e293b",
-              fontFamily: "system-ui, -apple-system, sans-serif",
-            }}
-          >
-            PESQUISAS DE OPINIÃO PÚBLICA
-          </h1>
-        </div>
-        <div className="text-center">
-          <p
-            className="mb-1"
-            style={{
-              fontSize: "1.1rem",
-              color: "#64748b",
-              fontWeight: "500",
-            }}
-          >
-            Secretaria de Comunicação Social da Presidência da República
-          </p>
-          <p
-            style={{
-              fontSize: "0.95rem",
-              color: "#94a3b8",
-              fontWeight: "400",
-            }}
-          >
-            Dashboard de Análise e Monitoramento - Governo Federal
-          </p>
-        </div>
-      </div>
+    <div className="home-page-wrapper">
+      <header className="main-header">
+        <Container className="d-flex justify-content-between align-items-center">
+          <Image src="/nexus-logo.png" alt="Nexus Logo" className="header-logo-nexus" />
+          <Button variant="outline-light" size="sm" onClick={handleLogout}>
+            Sair
+          </Button>
+        </Container>
+      </header>
 
-      {/* Subtitle */}
-      <div className="text-center mb-4">
-        <h2
-          style={{
-            fontSize: "1.5rem",
-            fontWeight: "600",
-            color: "#475569",
-            marginBottom: "8px",
-          }}
-        >
-          Selecione um Tema para Análise
-        </h2>
-        <p style={{ color: "#64748b", fontSize: "1rem" }}>
-          Explore os dados das pesquisas organizados por área temática
-        </p>
-      </div>
+      <main className="content-area">
+        <Container>
+          <div className="page-title-section">
+            <Image src="governo-federal-logo.png" alt="Governo Federal" className="gov-logo" />
+            <h1 className="main-title">PESQUISAS DE OPINIÃO PÚBLICA</h1>
+            <h2 className="main-subtitle">Selecione um Tema para Análise</h2>
+            <p className="main-description">Explore os dados das pesquisas organizados por área temática</p>
+          </div>
 
-      {/* Cards Grid */}
-      <Row className="g-4 justify-content-center" style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        {temas.map((tema) => {
-          const IconComponent = tema.icon
-          return (
-            <Col key={tema.id} lg={4} md={6} sm={12}>
-              <Card
-                style={cardStyle}
-                onClick={() => handleTemaClick(tema)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-8px)"
-                  e.currentTarget.style.boxShadow = "0 12px 24px rgba(0, 0, 0, 0.15)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)"
-                  e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.08)"
-                }}
-              >
-                <div style={overlayStyle(tema.cor)}>
-                  {/* Icon */}
-                  <div className="d-flex justify-content-center mb-3">
-                    <div
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        borderRadius: "50%",
-                        padding: "16px",
-                        backdropFilter: "blur(10px)",
-                      }}
-                    >
-                      <IconComponent size={40} color="white" />
-                    </div>
-                  </div>
+          {loading && (
+            <div className="text-center py-5">
+              <Spinner animation="border" variant="primary" />
+              <p className="mt-3 text-muted">Carregando temas...</p>
+            </div>
+          )}
 
-                  {/* Content */}
-                  <div className="text-center">
-                    <h3
-                      style={{
-                        fontSize: "1.4rem",
-                        fontWeight: "700",
-                        marginBottom: "12px",
-                        textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                      }}
-                    >
-                      {tema.titulo}
-                    </h3>
-                    <p
-                      style={{
-                        fontSize: "0.95rem",
-                        opacity: 0.9,
-                        lineHeight: "1.4",
-                        marginBottom: "0",
-                      }}
-                    >
-                      {tema.descricao}
-                    </p>
-                  </div>
+          {error && (
+            <div className="alert alert-danger text-center">
+              <p className="mb-0">{error}</p>
+            </div>
+          )}
 
-                  {/* Bottom indicator */}
-                  <div className="text-center mt-3">
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        padding: "6px 12px",
-                        borderRadius: "20px",
-                        fontSize: "0.85rem",
-                        fontWeight: "500",
-                      }}
-                    >
-                      <BarChart3 size={16} className="me-2" />
-                      Ver Análises
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-          )
-        })}
-      </Row>
+          {!loading && !error && (
+            <Row className="g-4 justify-content-center">
+              {temas.map((tema) => {
+                const IconComponent = tema.icon
+                return (
+                  <Col key={tema.id} lg={4} md={6} sm={12}>
+                    <Card className="theme-card" onClick={() => handleTemaClick(tema)}>
+                      <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center">
+                        <div className="theme-icon-wrapper">
+                          <IconComponent size={32} color="white" />
+                        </div>
+                        <h3 className="theme-card-title">{tema.title}</h3>
+                        <p className="theme-card-description">{tema.description}</p>
+                        <Button variant="dark" size="sm" className="view-analysis-btn">
+                          <BarChart3 size={14} className="me-2" />
+                          Ver Análises
+                        </Button>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                )
+              })}
+            </Row>
+          )}
+        </Container>
+      </main>
 
-      {/* Footer info */}
-      <div className="text-center mt-5 pb-4">
-        <p style={{ color: "#94a3b8", fontSize: "0.9rem" }}>
-          Dados atualizados em tempo real • Sistema de Monitoramento Secom/PR
-        </p>
-      </div>
-    </Container>
+      <footer className="page-footer">
+        <p>Dados atualizados em tempo real • Sistema de Monitoramento Secom/PR</p>
+      </footer>
+    </div>
   )
 }

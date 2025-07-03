@@ -1,0 +1,132 @@
+.home-page-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f8f9fa; /* Fundo mais claro */
+}
+
+.main-header {
+  background-color: #343a40;
+  padding: 1rem 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-logo-nexus {
+  height: 40px;
+}
+
+.content-area {
+  flex-grow: 1;
+  padding: 40px 0;
+}
+
+.page-title-section {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.gov-logo {
+  max-height: 80px;
+  margin-bottom: 24px;
+}
+
+.main-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #212529;
+  margin-bottom: 8px;
+}
+
+.main-subtitle {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 8px;
+}
+
+.main-description {
+  font-size: 1rem;
+  color: #6c757d;
+}
+
+.theme-card {
+  background-color: #ffffff;
+  border: 1px solid #e9ecef;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  cursor: pointer;
+  height: 280px; /* Altura fixa para alinhar os botões */
+}
+
+.theme-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.theme-icon-wrapper {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background-color: #212529; /* Círculo preto */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.theme-card-title {
+  font-size: 1.25rem; /* Aumentar um pouco */
+  font-weight: 600;
+  color: #212529; /* Título preto */
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.theme-card-description {
+  font-size: 0.95rem;
+  color: #6c757d; /* Descrição cinza */
+  flex-grow: 1;
+  max-width: 90%;
+  margin-bottom: 0.5rem;
+}
+
+.theme-question-count {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.view-analysis-btn {
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 8px 20px; /* Botão um pouco maior */
+  background-color: #343a40;
+  border-color: #343a40;
+}
+
+.view-analysis-btn:hover {
+  background-color: #212529;
+  border-color: #212529;
+}
+
+.page-footer {
+  text-align: center;
+  padding: 20px 0;
+  color: #adb5bd;
+  font-size: 0.875rem;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .main-title {
+    font-size: 1.75rem;
+  }
+  .main-subtitle {
+    font-size: 1.1rem;
+  }
+  .content-area {
+    padding: 20px 0;
+  }
+}

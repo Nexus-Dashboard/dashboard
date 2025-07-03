@@ -1,0 +1,121 @@
+.questions-page-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #ffffff;
+}
+
+.main-header {
+  background-color: #343a40;
+  padding: 1rem 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-logo-nexus {
+  height: 40px;
+}
+
+.content-area {
+  flex-grow: 1;
+  padding: 40px 0;
+}
+
+.breadcrumb .breadcrumb-item a {
+  text-decoration: none;
+  color: #0d6efd;
+}
+.breadcrumb .breadcrumb-item a:hover {
+  text-decoration: underline;
+}
+
+.page-title-section {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.main-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #212529;
+  margin-bottom: 8px;
+}
+
+.main-description {
+  font-size: 1rem;
+  color: #6c757d;
+}
+
+.question-card {
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.question-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.07);
+}
+
+.question-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #212529;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 20px;
+  flex-shrink: 0;
+}
+
+.question-text-wrapper {
+  flex-grow: 1;
+}
+
+.question-text {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #343a40;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.view-question-btn {
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 6px 16px;
+  white-space: nowrap;
+}
+
+.page-footer {
+  text-align: center;
+  padding: 20px 0;
+  color: #adb5bd;
+  font-size: 0.875rem;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .main-title {
+    font-size: 1.75rem;
+  }
+  .content-area {
+    padding: 20px 0;
+  }
+  .question-card .card-body {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .question-icon-wrapper {
+    margin-right: 0;
+    margin-bottom: 16px;
+  }
+  .view-question-btn {
+    margin-top: 16px;
+    align-self: flex-start;
+  }
+}

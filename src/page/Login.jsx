@@ -1,123 +1,120 @@
 "use client"
 
-import React from "react"
-import { GoogleLogin } from "@react-oauth/google"
+import React, { useState } from "react"
+import { Card, Form, Button, Image, Alert } from "react-bootstrap"
+import { useGoogleLogin } from "@react-oauth/google"
 import { useAuth } from "../contexts/AuthContext"
-import { BarChart3 } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
+import { Eye, EyeSlash } from "react-bootstrap-icons"
+import "./Login.css"
 
 const Login = () => {
-  const { login, isAuthenticated, isAuthorized } = useAuth()
+  const { login, loginWithGoogle, isAuthenticated } = useAuth()
   const navigate = useNavigate()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
-  const handleSuccess = (credentialResponse) => {
-    if (credentialResponse.credential) {
-      login(credentialResponse.credential)
+  const handleEmailPasswordLogin = async (e) => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+    try {
+      await login(email, password)
+      navigate("/home", { replace: true })
+    } catch (err) {
+      setError(err.response?.data?.message || "Email ou senha inválidos.")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleError = () => {
-    console.error("Erro no login com Google")
-    alert("Erro ao fazer login com o Google. Por favor, tente novamente.")
-  }
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true)
+      setError("")
+      try {
+        await loginWithGoogle(tokenResponse.access_token)
+        navigate("/home", { replace: true })
+      } catch (err) {
+        setError("Falha na autenticação com o Google.")
+      } finally {
+        setLoading(false)
+      }
+    },
+    onError: () => {
+      setError("Erro ao fazer login com o Google. Por favor, tente novamente.")
+    },
+  })
 
-  // Se já estiver autenticado e autorizado, redireciona para a home
   React.useEffect(() => {
-    if (isAuthenticated && isAuthorized) {
+    if (isAuthenticated) {
       navigate("/home", { replace: true })
     }
-  }, [isAuthenticated, isAuthorized, navigate])
+  }, [isAuthenticated, navigate])
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative">
-      {/* Background Image */}
-      <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-0"
-        style={{
-          backgroundImage: "url('/images/banner-background.webp')",
-        }}
-      >
-        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm"></div>
-      </div>
+    <div className="login-page">
+      <Image src="/governo-federal-logo.png" alt="Governo Federal" className="login-logo-gov" />
+      <Card className="login-card">
+        <Card.Body>
+          <h2>Dashboard pesquisas de opinião pública</h2>
+          {error && <Alert variant="danger">{error}</Alert>}
+          <Form onSubmit={handleEmailPasswordLogin} className="login-form">
+            <Form.Group controlId="formBasicEmail">
+              <Form.Control
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </Form.Group>
+            <br />
 
-      {/* Login Content */}
-      <div className="relative z-10 max-w-md w-full mx-4">
-        <div
-          style={{
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
-            borderRadius: "12px",
-            boxShadow: "0 8px 16px rgba(0, 0, 0, 0.15)",
-            padding: "2.5rem",
-            backdropFilter: "blur(5px)",
-            border: "1px solid rgba(0, 0, 0, 0.08)",
-          }}
-        >
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <div
-                style={{
-                  width: "64px",
-                  height: "64px",
-                  backgroundColor: "#183EFF",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <BarChart3 className="w-8 h-8 text-white" />
+            <Form.Group controlId="formBasicPassword">
+              <div className="password-input-container">
+                <Form.Control
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Senha"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+                <div className="password-toggle-icon" onClick={() => !loading && setShowPassword(!showPassword)}>
+                  {showPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
+                </div>
               </div>
-            </div>
-            <h1
-              style={{
-                fontSize: "2rem",
-                fontWeight: "700",
-                color: "#333",
-                marginBottom: "0.5rem",
-                fontFamily: "Rawline, sans-serif",
-              }}
-            >
-              Dashboard Secom/PR
-            </h1>
-            <p
-              style={{
-                color: "#666",
-                fontSize: "1rem",
-                fontFamily: "Rawline, sans-serif",
-              }}
-            >
-              Acesse as pesquisas de opinião pública
-            </p>
+            </Form.Group>
+            <br />
+
+            <Button variant="primary" type="submit" className="login-btn" disabled={loading}>
+              {loading ? <div className="spinner-dot"></div> : "Login"}
+            </Button>
+          </Form>
+
+          <div className="divider">ou</div>
+
+          <Button onClick={() => googleLogin()} variant="light" className="google-login-btn" disabled={loading}>
+            <Image src="/google-icon.png" alt="Google icon" className="google-icon" />
+            Fazer Login com o Google
+          </Button>
+
+          <div className="register-link">
+            <Link to="/register" className="back-to-login-link">
+              Não possui uma conta? Cadastre-se
+            </Link>
           </div>
 
-          {/* Google Login Button */}
-          <div className="flex justify-center">
-            <GoogleLogin
-              onSuccess={handleSuccess}
-              onError={handleError}
-              theme="outline"
-              size="large"
-              text="signin_with"
-              shape="rectangular"
-              logo_alignment="left"
-            />
+          <div className="nexus-logo-container">
+            <Image src="/nexus-logo.png" alt="Nexus Logo" className="login-logo-nexus" />
           </div>
-
-          {/* Footer */}
-          <div className="mt-8 text-center">
-            <p
-              style={{
-                fontSize: "0.75rem",
-                color: "#888",
-                fontFamily: "Rawline, sans-serif",
-              }}
-            >
-              Apenas usuários com e-mails autorizados da Secom/PR podem acessar este sistema.
-            </p>
-          </div>
-        </div>
-      </div>
+        </Card.Body>
+      </Card>
     </div>
   )
 }
