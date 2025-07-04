@@ -15,7 +15,7 @@ const DemographicFilters = ({ availableDemographics, onFilterChange, activeFilte
   ]
 
   return (
-    <Box sx={{ mt: 3 }}>
+    <Box sx={{ mt: 3, borderTop: "1px solid #e0e0e0", pt: 2 }}>
       <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: "bold" }}>
         Filtros Demográficos
       </Typography>
@@ -26,7 +26,7 @@ const DemographicFilters = ({ availableDemographics, onFilterChange, activeFilte
             variant={activeFilters[filter.key] === filter.value ? "contained" : "outlined"}
             startIcon={filter.icon}
             onClick={() => onFilterChange(filter.key, filter.value)}
-            sx={{ borderRadius: "20px", textTransform: "none" }}
+            sx={{ borderRadius: "20px", textTransform: "none", fontWeight: 400 }}
           >
             {filter.label || filter.value}
           </Button>

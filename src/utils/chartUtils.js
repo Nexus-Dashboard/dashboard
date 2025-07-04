@@ -31,6 +31,7 @@ export const responseColorMap = {
   // Outros - CINZA
   "Não sabe": "#6c757d",
   "Não respondeu": "#6c757d",
+  "NS/NR": "#6c757d",
 
   // Aprovação
   Aprova: "#28a745",
@@ -44,7 +45,9 @@ export const getResponseColor = (response) => {
 
 // Função para normalizar respostas
 export const normalizeAnswer = (raw) => {
-  const s = String(raw || "").trim()
+  const s = String(raw || "")
+    .trim()
+    .replace(/\s*$$NÃO LER$$\s*/i, "")
   if (/^não sabe/i.test(s)) return "Não sabe"
   if (/^não respond/i.test(s)) return "Não respondeu"
   return s || "Não respondeu"

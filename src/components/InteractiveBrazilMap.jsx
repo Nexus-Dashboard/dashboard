@@ -1,18 +1,18 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import * as d3 from "d3"
+import { Box, Typography, Grid } from "@mui/material"
 import {
   normalizeAnswer,
   getResponseColor,
-  RESPONSE_ORDER,
   groupResponses,
   shouldGroupResponses,
   groupedResponseColorMap,
   GROUPED_RESPONSE_ORDER,
+  RESPONSE_ORDER,
 } from "../utils/chartUtils"
 
-// State name mappings
 const ABBR_TO_STATE_NAMES = {
   AC: "Acre",
   AL: "Alagoas",
@@ -43,43 +43,36 @@ const ABBR_TO_STATE_NAMES = {
   TO: "Tocantins",
 }
 
-const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selectedState, filters = {} }) => {
+// Reverse mapping: full state name to abbreviation
+const STATE_NAME_TO_ABBR = Object.fromEntries(Object.entries(ABBR_TO_STATE_NAMES).map(([abbr, name]) => [name, abbr]))
+
+const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => {
   const svgRef = useRef(null)
+  const tooltipRef = useRef(null)
   const [geoData, setGeoData] = useState(null)
-  const [hoveredState, setHoveredState] = useState(null)
-  const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, data: null })
 
   useEffect(() => {
-    const loadGeoData = async () => {
-      try {
-        const response = await fetch("/brazil-states.json")
-        const data = await response.json()
-        setGeoData(data)
-      } catch (error) {
-        console.error("Error loading Brazil GeoJSON:", error)
-      }
-    }
-    loadGeoData()
+    fetch("/brazil-states.json")
+      .then((res) => res.json())
+      .then(setGeoData)
+      .catch((err) => console.error("Error loading Brazil GeoJSON:", err))
   }, [])
 
   const mapData = useMemo(() => {
-    if (!responses || !selectedQuestion?.key) return new Map()
+    if (!responses || responses.length === 0 || !selectedQuestion?.variable)
+      return { stateResults: new Map(), useGrouping: false }
 
+    const questionKey = selectedQuestion.variable
     const stateResults = new Map()
-    const allAnswersInMap = new Set()
-
-    responses.forEach((r) => {
-      const answer = normalizeAnswer(r[selectedQuestion.key])
-      if (answer) allAnswersInMap.add(answer)
-    })
-
+    const allAnswersInMap = new Set(responses.map((r) => normalizeAnswer(r[questionKey])).filter(Boolean))
     const useGrouping = shouldGroupResponses(Array.from(allAnswersInMap))
 
     responses.forEach((response) => {
-      const stateAbbr = response.UF
-      if (!stateAbbr || !ABBR_TO_STATE_NAMES[stateAbbr]) return
+      const stateName = response.UF // This comes as full state name from API
+      if (!stateName || !STATE_NAME_TO_ABBR[stateName]) return
 
-      const answer = normalizeAnswer(response[selectedQuestion.key])
+      const stateAbbr = STATE_NAME_TO_ABBR[stateName]
+      const answer = normalizeAnswer(response[questionKey])
       if (!answer) return
 
       const finalAnswer = useGrouping ? groupResponses(answer) : answer
@@ -87,7 +80,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       if (!stateResults.has(stateAbbr)) {
         stateResults.set(stateAbbr, {
           id: stateAbbr,
-          name: ABBR_TO_STATE_NAMES[stateAbbr],
+          name: stateName,
           counts: {},
           total: 0,
         })
@@ -100,187 +93,184 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
 
     stateResults.forEach((stateData) => {
       if (stateData.total > 0) {
-        let maxCount = 0
-        let dominantResponse = null
+        stateData.dominantResponse = Object.keys(stateData.counts).reduce((a, b) =>
+          stateData.counts[a] > stateData.counts[b] ? a : b,
+        )
 
-        Object.entries(stateData.counts).forEach(([response, count]) => {
-          if (count > maxCount) {
-            maxCount = count
-            dominantResponse = response
-          }
-        })
-
-        stateData.dominantResponse = dominantResponse
-        stateData.dominantPercentage = Math.round((maxCount / stateData.total) * 100)
-        stateData.responses = Object.entries(stateData.counts)
-          .map(([response, count]) => ({
-            response,
-            count,
-            percentage: Math.round((count / stateData.total) * 100),
-          }))
-          .sort((a, b) => b.percentage - a.percentage)
-        stateData.totalResponses = stateData.total
+        // Calculate percentage for the dominant response
+        stateData.dominantPercentage = ((stateData.counts[stateData.dominantResponse] / stateData.total) * 100).toFixed(
+          1,
+        )
       }
     })
 
-    return stateResults
-  }, [responses, selectedQuestion, filters])
+    return { stateResults, useGrouping }
+  }, [responses, selectedQuestion])
 
   useEffect(() => {
     if (!geoData || !svgRef.current) return
 
+    const { stateResults, useGrouping } = mapData
+    const colorFn = useGrouping ? (d) => groupedResponseColorMap[d] : getResponseColor
+
     const svg = d3.select(svgRef.current)
     svg.selectAll("*").remove()
 
-    const width = 600
-    const height = 500
+    const tooltip = d3.select(tooltipRef.current)
+
+    // Get container dimensions
+    const container = svgRef.current.parentElement
+    const containerWidth = container.clientWidth
+    const containerHeight = container.clientHeight
+
+    // Use container dimensions with some padding
+    const width = Math.max(containerWidth - 20, 400)
+    const height = Math.max(containerHeight - 20, 300)
+
     const projection = d3.geoMercator().fitSize([width, height], geoData)
     const path = d3.geoPath().projection(projection)
-    const g = svg.append("g")
 
-    const allAnswersInMap = new Set()
-    mapData.forEach((stateData) => {
-      if (stateData.dominantResponse) {
-        allAnswersInMap.add(stateData.dominantResponse)
-      }
-    })
-    const useGrouping = shouldGroupResponses(Array.from(allAnswersInMap))
-    const colorFn = useGrouping ? (d) => groupedResponseColorMap[d] : getResponseColor
-
-    g.selectAll("path")
+    svg
+      .attr("width", width)
+      .attr("height", height)
+      .append("g")
+      .selectAll("path")
       .data(geoData.features)
-      .enter()
-      .append("path")
+      .join("path")
       .attr("d", path)
       .attr("fill", (d) => {
-        const stateData = mapData.get(d.properties.sigla)
-        return stateData?.dominantResponse ? colorFn(stateData.dominantResponse) : "#e0e0e0"
+        const stateData = stateResults.get(d.properties.sigla)
+        return stateData?.dominantResponse ? colorFn(stateData.dominantResponse) : "#e9ecef"
       })
-      .attr("stroke", (d) => (selectedState === d.properties.sigla ? "#2c3e50" : "#ffffff"))
-      .attr("stroke-width", (d) => (selectedState === d.properties.sigla ? 2 : 1))
-      .attr("opacity", (d) => (hoveredState === d.properties.sigla ? 0.8 : 1))
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 0.5)
       .style("cursor", "pointer")
       .on("mouseover", function (event, d) {
-        const stateId = d.properties.sigla
-        const stateData = mapData.get(stateId)
-        setHoveredState(stateId)
+        d3.select(this).attr("stroke", "#343a40").attr("stroke-width", 2)
+        const stateData = stateResults.get(d.properties.sigla)
         if (stateData) {
-          const [x, y] = d3.pointer(event, document.body)
-          setTooltip({ visible: true, x: x + 15, y: y - 10, data: stateData })
+          tooltip.style("opacity", 1).html(`
+              <strong>${stateData.name}</strong><br/>
+              ${stateData.dominantResponse}: ${stateData.dominantPercentage}%<br/>
+              Total: ${stateData.total} respostas
+            `)
+        } else {
+          tooltip
+            .style("opacity", 1)
+            .html(`<strong>${ABBR_TO_STATE_NAMES[d.properties.sigla] || d.properties.sigla}</strong><br/>Sem dados`)
         }
-        d3.select(this).attr("opacity", 0.8)
       })
       .on("mousemove", (event) => {
-        const [x, y] = d3.pointer(event, document.body)
-        setTooltip((prev) => ({ ...prev, x: x + 15, y: y - 10 }))
+        tooltip.style("left", event.pageX + 10 + "px").style("top", event.pageY - 28 + "px")
       })
       .on("mouseout", function () {
-        setHoveredState(null)
-        setTooltip({ visible: false, data: null })
-        d3.select(this).attr("opacity", 1)
+        d3.select(this).attr("stroke", "#fff").attr("stroke-width", 0.5)
+        tooltip.style("opacity", 0)
       })
       .on("click", (event, d) => {
-        const stateId = d.properties.sigla
         if (onStateClick) {
-          onStateClick(selectedState === stateId ? null : stateId)
+          onStateClick(d.properties.sigla)
         }
       })
-  }, [geoData, mapData, hoveredState, selectedState, onStateClick])
+  }, [geoData, mapData, onStateClick])
 
   const legendData = useMemo(() => {
-    const responseSet = new Set()
-    mapData.forEach((stateData) => {
-      if (stateData.dominantResponse) {
-        responseSet.add(stateData.dominantResponse)
+    const { stateResults, useGrouping } = mapData
+    if (stateResults.size === 0) return []
+
+    const legendMap = new Map()
+    const orderToUse = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
+
+    stateResults.forEach((data) => {
+      if (data.dominantResponse) {
+        if (!legendMap.has(data.dominantResponse)) {
+          legendMap.set(data.dominantResponse, {
+            response: data.dominantResponse,
+            count: 0,
+            order: orderToUse.indexOf(data.dominantResponse),
+          })
+        }
+        legendMap.get(data.dominantResponse).count++
       }
     })
 
-    const useGrouping = shouldGroupResponses(Array.from(responseSet))
-    const orderToUse = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
-    const colorFn = useGrouping ? (d) => groupedResponseColorMap[d] : getResponseColor
-
-    return Array.from(responseSet)
-      .sort((a, b) => {
-        const indexA = orderToUse.indexOf(a)
-        const indexB = orderToUse.indexOf(b)
-        if (indexA >= 0 && indexB >= 0) return indexA - indexB
-        if (indexA >= 0) return -1
-        if (indexB >= 0) return 1
-        return a.localeCompare(b)
-      })
-      .map((response) => ({
-        response,
-        color: colorFn(response) || "#6c757d",
-        count: Array.from(mapData.values()).filter((state) => state.dominantResponse === response).length,
-      }))
+    return Array.from(legendMap.values()).sort((a, b) => {
+      if (a.order !== -1 && b.order !== -1) return a.order - b.order
+      return a.response.localeCompare(b.response)
+    })
   }, [mapData])
 
   return (
-    <Box sx={{ position: "relative" }}>
-      <svg
-        ref={svgRef}
-        width="100%"
-        height="auto"
-        viewBox="0 0 600 500"
-        style={{ background: "#f8f9fa", borderRadius: "8px" }}
-      />
-      {tooltip.visible && tooltip.data && (
-        <div
-          style={{
-            position: "fixed",
-            left: tooltip.x,
-            top: tooltip.y,
-            background: "white",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            padding: "12px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-            fontSize: "14px",
-            zIndex: 1000,
-            maxWidth: "250px",
-            pointerEvents: "none",
-          }}
-        >
-          <div style={{ fontWeight: "bold", marginBottom: "8px", color: "#2c3e50" }}>{tooltip.data.name}</div>
-          <div style={{ marginBottom: "4px" }}>
-            <strong>Resposta dominante:</strong> {tooltip.data.dominantResponse}
-          </div>
-          <div style={{ marginBottom: "8px" }}>
-            <strong>Percentual:</strong> {tooltip.data.dominantPercentage}%
-          </div>
-          <div style={{ fontSize: "12px", color: "#666" }}>
-            <strong>Total de respostas:</strong> {tooltip.data.totalResponses}
-          </div>
-        </div>
-      )}
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="subtitle2" sx={{ mb: 1 }}>
-          Legenda
-        </Typography>
-        {legendData.map(({ response, color, count }) => (
-          <Box key={response} sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
-            <Box
-              sx={{
-                width: 16,
-                height: 16,
-                backgroundColor: color,
-                mr: 1,
-                borderRadius: "2px",
-                border: "1px solid #ddd",
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <Grid container spacing={2} sx={{ height: "100%" }}>
+        <Grid item xs={8} sx={{ height: "100%" }}>
+          <Box sx={{ width: "100%", height: "100%", minHeight: "300px" }}>
+            <svg
+              ref={svgRef}
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "block",
               }}
             />
-            <Typography variant="body2">
-              {response} ({count} {count > 1 ? "estados" : "estado"})
-            </Typography>
           </Box>
-        ))}
-      </Box>
+        </Grid>
+        <Grid item xs={4} sx={{ height: "100%", overflow: "auto" }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold" }}>
+            Legenda
+          </Typography>
+          {legendData.length > 0 ? (
+            legendData.map(({ response, count }) => (
+              <Box key={response} sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Box
+                  sx={{
+                    width: 18,
+                    height: 18,
+                    backgroundColor: mapData.useGrouping
+                      ? groupedResponseColorMap[response]
+                      : getResponseColor(response),
+                    mr: 1.5,
+                    borderRadius: "4px",
+                    flexShrink: 0,
+                  }}
+                />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500, fontSize: "0.8rem" }}>
+                    {response}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {count} {count > 1 ? "estados" : "estado"}
+                  </Typography>
+                </Box>
+              </Box>
+            ))
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Sem dados para exibir
+            </Typography>
+          )}
+        </Grid>
+      </Grid>
+      <div
+        ref={tooltipRef}
+        style={{
+          position: "absolute",
+          textAlign: "left",
+          padding: "8px 12px",
+          background: "rgba(0, 0, 0, 0.8)",
+          color: "white",
+          borderRadius: "4px",
+          pointerEvents: "none",
+          opacity: 0,
+          transition: "opacity 0.2s",
+          fontSize: "12px",
+          lineHeight: "1.4",
+          maxWidth: "200px",
+          zIndex: 1000,
+        }}
+      ></div>
     </Box>
   )
 }
-
-// Dummy Box component for syntax compatibility
-const Box = ({ children, sx }) => <div style={sx}>{children}</div>
-const Typography = ({ children, ...props }) => <p {...props}>{children}</p>
 
 export default InteractiveBrazilMap
