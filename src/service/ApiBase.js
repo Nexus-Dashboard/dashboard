@@ -2,7 +2,7 @@ import axios from "axios"
 
 const ApiBase = axios.create({
   baseURL: "https://api-phi-one-99.vercel.app" || "http://localhost:4000",
-  timeout: 30000,
+  timeout: 120000, // Aumentado para 2 minutos (120 segundos)
   headers: {
     "Content-Type": "application/json",
   },
@@ -25,7 +25,12 @@ ApiBase.interceptors.response.use(
     return response
   },
   (error) => {
-    console.error("API Error:", error.response?.data || error.message)
+    // Better error handling for timeouts and large responses
+    if (error.code === "ECONNABORTED") {
+      console.error("Request timeout - A resposta da API está demorando mais que o esperado")
+    } else {
+      console.error("API Error:", error.response?.data || error.message)
+    }
     return Promise.reject(error)
   },
 )

@@ -23,7 +23,7 @@ const Login = () => {
     setLoading(true)
     try {
       await login(email, password)
-      navigate("/home", { replace: true })
+      navigate("/", { replace: true })
     } catch (err) {
       setError(err.response?.data?.message || "Email ou senha inválidos.")
     } finally {
@@ -37,7 +37,7 @@ const Login = () => {
       setError("")
       try {
         await loginWithGoogle(tokenResponse.access_token)
-        navigate("/home", { replace: true })
+        navigate("/", { replace: true })
       } catch (err) {
         setError("Falha na autenticação com o Google.")
       } finally {
@@ -51,7 +51,7 @@ const Login = () => {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      navigate("/home", { replace: true })
+      navigate("/", { replace: true })
     }
   }, [isAuthenticated, navigate])
 

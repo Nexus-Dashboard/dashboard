@@ -10,7 +10,7 @@ import "./ThemeQuestionsPage.css"
 
 export default function ThemeQuestionsPage() {
   const navigate = useNavigate()
-  const { themeSlug } = useParams()
+  const { surveyType, themeSlug } = useParams()
   const { logout } = useAuth()
 
   const [questions, setQuestions] = useState([])
@@ -81,8 +81,11 @@ export default function ThemeQuestionsPage() {
       <main className="content-area">
         <Container>
           <Breadcrumb className="mb-4">
-            <Breadcrumb.Item linkAs={Link} linkProps={{ to: "/home" }}>
-              Temas
+            <Breadcrumb.Item linkAs={Link} linkProps={{ to: "/" }}>
+              Tipos de Pesquisa
+            </Breadcrumb.Item>
+            <Breadcrumb.Item linkAs={Link} linkProps={{ to: `/themes/${surveyType}` }}>
+              {surveyType === "telefonica" ? "Pesquisas Telefônicas" : "Pesquisas F2F"}
             </Breadcrumb.Item>
             <Breadcrumb.Item active>{loading ? "Carregando..." : themeName}</Breadcrumb.Item>
           </Breadcrumb>
@@ -106,7 +109,7 @@ export default function ThemeQuestionsPage() {
           {error && (
             <div className="alert alert-danger text-center">
               <p className="mb-0">{error}</p>
-              <Button variant="primary" size="sm" className="mt-3" onClick={() => navigate("/home")}>
+              <Button variant="primary" size="sm" className="mt-3" onClick={() => navigate(`/themes/${surveyType}`)}>
                 <ChevronLeft size={16} className="me-2" />
                 Voltar para Temas
               </Button>

@@ -3,9 +3,9 @@
 import { useState, useMemo, useRef, useEffect } from "react"
 import { useLocation } from "react-router-dom"
 import ApiBase from "../service/ApiBase"
-import { useInfiniteQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { ResponsiveLine } from "@nivo/line"
-import { Box, Typography, CircularProgress, IconButton, Button } from "@mui/material"
+import { Box, Typography, CircularProgress, IconButton, Button, LinearProgress } from "@mui/material"
 import { Download, PictureAsPdf, Menu as MenuIcon } from "@mui/icons-material"
 import OffcanvasNavigation from "../components/OffcanvasNavigation"
 import InteractiveBrazilMap from "../components/InteractiveBrazilMap"
@@ -20,11 +20,27 @@ import {
 } from "../utils/chartUtils"
 import "./Dashboard.css"
 
-const fetchQuestionData = async ({ queryKey, pageParam = 1 }) => {
+// Updated fetch function for the new API structure
+const fetchQuestionData = async ({ queryKey }) => {
   const [, questionCode] = queryKey
-  const { data } = await ApiBase.get(`/api/data/question/${questionCode}/responses?page=${pageParam}&limit=5`)
-  return data
+  console.log(`Iniciando busca para pergunta: ${questionCode}`)
+
+  try {
+    const { data } = await ApiBase.get(`/api/data/question/${questionCode}/responses`)
+    console.log("Dados recebidos com sucesso")
+
+    if (!data.success) {
+      throw new Error("API returned an error")
+    }
+    return data
+  } catch (error) {
+    console.error("Erro na busca de dados:", error.message)
+    throw error
+  }
 }
+
+// UF demographic key - adjust this if your API uses a different key for states
+const UF_DEMOGRAPHIC_KEY = "UF"
 
 export default function Dashboard() {
   const chartRef = useRef(null)
@@ -32,154 +48,138 @@ export default function Dashboard() {
 
   const [showOffcanvas, setShowOffcanvas] = useState(false)
   const [filters, setFilters] = useState({})
-  const [chartRangeStart, setChartRangeStart] = useState(0) // Start from most recent
-  const [chartRangeEnd, setChartRangeEnd] = useState(9) // Show last 10 rounds
-  const [selectedMapRoundIndex, setSelectedMapRoundIndex] = useState(0) // Most recent round
+  const [chartRangeStart, setChartRangeStart] = useState(0)
+  const [chartRangeEnd, setChartRangeEnd] = useState(9)
+  const [selectedMapRoundIndex, setSelectedMapRoundIndex] = useState(0)
 
   const questionCode = useMemo(() => {
     const params = new URLSearchParams(location.search)
     return params.get("question")
   }, [location.search])
 
-  const { data, error, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, status } = useInfiniteQuery({
+  // Enhanced query with better timeout handling
+  const { data, error, status, isFetching } = useQuery({
     queryKey: ["questionData", questionCode],
     queryFn: fetchQuestionData,
-    getNextPageParam: (lastPage) => {
-      if (lastPage.pagination.hasNextPage) {
-        return lastPage.pagination.currentPage + 1
-      }
-      return undefined
-    },
     enabled: !!questionCode,
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: 1000 * 60 * 10, // 10 minutes - dados grandes não mudam frequentemente
+    cacheTime: 1000 * 60 * 15, // 15 minutes cache
     refetchOnWindowFocus: false,
+    retry: 2, // Retry 2 times on failure
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   })
 
-  // Auto-fetch remaining pages in background after first page loads
-  useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage && data?.pages?.length >= 1) {
-      const timer = setTimeout(() => {
-        fetchNextPage()
-      }, 100) // Small delay to not block UI
-      return () => clearTimeout(timer)
-    }
-  }, [hasNextPage, fetchNextPage, isFetchingNextPage, data?.pages?.length])
-
   const { questionInfo, allHistoricalData, availableDemographics, mapRoundsWithData } = useMemo(() => {
-    if (!data?.pages || data.pages.length === 0) {
+    if (!data) {
       return { questionInfo: null, allHistoricalData: [], availableDemographics: [], mapRoundsWithData: [] }
     }
 
-    // Properly append all historical data from all pages
-    const allHistoricalData = []
-    data.pages.forEach((page) => {
-      if (page.historicalData && Array.isArray(page.historicalData)) {
-        allHistoricalData.push(...page.historicalData)
-      }
-    })
-
-    const firstPage = data.pages[0]
+    console.log("Processando dados históricos:", data.historicalData?.length || 0, "rodadas")
 
     // Sort all rounds by period (most recent first)
-    const sortedRounds = [...allHistoricalData].sort((a, b) => {
+    const sortedRounds = [...(data.historicalData || [])].sort((a, b) => {
       const [yearA, roundA] = a.period.split("-R").map(Number)
       const [yearB, roundB] = b.period.split("-R").map(Number)
-      if (yearA !== yearB) return yearB - yearA // Most recent first
+      if (yearA !== yearB) return yearB - yearA
       return roundB - roundA
     })
 
     // Filter rounds that have UF data for the map
     const roundsWithMapData = sortedRounds.filter((round) => {
       return round.distribution.some(
-        (dist) => dist.demographics && dist.demographics.UF && dist.demographics.UF.length > 0,
+        (dist) =>
+          dist.demographics &&
+          dist.demographics[UF_DEMOGRAPHIC_KEY] &&
+          dist.demographics[UF_DEMOGRAPHIC_KEY].length > 0,
       )
     })
 
+    console.log("Rodadas com dados de mapa:", roundsWithMapData.length)
+
+    // Generate availableDemographics from demographicFields
+    const demographics = (data.demographicFields || []).map((field) => {
+      return { key: field, label: field, values: [] }
+    })
+
     return {
-      questionInfo: firstPage.questionInfo,
+      questionInfo: data.questionInfo,
       allHistoricalData: sortedRounds,
-      availableDemographics: firstPage.availableDemographics || [],
+      availableDemographics: demographics,
       mapRoundsWithData: roundsWithMapData,
     }
   }, [data])
 
-  // Update range when data changes - start from most recent
+  // Update range when data changes
   useEffect(() => {
     if (allHistoricalData.length > 0) {
       const maxIndex = Math.max(0, allHistoricalData.length - 1)
-      setChartRangeStart(0) // Start from most recent (index 0)
-      setChartRangeEnd(Math.min(9, maxIndex)) // Show up to 10 rounds or all available
+      setChartRangeStart(0)
+      setChartRangeEnd(Math.min(9, maxIndex))
+      console.log(`Configurando range do gráfico: ${0} a ${Math.min(9, maxIndex)}`)
     }
   }, [allHistoricalData])
 
-  // Update selected map round index - always start with most recent
+  // Update selected map round index
   useEffect(() => {
     if (mapRoundsWithData.length > 0) {
-      setSelectedMapRoundIndex(0) // Most recent round with data
+      setSelectedMapRoundIndex(0)
+      console.log("Selecionando rodada mais recente para o mapa")
     }
   }, [mapRoundsWithData])
 
-  // Get the selected rounds for the chart (slice from sorted array)
   const selectedChartData = useMemo(() => {
     if (!allHistoricalData.length) return []
     return allHistoricalData.slice(chartRangeStart, chartRangeEnd + 1)
   }, [allHistoricalData, chartRangeStart, chartRangeEnd])
 
-  // Extract map data for the selected round
   const mapData = useMemo(() => {
-    if (!mapRoundsWithData.length || selectedMapRoundIndex >= mapRoundsWithData.length) {
+    if (!mapRoundsWithData.length || selectedMapRoundIndex >= mapRoundsWithData.length || !questionInfo) {
       return []
     }
 
     const selectedRound = mapRoundsWithData[selectedMapRoundIndex]
     const mapResponses = []
 
-    if (selectedRound && questionInfo) {
-      // Process each response type in the distribution
-      selectedRound.distribution.forEach((dist) => {
-        const responseValue = dist.response
+    selectedRound.distribution.forEach((dist) => {
+      const responseValue = dist.response
+      const ufDemographics = dist.demographics?.[UF_DEMOGRAPHIC_KEY]
 
-        // Get UF demographics for this response
-        if (dist.demographics && dist.demographics.UF) {
-          dist.demographics.UF.forEach((ufDemo) => {
-            // Create individual response entries for each count
-            for (let i = 0; i < ufDemo.count; i++) {
-              mapResponses.push({
-                [questionInfo.variable]: responseValue,
-                UF: ufDemo.response, // This is the state name from API
-              })
-            }
-          })
-        }
-      })
-    }
+      if (ufDemographics) {
+        ufDemographics.forEach((ufDemo) => {
+          // Create individual response entries for each count
+          for (let i = 0; i < ufDemo.count; i++) {
+            mapResponses.push({
+              [questionInfo.variable]: responseValue,
+              UF: ufDemo.response, // This is the state name from API
+            })
+          }
+        })
+      }
+    })
 
+    console.log("Dados do mapa processados:", mapResponses.length, "respostas")
     return mapResponses
   }, [mapRoundsWithData, selectedMapRoundIndex, questionInfo])
 
   const chartData = useMemo(() => {
     if (!selectedChartData || selectedChartData.length === 0) return []
 
-    // 1. Get all unique periods from the selected data and sort them chronologically
     const allPeriods = [...new Set(selectedChartData.map((d) => d.period))].filter(Boolean)
     allPeriods.sort((a, b) => {
       const [yearA, roundA] = a.split("-R").map(Number)
       const [yearB, roundB] = b.split("-R").map(Number)
-      if (yearA !== yearB) return yearA - yearB // Chronological order for X-axis
+      if (yearA !== yearB) return yearA - yearB
       return roundA - roundB
     })
 
     if (allPeriods.length === 0) return []
 
-    // 2. Create a lookup map for faster data access
     const dataByPeriod = new Map(selectedChartData.map((d) => [d.period, d]))
 
-    // 3. Determine if responses should be grouped
     const allActualResponses = new Set(selectedChartData.flatMap((r) => r.distribution.map((d) => d.response)))
     const useGrouping = shouldGroupResponses(Array.from(allActualResponses))
     const responseOrder = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
 
-    // 4. Identify all unique series IDs
     const allSeriesIds = new Set()
     selectedChartData.forEach((rodada) => {
       rodada.distribution.forEach((dist) => {
@@ -190,7 +190,6 @@ export default function Dashboard() {
 
     if (allSeriesIds.size === 0) return []
 
-    // 5. Build the series data, ensuring every series has a point for every period
     const series = Array.from(allSeriesIds).map((seriesId) => ({
       id: seriesId,
       data: allPeriods
@@ -223,7 +222,6 @@ export default function Dashboard() {
         .filter((point) => point.x && point.x !== ""),
     }))
 
-    // 6. Sort the final series array according to the CORRECT order (best to worst)
     const sortedSeries = series.sort((a, b) => {
       const indexA = responseOrder.indexOf(a.id)
       const indexB = responseOrder.indexOf(b.id)
@@ -233,6 +231,7 @@ export default function Dashboard() {
       return a.id.localeCompare(b.id)
     })
 
+    console.log("Dados do gráfico processados:", sortedSeries.length, "séries")
     return sortedSeries.filter((serie) => serie.data && serie.data.length > 0)
   }, [selectedChartData])
 
@@ -248,24 +247,43 @@ export default function Dashboard() {
     })
   }
 
-  // Show loading only for initial first page load
+  // Enhanced loading state with progress indication
   if (status === "loading") {
     return (
       <Box className="loading-container">
         <CircularProgress size={60} />
-        <Typography variant="h6" color="text.secondary" sx={{ mt: 2 }}>
+        <Typography variant="h6" color="text.secondary" sx={{ mt: 2, mb: 2 }}>
           Carregando dados da pergunta...
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Esta operação pode levar até 2 minutos devido ao volume de dados
+        </Typography>
+        <Box sx={{ width: "300px", mt: 2 }}>
+          <LinearProgress />
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+          Processando dados históricos e demográficos...
         </Typography>
       </Box>
     )
   }
 
   if (status === "error") {
+    const isTimeout = error?.code === "ECONNABORTED" || error?.message?.includes("timeout")
+
     return (
       <Box className="error-container">
-        <Typography variant="h5" color="error">
-          Erro ao carregar dados: {error.message}
+        <Typography variant="h5" color="error" sx={{ mb: 2 }}>
+          {isTimeout ? "Timeout na Requisição" : "Erro ao carregar dados"}
         </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+          {isTimeout
+            ? "A resposta da API está demorando mais que o esperado. Isso pode acontecer com grandes volumes de dados."
+            : `Erro: ${error.message}`}
+        </Typography>
+        <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
+          Tentar Novamente
+        </Button>
       </Box>
     )
   }
@@ -312,7 +330,6 @@ export default function Dashboard() {
                 {questionInfo?.label || questionInfo?.questionText || "Análise Temporal"}
               </Typography>
 
-              {/* Chart Range Selection - Corrected Logic */}
               {allHistoricalData.length > 1 && (
                 <Box sx={{ mb: 3, px: 1 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: "block" }}>
@@ -321,7 +338,6 @@ export default function Dashboard() {
                   </Typography>
 
                   <Box sx={{ position: "relative", height: "40px", mb: 1 }}>
-                    {/* Background track */}
                     <Box
                       sx={{
                         position: "absolute",
@@ -333,8 +349,6 @@ export default function Dashboard() {
                         borderRadius: "3px",
                       }}
                     />
-
-                    {/* Active range */}
                     <Box
                       sx={{
                         position: "absolute",
@@ -346,8 +360,6 @@ export default function Dashboard() {
                         width: `${((chartRangeEnd - chartRangeStart) / Math.max(1, allHistoricalData.length - 1)) * 100}%`,
                       }}
                     />
-
-                    {/* Start handle slider (most recent) */}
                     <input
                       type="range"
                       min={0}
@@ -355,9 +367,8 @@ export default function Dashboard() {
                       value={chartRangeStart}
                       onChange={(e) => {
                         const newStart = Number.parseInt(e.target.value)
-                        setChartRangeStart(newStart)
-                        if (newStart > chartRangeEnd) {
-                          setChartRangeEnd(newStart)
+                        if (newStart <= chartRangeEnd) {
+                          setChartRangeStart(newStart)
                         }
                       }}
                       className="range-slider range-slider-start"
@@ -373,14 +384,17 @@ export default function Dashboard() {
                         zIndex: 2,
                       }}
                     />
-
-                    {/* End handle slider (oldest in selection) */}
                     <input
                       type="range"
                       min={0}
                       max={Math.max(0, allHistoricalData.length - 1)}
                       value={chartRangeEnd}
-                      onChange={(e) => setChartRangeEnd(Number.parseInt(e.target.value))}
+                      onChange={(e) => {
+                        const newEnd = Number.parseInt(e.target.value)
+                        if (newEnd >= chartRangeStart) {
+                          setChartRangeEnd(newEnd)
+                        }
+                      }}
                       className="range-slider range-slider-end"
                       style={{
                         position: "absolute",
@@ -413,7 +427,7 @@ export default function Dashboard() {
                     data={chartData}
                     margin={{ top: 20, right: 110, bottom: 60, left: 60 }}
                     xScale={{ type: "point" }}
-                    yScale={{ type: "linear", min: 0, max: 50 }}
+                    yScale={{ type: "linear", min: 0, max: "auto" }}
                     yFormat=" >-.1f"
                     curve="monotoneX"
                     axisTop={null}
@@ -467,12 +481,11 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Loading indicator for background fetching */}
-              {isFetching && hasNextPage && (
+              {isFetching && (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", mt: 1 }}>
                   <CircularProgress size={16} sx={{ mr: 1 }} />
                   <Typography variant="caption" color="text.secondary">
-                    Carregando mais dados...
+                    Atualizando dados...
                   </Typography>
                 </Box>
               )}
@@ -487,7 +500,6 @@ export default function Dashboard() {
                 Visualização geográfica das respostas por estado
               </Typography>
 
-              {/* Map Round Selection Slider - Only for rounds with data */}
               {mapRoundsWithData.length > 1 && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
@@ -513,7 +525,21 @@ export default function Dashboard() {
               )}
 
               <div className="map-container">
-                <InteractiveBrazilMap responses={mapData} selectedQuestion={questionInfo} onStateClick={() => {}} />
+                {mapData.length > 0 ? (
+                  <InteractiveBrazilMap responses={mapData} selectedQuestion={questionInfo} onStateClick={() => {}} />
+                ) : (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      height: "100%",
+                      color: "text.secondary",
+                    }}
+                  >
+                    <Typography>Nenhum dado geográfico para a rodada selecionada.</Typography>
+                  </Box>
+                )}
               </div>
               <DemographicFilters
                 availableDemographics={availableDemographics}

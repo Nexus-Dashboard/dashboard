@@ -8,6 +8,7 @@ import Login from "../page/Login"
 import Register from "../page/Register"
 import { useAuth } from "../contexts/AuthContext"
 import ThemeQuestionsPage from "../page/ThemeQuestionsPage"
+import SurveyTypePage from "../page/SurveyTypePage"
 
 // Componente de Rota Protegida
 const ProtectedRoute = ({ children }) => {
@@ -45,12 +46,12 @@ const Routers = () => (
       path="/"
       element={
         <ProtectedRoute>
-          <HomePage />
+          <SurveyTypePage />
         </ProtectedRoute>
       }
     />
     <Route
-      path="/home"
+      path="/themes/:surveyType"
       element={
         <ProtectedRoute>
           <HomePage />
@@ -58,7 +59,7 @@ const Routers = () => (
       }
     />
     <Route
-      path="/theme/:themeSlug"
+      path="/theme/:surveyType/:themeSlug"
       element={
         <ProtectedRoute>
           <ThemeQuestionsPage />
@@ -66,7 +67,7 @@ const Routers = () => (
       }
     />
     <Route
-      path="/dashboard" // Changed from /dashboard/:questionCode
+      path="/dashboard"
       element={
         <ProtectedRoute>
           <Dashboard />

@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Container, Row, Col, Card, Button, Image, Spinner } from "react-bootstrap"
-import { useNavigate } from "react-router-dom"
+import { Container, Row, Col, Card, Button, Image, Spinner, Breadcrumb } from "react-bootstrap"
+import { useNavigate, useParams, Link } from "react-router-dom"
 import {
   BarChart3,
   Users,
@@ -100,12 +100,14 @@ export default function HomePage() {
   const [temas, setTemas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const { surveyType } = useParams()
 
   useEffect(() => {
     const fetchThemes = async () => {
       try {
         setLoading(true)
-        const response = await ApiBase.get("/api/data/themes")
+        // Incluir o tipo de pesquisa na requisição se necessário
+        const response = await ApiBase.get(`/api/data/themes?surveyType=${surveyType}`)
         if (response.data && response.data.success) {
           const apiThemes = response.data.themes
 
@@ -140,11 +142,10 @@ export default function HomePage() {
     }
 
     fetchThemes()
-  }, [])
+  }, [surveyType]) // Adicionar surveyType como dependência
 
   const handleTemaClick = (tema) => {
-    // Navega para a nova página de perguntas, usando o slug do tema
-    navigate(`/theme/${tema.slug}`)
+    navigate(`/theme/${surveyType}/${tema.slug}`)
   }
 
   const handleLogout = () => {
@@ -165,6 +166,14 @@ export default function HomePage() {
 
       <main className="content-area">
         <Container>
+          <Breadcrumb className="mb-4">
+            <Breadcrumb.Item linkAs={Link} linkProps={{ to: "/" }}>
+              Tipos de Pesquisa
+            </Breadcrumb.Item>
+            <Breadcrumb.Item active>
+              {surveyType === "telefonica" ? "Pesquisas Telefônicas" : "Pesquisas F2F"}
+            </Breadcrumb.Item>
+          </Breadcrumb>
           <div className="page-title-section">
             <Image src="governo-federal-logo.png" alt="Governo Federal" className="gov-logo" />
             <h1 className="main-title">PESQUISAS DE OPINIÃO PÚBLICA</h1>
