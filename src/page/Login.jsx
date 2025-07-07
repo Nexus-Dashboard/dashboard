@@ -22,10 +22,11 @@ const Login = () => {
     setError("")
     setLoading(true)
     try {
+      // Login com email/senha é verificado pela API, não precisa verificar email autorizado aqui
       await login(email, password)
       navigate("/", { replace: true })
     } catch (err) {
-      setError(err.response?.data?.message || "Email ou senha inválidos.")
+      setError(err.response?.data?.message || err.message || "Email ou senha inválidos.")
     } finally {
       setLoading(false)
     }
@@ -36,10 +37,11 @@ const Login = () => {
       setLoading(true)
       setError("")
       try {
+        // Login com Google verifica emails autorizados no AuthContext
         await loginWithGoogle(tokenResponse.access_token)
         navigate("/", { replace: true })
       } catch (err) {
-        setError("Falha na autenticação com o Google.")
+        setError(err.message || "Falha na autenticação com o Google.")
       } finally {
         setLoading(false)
       }

@@ -1,17 +1,21 @@
 import axios from "axios"
 
+// Configuração base da API
 const ApiBase = axios.create({
   baseURL: "https://api-phi-one-99.vercel.app" || "http://localhost:4000",
-  timeout: 120000, // Aumentado para 2 minutos (120 segundos)
+  timeout: 120000, // 2 minutes timeout for large responses
   headers: {
     "Content-Type": "application/json",
   },
 })
 
-// Add request interceptor for authentication if needed
+// Interceptor para adicionar token de autenticação
 ApiBase.interceptors.request.use(
   (config) => {
-    // You can add auth tokens here if required in the future
+    const token = localStorage.getItem("token")
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     return config
   },
   (error) => {
@@ -19,18 +23,23 @@ ApiBase.interceptors.request.use(
   },
 )
 
-// Add response interceptor for error handling
+// Interceptor para tratar respostas e erros
 ApiBase.interceptors.response.use(
   (response) => {
     return response
   },
   (error) => {
-    // Better error handling for timeouts and large responses
-    if (error.code === "ECONNABORTED") {
-      console.error("Request timeout - A resposta da API está demorando mais que o esperado")
-    } else {
-      console.error("API Error:", error.response?.data || error.message)
+    console.error("API Error:", error.message)
+
+    // Se o token expirou, redirecionar para login
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token")
+      localStorage.removeItem("user")
+      if (!window.location.pathname.includes("/login")) {
+        window.location.href = "/login"
+      }
     }
+
     return Promise.reject(error)
   },
 )

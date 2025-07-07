@@ -175,7 +175,7 @@ export default function HomePage() {
             </Breadcrumb.Item>
           </Breadcrumb>
           <div className="page-title-section">
-            <Image src="governo-federal-logo.png" alt="Governo Federal" className="gov-logo" />
+            <Image src="/governo-federal-logo.png" alt="Governo Federal" className="gov-logo" />
             <h1 className="main-title">PESQUISAS DE OPINIÃO PÚBLICA</h1>
             <h2 className="main-subtitle">Selecione um Tema para Análise</h2>
             <p className="main-description">Explore os dados das pesquisas organizados por área temática</p>

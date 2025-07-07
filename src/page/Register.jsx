@@ -1,14 +1,13 @@
 "use client"
 
-import React, { useState } from "react"
+import { useState } from "react"
 import { Card, Form, Button, Image, Alert } from "react-bootstrap"
-import { useAuth } from "../contexts/AuthContext"
 import { useNavigate, Link } from "react-router-dom"
 import { Eye, EyeSlash } from "react-bootstrap-icons"
+import ApiBase from "../service/ApiBase"
 import "./Login.css"
 
 const Register = () => {
-  const { register, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     name: "",
@@ -61,27 +60,61 @@ const Register = () => {
 
     setLoading(true)
     try {
-      await register({
-        name: formData.name,
-        email: formData.email,
+      // Enviar dados exatamente como a API espera
+      const requestData = {
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
         password: formData.password,
-      })
-      setSuccess("Cadastro realizado com sucesso! Redirecionando...")
-      setTimeout(() => {
-        navigate("/home", { replace: true })
-      }, 2000)
+        role: "user", // Definir role padrão como 'user'
+      }
+
+      console.log("Enviando dados para registro:", { ...requestData, password: "[HIDDEN]" })
+
+      const response = await ApiBase.post("/api/auth/register", requestData)
+
+      console.log("Resposta do registro:", response.data)
+
+      if (response.data.success) {
+        setSuccess("Cadastro realizado com sucesso! Aguarde a aprovação do administrador para acessar o sistema.")
+        setFormData({
+          name: "",
+          email: "",
+          password: "",
+          confirmPassword: "",
+        })
+
+        // Redirecionar para login após 3 segundos
+        setTimeout(() => {
+          navigate("/login")
+        }, 3000)
+      } else {
+        setError(response.data.message || "Erro ao realizar cadastro")
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "Erro ao realizar cadastro. Tente novamente.")
+      console.error("Erro no cadastro:", err)
+
+      if (err.response?.data?.message) {
+        setError(err.response.data.message)
+      } else if (err.response?.data?.errors) {
+        // Se houver erros de validação específicos
+        setError(err.response.data.errors.join(", "))
+      } else if (err.response?.status === 400) {
+        if (err.response.data?.message?.includes("já existe")) {
+          setError("Este email já está cadastrado no sistema")
+        } else {
+          setError("Dados inválidos. Verifique as informações e tente novamente.")
+        }
+      } else if (err.response?.status === 409) {
+        setError("Email já está em uso")
+      } else if (err.response?.status === 500) {
+        setError("Erro interno do servidor. Tente novamente mais tarde.")
+      } else {
+        setError("Erro ao realizar cadastro. Verifique sua conexão e tente novamente.")
+      }
     } finally {
       setLoading(false)
     }
   }
-
-  React.useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/home", { replace: true })
-    }
-  }, [isAuthenticated, navigate])
 
   return (
     <div className="login-page">

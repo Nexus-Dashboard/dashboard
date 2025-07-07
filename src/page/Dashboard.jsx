@@ -247,8 +247,8 @@ export default function Dashboard() {
     })
   }
 
-  // Enhanced loading state with progress indication
-  if (status === "loading") {
+  // Show loading screen until data is loaded
+  if (status === "loading" || !data) {
     return (
       <Box className="loading-container">
         <CircularProgress size={60} />
@@ -480,15 +480,6 @@ export default function Dashboard() {
                   </Box>
                 )}
               </div>
-
-              {isFetching && (
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", mt: 1 }}>
-                  <CircularProgress size={16} sx={{ mr: 1 }} />
-                  <Typography variant="caption" color="text.secondary">
-                    Atualizando dados...
-                  </Typography>
-                </Box>
-              )}
             </div>
           </div>
 

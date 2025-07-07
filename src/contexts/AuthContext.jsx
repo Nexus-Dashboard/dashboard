@@ -6,6 +6,17 @@ import axios from "axios"
 
 const AuthContext = createContext(undefined)
 
+// Lista de emails e domínios autorizados
+const AUTHORIZED_EMAILS = [
+  "marcosvitor1994@gmail.com",
+  "vitor.checkmedia@gmail.com"  
+]
+
+const AUTHORIZED_DOMAINS = [
+  "@presidencia.gov.br",
+  "@nexus.com.br",
+]
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -26,12 +37,32 @@ export const AuthProvider = ({ children }) => {
     setLoading(false)
   }, [])
 
+  // Função para verificar se o email é autorizado APENAS PARA GOOGLE
+  const isEmailAuthorizedForGoogle = (email) => {
+    if (!email) return false
+    const emailLower = email.toLowerCase()
+
+    // Verificar emails específicos
+    if (AUTHORIZED_EMAILS.some((authorizedEmail) => authorizedEmail.toLowerCase() === emailLower)) {
+      return true
+    }
+
+    // Verificar domínios
+    return AUTHORIZED_DOMAINS.some((domain) => emailLower.endsWith(domain.toLowerCase()))
+  }
+
   const login = async (email, password) => {
     try {
       const response = await ApiBase.post("/api/auth/login", { email, password })
 
       if (response.data && response.data.success) {
         const { token, user: userData } = response.data
+
+        // Verificar se o usuário tem permissão para acessar
+        if (!canAccessSystem(userData.role)) {
+          throw new Error("Usuário não tem permissão para acessar o sistema. Aguarde aprovação do administrador.")
+        }
+
         setUser(userData)
         localStorage.setItem("user", JSON.stringify(userData))
         localStorage.setItem("token", token)
@@ -48,14 +79,17 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await ApiBase.post("/api/auth/register", userData)
+      // Garantir que novos usuários sejam cadastrados como 'user'
+      const registrationData = {
+        ...userData,
+        role: "user", // Forçar role como 'user' para novos cadastros
+      }
+
+      const response = await ApiBase.post("/api/auth/register", registrationData)
 
       if (response.data && response.data.success) {
-        const { token, user: newUser } = response.data
-        setUser(newUser)
-        localStorage.setItem("user", JSON.stringify(newUser))
-        localStorage.setItem("token", token)
-        return newUser
+        // Não fazer login automático para usuários 'user' - eles precisam de aprovação
+        throw new Error("Cadastro realizado com sucesso! Aguarde a aprovação do administrador para acessar o sistema.")
       } else {
         throw new Error(response.data.message || "Falha no cadastro")
       }
@@ -74,6 +108,11 @@ export const AuthProvider = ({ children }) => {
 
       const { email, name, picture } = googleResponse.data
 
+      // Verificar se o email do Google é autorizado
+      if (!isEmailAuthorizedForGoogle(email)) {
+        throw new Error("Email do Google não autorizado para acesso ao sistema. Entre em contato com o administrador.")
+      }
+
       // 2. Enviar as informações para a sua API para obter um token de sessão
       const apiResponse = await ApiBase.post("/api/auth/google", {
         email,
@@ -83,10 +122,17 @@ export const AuthProvider = ({ children }) => {
 
       if (apiResponse.data && apiResponse.data.success) {
         const { token, user: userData } = apiResponse.data
-        setUser(userData)
-        localStorage.setItem("user", JSON.stringify(userData))
+
+        // Usuários do Google automaticamente recebem role 'viewer'
+        const googleUser = {
+          ...userData,
+          role: userData.role || "viewer",
+        }
+
+        setUser(googleUser)
+        localStorage.setItem("user", JSON.stringify(googleUser))
         localStorage.setItem("token", token)
-        return userData
+        return googleUser
       } else {
         throw new Error(apiResponse.data.message || "Falha no login com Google")
       }
@@ -101,11 +147,19 @@ export const AuthProvider = ({ children }) => {
             headers: { Authorization: `Bearer ${accessToken}` },
           })
         ).data
+
+        // Verificar se o email é autorizado mesmo no fallback
+        if (!isEmailAuthorizedForGoogle(googleUserInfo.email)) {
+          throw new Error(
+            "Email do Google não autorizado para acesso ao sistema. Entre em contato com o administrador.",
+          )
+        }
+
         const simulatedUser = {
           email: googleUserInfo.email,
           name: googleUserInfo.name,
           picture: googleUserInfo.picture,
-          role: "user",
+          role: "viewer", // Usuários Google recebem role 'viewer'
         }
         setUser(simulatedUser)
         localStorage.setItem("user", JSON.stringify(simulatedUser))
@@ -122,6 +176,16 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token")
   }
 
+  // Função para verificar se o usuário pode acessar o sistema
+  const canAccessSystem = (role) => {
+    return ["admin", "viewer"].includes(role)
+  }
+
+  // Função para verificar se o usuário é admin
+  const isAdmin = () => {
+    return user?.role === "admin"
+  }
+
   const isAuthenticated = !!user
 
   return (
@@ -129,6 +193,9 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         isAuthenticated,
+        isAdmin,
+        canAccessSystem,
+        isEmailAuthorizedForGoogle, // Renomeado para deixar claro que é só para Google
         login,
         register,
         loginWithGoogle,

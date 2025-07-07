@@ -1,39 +1,29 @@
 "use client"
+
+import { useState } from "react"
 import { Container, Row, Col, Card, Button, Image } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
-import { Phone, Users, BarChart3 } from "lucide-react"
+import { Phone, Users, Settings } from "lucide-react"
 import { useAuth } from "../contexts/AuthContext"
 import "./SurveyTypePage.css"
 
-const SURVEY_TYPES = [
-  {
-    id: "telefonica",
-    title: "Pesquisas Telefônicas",
-    description: "Pesquisas realizadas por meio de entrevistas telefônicas",
-    icon: Phone,
-    color: "#1e40af",
-  },
-  {
-    id: "f2f",
-    title: "Pesquisas F2F",
-    description: "Pesquisas Face a Face realizadas presencialmente",
-    icon: Users,
-    color: "#059669",
-  },
-]
-
 export default function SurveyTypePage() {
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { logout, isAdmin } = useAuth()
+  const [selectedType, setSelectedType] = useState(null)
 
-  const handleSurveyTypeClick = (surveyType) => {
-    // Navega para a página de temas passando o tipo de pesquisa
-    navigate(`/themes/${surveyType.id}`)
+  const handleTypeSelect = (type) => {
+    setSelectedType(type)
+    navigate(`/themes/${type}`)
   }
 
   const handleLogout = () => {
     logout()
     navigate("/login")
+  }
+
+  const handleUserManagement = () => {
+    navigate("/admin/users")
   }
 
   return (
@@ -50,43 +40,85 @@ export default function SurveyTypePage() {
       <main className="content-area">
         <Container>
           <div className="page-title-section">
-            <Image src="governo-federal-logo.png" alt="Governo Federal" className="gov-logo" />
-            <h1 className="main-title">PESQUISAS DE OPINIÃO PÚBLICA</h1>
-            <h2 className="main-subtitle">Selecione o Tipo de Pesquisa</h2>
-            <p className="main-description">Escolha entre pesquisas telefônicas ou face a face para análise</p>
+            <h1 className="main-title">Selecione o Tipo de Pesquisa</h1>
+            <p className="main-description">Escolha o tipo de pesquisa que deseja visualizar</p>
           </div>
 
-          <Row className="g-4 justify-content-center">
-            {SURVEY_TYPES.map((surveyType) => {
-              const IconComponent = surveyType.icon
-              return (
-                <Col key={surveyType.id} lg={5} md={6} sm={12}>
-                  <Card
-                    className="survey-type-card"
-                    onClick={() => handleSurveyTypeClick(surveyType)}
-                    style={{ "--card-color": surveyType.color }}
-                  >
-                    <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center">
-                      <div className="survey-type-icon-wrapper">
-                        <IconComponent size={48} color="white" />
-                      </div>
-                      <h3 className="survey-type-card-title">{surveyType.title}</h3>
-                      <p className="survey-type-card-description">{surveyType.description}</p>
-                      <Button variant="dark" size="sm" className="view-themes-btn">
-                        <BarChart3 size={14} className="me-2" />
-                        Ver Temas
-                      </Button>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              )
-            })}
+          <Row className="survey-type-cards">
+            <Col lg={4} md={6} className="mb-4">
+              <Card
+                className={`survey-type-card telefonica ${selectedType === "telefonica" ? "selected" : ""}`}
+                onClick={() => handleTypeSelect("telefonica")}
+              >
+                <Card.Body className="text-center">
+                  <div className="card-icon telefonica-icon">
+                    <Phone size={48} />
+                  </div>
+                  <Card.Title className="card-title">Telefônicas</Card.Title>
+                  <Card.Text className="card-description">
+                    Pesquisas realizadas por meio de entrevistas telefônicas com a população
+                  </Card.Text>
+                  <Button variant="primary" className="select-button">
+                    Selecionar
+                  </Button>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            <Col lg={4} md={6} className="mb-4">
+              <Card
+                className={`survey-type-card f2f ${selectedType === "f2f" ? "selected" : ""}`}
+                onClick={() => handleTypeSelect("f2f")}
+              >
+                <Card.Body className="text-center">
+                  <div className="card-icon f2f-icon">
+                    <Users size={48} />
+                  </div>
+                  <Card.Title className="card-title">F2F (Face a Face)</Card.Title>
+                  <Card.Text className="card-description">
+                    Pesquisas realizadas através de entrevistas presenciais face a face
+                  </Card.Text>
+                  <Button variant="success" className="select-button">
+                    Selecionar
+                  </Button>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            {/* Card de Administração - Visível apenas para admins */}
+            {isAdmin() && (
+              <Col lg={4} md={6} className="mb-4">
+                <Card className="survey-type-card admin-card" onClick={handleUserManagement}>
+                  <Card.Body className="text-center">
+                    <div className="card-icon admin-icon">
+                      <Settings size={48} />
+                    </div>
+                    <Card.Title className="card-title">Gerenciar Usuários</Card.Title>
+                    <Card.Text className="card-description">
+                      Administrar usuários, permissões e acessos do sistema
+                    </Card.Text>
+                    <Button variant="danger" className="select-button">
+                      Acessar
+                    </Button>
+                  </Card.Body>
+                </Card>
+              </Col>
+            )}
           </Row>
         </Container>
       </main>
 
       <footer className="page-footer">
-        <p>Dados atualizados em tempo real • Sistema de Monitoramento Secom/PR</p>
+        <Container>
+          <Row>
+            <Col md={6}>
+              <Image src="/governo-federal-logo.png" alt="Governo Federal" className="footer-logo" />
+            </Col>
+            <Col md={6} className="text-md-end">
+              <p className="footer-text">Sistema de Pesquisas • Secom/PR</p>
+            </Col>
+          </Row>
+        </Container>
       </footer>
     </div>
   )
