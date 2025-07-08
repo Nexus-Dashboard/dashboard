@@ -94,7 +94,7 @@ const Login = () => {
             </Form.Group>
             <br />
 
-            <Button variant="primary" type="submit" className="login-btn" disabled={loading}>
+            <Button variant="dark" type="submit" className="login-btn" disabled={loading}>
               {loading ? <div className="spinner-dot"></div> : "Login"}
             </Button>
           </Form>
