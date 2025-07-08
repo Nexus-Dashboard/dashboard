@@ -63,8 +63,8 @@
 
 .login-btn {
   width: 100%;
-  background-color: #4285f4;
-  border-color: #4285f4;
+  background-color:rgb(0, 0, 0);
+  border-color:rgb(0, 0, 0);
   border-radius: 8px;
   padding: 14px;
   font-weight: 600;
@@ -74,13 +74,13 @@
 
 .login-btn:hover,
 .login-btn:focus {
-  background-color: #357ae8;
-  border-color: #357ae8;
+  background-color:rgb(27, 27, 27);
+  border-color:rgb(27, 27, 27);
 }
 
 .login-btn:disabled {
-  background-color: #a0c3ff;
-  border-color: #a0c3ff;
+  background-color:rgb(139, 139, 139);
+  border-color:rgb(139, 139, 139);
 }
 
 .divider {
@@ -172,14 +172,14 @@
 }
 
 .back-to-login-link {
-  color: #4285f4;
+  color:rgb(27, 27, 27);
   text-decoration: none;
   font-weight: 500;
   font-size: 0.95rem;
 }
 
 .back-to-login-link:hover {
-  color: #357ae8;
+  color:rgb(0, 0, 0);
   text-decoration: underline;
 }
 

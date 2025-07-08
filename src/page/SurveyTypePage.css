@@ -1,12 +1,12 @@
 .survey-type-page-wrapper {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #fff;
   display: flex;
   flex-direction: column;
 }
 
 .main-header {
-  background: rgba(0, 0, 0, 0.1);
+  background: #000 !important;
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding: 1rem 0;
@@ -29,14 +29,8 @@
   margin-bottom: 3rem;
 }
 
-.gov-logo {
-  height: 80px;
-  width: auto;
-  margin-bottom: 1rem;
-}
-
 .main-title {
-  color: white;
+  color: black;
   font-size: 2.5rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
@@ -44,19 +38,20 @@
 }
 
 .main-subtitle {
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(0, 0, 0, 0.9);
   font-size: 1.5rem;
   font-weight: 500;
   margin-bottom: 0.5rem;
 }
 
 .main-description {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(0, 0, 0, 0.8);
   font-size: 1.1rem;
   max-width: 600px;
   margin: 0 auto;
 }
 
+/* Cards padronizados - mantendo estilo original */
 .survey-type-card {
   background: rgba(255, 255, 255, 0.95);
   border: none;
@@ -65,6 +60,7 @@
   transition: all 0.3s ease;
   cursor: pointer;
   min-height: 280px;
+  height: 280px;
   backdrop-filter: blur(10px);
 }
 
@@ -74,18 +70,26 @@
 }
 
 .survey-type-card.admin-card {
-  border: 2px solid var(--card-color);
+  border: 2px solidrgb(204, 204, 204);
 }
 
 .survey-type-card.admin-card:hover {
-  background: rgba(220, 38, 38, 0.05);
+  background: rgba(194, 194, 194, 0.05);
 }
 
-.survey-type-icon-wrapper {
+.card-body {
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.card-icon {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: var(--card-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -93,7 +97,22 @@
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
-.survey-type-card-title {
+.telefonica-icon {
+  background:rgb(0, 0, 0);
+  color: white;
+}
+
+.f2f-icon {
+  background:rgb(0, 0, 0);
+  color: white;
+}
+
+.admin-icon {
+  background:rgb(0, 0, 0);
+  color: white;
+}
+
+.card-title {
   color: #2d3748;
   font-size: 1.5rem;
   font-weight: 600;
@@ -101,28 +120,31 @@
   text-align: center;
 }
 
-.survey-type-card-description {
+.card-description {
   color: #718096;
   font-size: 1rem;
   text-align: center;
   margin-bottom: 2rem;
   line-height: 1.5;
+  flex-grow: 1;
 }
 
-.view-themes-btn {
+.select-button {
   background: #2d3748;
   border: none;
   border-radius: 25px;
   padding: 0.5rem 1.5rem;
   font-weight: 500;
   transition: all 0.3s ease;
+  color: black;
 }
 
-.view-themes-btn:hover {
+.select-button:hover {
   background: #1a202c;
   transform: scale(1.05);
 }
 
+/* Footer original */
 .page-footer {
   background: rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(10px);
@@ -131,27 +153,60 @@
   text-align: center;
 }
 
-.page-footer p {
+.footer-logo {
+  height: 40px;
+  width: auto;
+}
+
+.footer-text {
   color: rgba(255, 255, 255, 0.8);
   margin: 0;
   font-size: 0.9rem;
 }
 
+/* Responsividade */
 @media (max-width: 768px) {
   .main-title {
     font-size: 2rem;
   }
 
-  .main-subtitle {
-    font-size: 1.2rem;
+  .survey-type-cards {
+    gap: 1.5rem;
   }
 
   .survey-type-card {
-    min-height: 250px;
+    max-width: 100%;
+    height: 250px;
   }
 
-  .survey-type-icon-wrapper {
+  .card-icon {
     width: 60px;
     height: 60px;
+  }
+
+  .card-title {
+    font-size: 1.1rem;
+  }
+
+  .card-description {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .content-area {
+    padding: 1rem 0;
+  }
+
+  .page-title-section {
+    margin-bottom: 2rem;
+  }
+
+  .main-title {
+    font-size: 1.8rem;
+  }
+
+  .card-body {
+    padding: 1.5rem 1rem;
   }
 }

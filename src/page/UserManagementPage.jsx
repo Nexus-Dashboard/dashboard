@@ -252,7 +252,7 @@ const UserManagementPage = () => {
               <Row className="align-items-center">
                 <Col>
                   <h4 className="mb-0">Gerenciamento de Usuários</h4>
-                  <small className="text-muted">
+                  <small className="text">
                     Total: {totalUsers} usuários
                     {getPendingUsersCount() > 0 && (
                       <span className="ms-2">

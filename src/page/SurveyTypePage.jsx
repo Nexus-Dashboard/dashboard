@@ -40,6 +40,7 @@ export default function SurveyTypePage() {
       <main className="content-area">
         <Container>
           <div className="page-title-section">
+            <Image src="/governo-federal-logo.png" alt="Governo Federal" className="gov-logo" />
             <h1 className="main-title">Selecione o Tipo de Pesquisa</h1>
             <p className="main-description">Escolha o tipo de pesquisa que deseja visualizar</p>
           </div>
@@ -50,7 +51,7 @@ export default function SurveyTypePage() {
                 className={`survey-type-card telefonica ${selectedType === "telefonica" ? "selected" : ""}`}
                 onClick={() => handleTypeSelect("telefonica")}
               >
-                <Card.Body className="text-center">
+                <Card.Body>
                   <div className="card-icon telefonica-icon">
                     <Phone size={48} />
                   </div>
@@ -70,7 +71,7 @@ export default function SurveyTypePage() {
                 className={`survey-type-card f2f ${selectedType === "f2f" ? "selected" : ""}`}
                 onClick={() => handleTypeSelect("f2f")}
               >
-                <Card.Body className="text-center">
+                <Card.Body>
                   <div className="card-icon f2f-icon">
                     <Users size={48} />
                   </div>
@@ -78,7 +79,7 @@ export default function SurveyTypePage() {
                   <Card.Text className="card-description">
                     Pesquisas realizadas através de entrevistas presenciais face a face
                   </Card.Text>
-                  <Button variant="success" className="select-button">
+                  <Button variant="primary" className="select-button">
                     Selecionar
                   </Button>
                 </Card.Body>
@@ -89,7 +90,7 @@ export default function SurveyTypePage() {
             {isAdmin() && (
               <Col lg={4} md={6} className="mb-4">
                 <Card className="survey-type-card admin-card" onClick={handleUserManagement}>
-                  <Card.Body className="text-center">
+                  <Card.Body>
                     <div className="card-icon admin-icon">
                       <Settings size={48} />
                     </div>
@@ -97,7 +98,7 @@ export default function SurveyTypePage() {
                     <Card.Text className="card-description">
                       Administrar usuários, permissões e acessos do sistema
                     </Card.Text>
-                    <Button variant="danger" className="select-button">
+                    <Button variant="primary" className="select-button">
                       Acessar
                     </Button>
                   </Card.Body>
@@ -111,10 +112,7 @@ export default function SurveyTypePage() {
       <footer className="page-footer">
         <Container>
           <Row>
-            <Col md={6}>
-              <Image src="/governo-federal-logo.png" alt="Governo Federal" className="footer-logo" />
-            </Col>
-            <Col md={6} className="text-md-end">
+            <Col md={12} className="text-center">
               <p className="footer-text">Sistema de Pesquisas • Secom/PR</p>
             </Col>
           </Row>

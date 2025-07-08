@@ -1,6 +1,6 @@
 .user-management-page-wrapper {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background:rgb(0, 0, 0);
   display: flex;
   flex-direction: column;
 }
@@ -183,7 +183,7 @@
 }
 
 .user-management-page .card-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #000;
   color: white;
   border-bottom: none;
 }
@@ -218,7 +218,7 @@
 }
 
 .user-management-page .modal-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background:rgb(0, 0, 0);
   color: white;
   border-bottom: none;
 }
