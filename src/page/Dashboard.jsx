@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react"
 import { useLocation } from "react-router-dom"
-import ApiBase, { ApiMethods } from "../service/ApiBase"
+import ApiBase from "../service/ApiBase"
 import { useQuery } from "@tanstack/react-query"
 import { ResponsiveLine } from "@nivo/line"
 import { Box, Typography, CircularProgress, IconButton, Button, LinearProgress } from "@mui/material"
@@ -39,15 +39,83 @@ const fetchQuestionData = async ({ queryKey }) => {
   }
 }
 
+// Função para buscar TODAS as questões de forma mais robusta
+const fetchAllQuestions = async () => {
+  console.log("🔍 Iniciando busca COMPLETA de todas as questões...")
+  
+  try {
+    // Primeiro, vamos buscar a primeira página para entender a estrutura
+    const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`)
+    console.log("📋 Resposta da primeira página:", firstResponse.data)
+    
+    if (!firstResponse.data?.success) {
+      throw new Error("API returned an error")
+    }
 
+    const { totalPages, totalQuestions } = firstResponse.data.data.pagination
+    console.log(`📊 Total de páginas: ${totalPages}, Total de questões: ${totalQuestions}`)
+
+    let allQuestions = [...firstResponse.data.data.questions]
+    console.log(`✅ Primeira página carregada: ${allQuestions.length} questões`)
+
+    // Agora vamos buscar todas as outras páginas
+    const promises = []
+    for (let page = 2; page <= totalPages; page++) {
+      promises.push(
+        ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
+          .then(response => {
+            console.log(`✅ Página ${page} carregada: ${response.data?.data?.questions?.length || 0} questões`)
+            return response.data?.success ? response.data.data.questions : []
+          })
+          .catch(error => {
+            console.error(`❌ Erro na página ${page}:`, error.message)
+            return []
+          })
+      )
+    }
+
+    console.log(`⏳ Aguardando ${promises.length} requisições...`)
+    const additionalPages = await Promise.all(promises)
+    
+    // Combinar todos os resultados
+    additionalPages.forEach(pageQuestions => {
+      allQuestions = [...allQuestions, ...pageQuestions]
+    })
+
+    console.log(`🎉 SUCESSO! Total de questões carregadas: ${allQuestions.length}`)
+    
+    // Vamos ver alguns exemplos do que foi carregado
+    console.log("📋 Primeiros 3 exemplos:", allQuestions.slice(0, 3).map(q => ({
+      surveyNumber: q.surveyNumber,
+      date: q.date,
+      variable: q.variable
+    })))
+
+    return {
+      success: true,
+      data: {
+        questions: allQuestions,
+        pagination: firstResponse.data.data.pagination
+      }
+    }
+  } catch (error) {
+    console.error("💥 Erro na busca completa:", error.message)
+    throw error
+  }
+}
 
 // UF demographic key - adjust this if your API uses a different key for states
 const UF_DEMOGRAPHIC_KEY = "UF"
 
 const formatChartXAxis = (period, dateLabel) => {
+  console.log(`🔧 Formatando eixo X - period: ${period}, dateLabel: ${dateLabel}`)
+  
   const roundNumber = period ? period.split("-R")[1] : ""
+  
   if (dateLabel && roundNumber) {
-    return `${dateLabel} - R${roundNumber.padStart(2, '0')}`
+    const formatted = `${dateLabel} - R${roundNumber.padStart(2, '0')}`
+    console.log(`✅ Formato com data: ${formatted}`)
+    return formatted
   }
 
   if (period) {
@@ -55,9 +123,13 @@ const formatChartXAxis = (period, dateLabel) => {
     if (parts.length === 2) {
       const year = parts[0].slice(-2)
       const round = parts[1].padStart(2, '0')
-      return `R${round}/${year}`
+      const formatted = `R${round}/${year}`
+      console.log(`⚠️ Formato sem data: ${formatted}`)
+      return formatted
     }
   }
+  
+  console.log(`❌ Formato padrão: ${period}`)
   return period || ""
 }
 
@@ -87,10 +159,9 @@ export default function Dashboard() {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   })
 
-  // Query atualizada para buscar todas as questões
-  const { data: allQuestionsData, isLoading: isLoadingAllQuestions } = useQuery({
+  const { data: allQuestionsData, isLoading: isLoadingAllQuestions, error: allQuestionsError } = useQuery({
     queryKey: ["allQuestions"],
-    queryFn: ApiMethods.getAllQuestionsComplete,
+    queryFn: fetchAllQuestions,
     staleTime: 1000 * 60 * 60, // 1 hour
     cacheTime: 1000 * 60 * 60,
     refetchOnWindowFocus: false,
@@ -98,14 +169,31 @@ export default function Dashboard() {
   })
 
   const surveyDateMap = useMemo(() => {
-    if (!allQuestionsData?.data?.questions) return new Map()
+    console.log("🗺️ Criando Survey Date Map...")
+    
+    if (!allQuestionsData?.data?.questions) {
+      console.log("❌ Sem dados de questões para criar o mapa")
+      return new Map()
+    }
+    
     const map = new Map()
-    allQuestionsData.data.questions.forEach((q) => {
-      if (q.surveyNumber && q.date && !map.has(q.surveyNumber.toString())) {
-        map.set(q.surveyNumber.toString(), q.date)
+    const questions = allQuestionsData.data.questions
+    
+    console.log(`📊 Processando ${questions.length} questões...`)
+    
+    questions.forEach((q, index) => {
+      if (q.surveyNumber && q.date) {
+        const key = q.surveyNumber.toString()
+        if (!map.has(key)) {
+          map.set(key, q.date)
+          console.log(`✅ Mapeamento ${index + 1}: surveyNumber ${key} → date ${q.date}`)
+        }
       }
     })
-    console.log("Survey Date Map criado:", map)
+    
+    console.log("🎯 Survey Date Map final:", Array.from(map.entries()))
+    console.log(`📈 Total de mapeamentos: ${map.size}`)
+    
     return map
   }, [allQuestionsData])
 
@@ -163,8 +251,6 @@ export default function Dashboard() {
 
   const handleFilterChange = (demographicKey, value, checked) => {
     setFilters((prevFilters) => {
-      // This logic allows multi-selection within a single demographic category.
-      // If a filter from a new category is selected, it clears the old one.
       const newFilters = {}
       const currentValues =
         prevFilters[demographicKey] && Object.keys(prevFilters)[0] === demographicKey
@@ -282,10 +368,19 @@ export default function Dashboard() {
   }, [mapRoundsWithData, selectedMapRoundIndex, questionInfo])
 
   const chartData = useMemo(() => {
-    if (!selectedChartData || selectedChartData.length === 0) return []
+    console.log("🎨 Criando dados do gráfico...")
+    
+    if (!selectedChartData || selectedChartData.length === 0) {
+      console.log("❌ Sem dados selecionados para o gráfico")
+      return []
+    }
+
+    console.log(`📊 Processando ${selectedChartData.length} rodadas para o gráfico`)
 
     const dataByPeriod = new Map(selectedChartData.map((d) => [d.period, d]))
     const allPeriods = Array.from(dataByPeriod.keys())
+    
+    console.log("🕐 Períodos encontrados:", allPeriods)
 
     const allActualResponses = new Set(selectedChartData.flatMap((r) => r.distribution.map((d) => d.response)))
     const useGrouping = shouldGroupResponses(Array.from(allActualResponses))
@@ -326,13 +421,19 @@ export default function Dashboard() {
 
         const roundNumber = period.split("-R")[1]
         const dateLabel = surveyDateMap.get(roundNumber)
+        
+        console.log(`🔍 Buscando data para rodada ${roundNumber}:`, dateLabel)
+
+        const xLabel = formatChartXAxis(period, dateLabel)
 
         return {
-          x: formatChartXAxis(period, dateLabel),
+          x: xLabel,
           y: Number.isFinite(yValue) ? yValue : 0,
         }
       }),
     }))
+
+    console.log("📈 Dados finais do gráfico:", series)
 
     return series
       .sort((a, b) => {
@@ -352,6 +453,13 @@ export default function Dashboard() {
     const dateLabel = surveyDateMap.get(roundNumber)
     return formatChartXAxis(rodada.period, dateLabel)
   }
+
+  // Debug dos erros
+  useEffect(() => {
+    if (allQuestionsError) {
+      console.error("💥 Erro ao carregar todas as questões:", allQuestionsError)
+    }
+  }, [allQuestionsError])
 
   if (status === "loading" || !data) {
     return (
@@ -378,10 +486,10 @@ export default function Dashboard() {
       <Box className="loading-container">
         <CircularProgress size={60} />
         <Typography variant="h6" color="text.secondary" sx={{ mt: 2, mb: 2 }}>
-          Carregando informações de datas...
+          🔄 Carregando informações de datas...
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Buscando dados de todas as rodadas para formatação correta dos rótulos
+          Buscando dados de todas as {allQuestionsData?.data?.pagination?.totalQuestions || "37"} páginas para formatação correta dos rótulos
         </Typography>
         <Box sx={{ width: "300px", mt: 2 }}>
           <LinearProgress />
@@ -401,6 +509,22 @@ export default function Dashboard() {
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
           {`Erro: ${error.message}`}
+        </Typography>
+        <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
+          Tentar Novamente
+        </Button>
+      </Box>
+    )
+  }
+
+  if (allQuestionsError) {
+    return (
+      <Box className="error-container">
+        <Typography variant="h5" color="error" sx={{ mb: 2 }}>
+          Erro ao carregar informações de datas
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+          {`Erro: ${allQuestionsError.message}`}
         </Typography>
         <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
           Tentar Novamente
@@ -441,6 +565,19 @@ export default function Dashboard() {
           </Button>
         </Box>
       </header>
+
+      {/* Debug Info */}
+      <Box sx={{ p: 2, bgcolor: "#f5f5f5", margin: 1 }}>
+        <Typography variant="caption" display="block">
+          🔍 DEBUG: Survey Date Map tem {surveyDateMap.size} entradas
+        </Typography>
+        <Typography variant="caption" display="block">
+          📊 Total questões carregadas: {allQuestionsData?.data?.questions?.length || 0}
+        </Typography>
+        <Typography variant="caption" display="block">
+          📈 Dados do gráfico: {chartData.length} séries
+        </Typography>
+      </Box>
 
       <div className="dashboard-content">
         <div className="dashboard-grid">
