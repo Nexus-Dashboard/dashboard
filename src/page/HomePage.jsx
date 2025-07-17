@@ -1,135 +1,42 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Container, Row, Col, Card, Button, Image, Spinner, Breadcrumb } from "react-bootstrap"
+import { Container, Row, Col, Card, Button, Image, Spinner, Breadcrumb, Badge } from "react-bootstrap"
 import { useNavigate, useParams, Link } from "react-router-dom"
-import {
-  BarChart3,
-  Users,
-  Heart,
-  GraduationCap,
-  Shield,
-  Building2,
-  TrendingUp,
-  FileText,
-  Globe,
-  CloudSun,
-  Briefcase,
-  Train,
-  Palette,
-  MessageSquare,
-} from "lucide-react"
+import { Folder, ChevronRight, Search } from "lucide-react"
 import ApiBase from "../service/ApiBase"
 import { useAuth } from "../contexts/AuthContext"
 import "./HomePage.css"
 
-// Mapeamento de temas da API para ícones, descrições e títulos personalizados
-const themeConfig = {
-  "Popularidade tracking": {
-    title: "Avaliação de Governo",
-    description: "Aprovação e desempenho governamental",
-    icon: Building2,
-  },
-  Saúde: {
-    title: "Saúde",
-    description: "Sistema de saúde e políticas públicas",
-    icon: Heart,
-  },
-  Educação: {
-    title: "Educação",
-    description: "Ensino público e qualidade educacional",
-    icon: GraduationCap,
-  },
-  "Segurança e Violência": {
-    title: "Segurança",
-    description: "Segurança pública e criminalidade",
-    icon: Shield,
-  },
-  "Economia brasileira": {
-    title: "Economia",
-    description: "Situação econômica e emprego",
-    icon: TrendingUp,
-  },
-  "Economia familiar": {
-    title: "Economia Familiar",
-    description: "Análise da situação econômica das famílias",
-    icon: Users,
-  },
-  "Programas Sociais e Emprego": {
-    title: "Programas Sociais",
-    description: "Impacto e avaliação de programas sociais",
-    icon: Briefcase,
-  },
-  "Meio Ambiente": {
-    title: "Meio Ambiente",
-    description: "Políticas de sustentabilidade e preservação",
-    icon: CloudSun,
-  },
-  "Relações internacionais": {
-    title: "Relações Internacionais",
-    description: "Cenário e política externa",
-    icon: Globe,
-  },
-  Transporte: {
-    title: "Transporte",
-    description: "Mobilidade urbana e infraestrutura",
-    icon: Train,
-  },
-  "Cultura e Turismo": {
-    title: "Cultura e Turismo",
-    description: "Fomento e acesso à cultura e turismo",
-    icon: Palette,
-  },
-  "Meios de Comunicação e Redes Sociais": {
-    title: "Mídia e Redes Sociais",
-    description: "Consumo de informação e tendências",
-    icon: MessageSquare,
-  },
-  // Adicione outros mapeamentos conforme necessário
-}
-
-const defaultThemeConfig = {
-  title: "Análise de Tema",
-  description: "Explore os dados desta área temática",
-  icon: FileText,
-}
-
 export default function HomePage() {
   const navigate = useNavigate()
+  const { surveyType } = useParams()
   const { logout } = useAuth()
-  const [temas, setTemas] = useState([])
+
+  const [themes, setThemes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const { surveyType } = useParams()
 
   useEffect(() => {
     const fetchThemes = async () => {
       try {
         setLoading(true)
-        // Incluir o tipo de pesquisa na requisição se necessário
-        const response = await ApiBase.get(`/api/data/themes?surveyType=${surveyType}`)
+        setError(null)
+
+        const response = await ApiBase.get("/api/data/themes")
+
         if (response.data && response.data.success) {
-          const apiThemes = response.data.themes
+          const fetchedThemes = response.data.themes
 
-          // Ordenar para que "Popularidade tracking" venha primeiro
-          apiThemes.sort((a, b) => {
-            if (a.theme === "Popularidade tracking") return -1
-            if (b.theme === "Popularidade tracking") return 1
-            return 0
-          })
+          // Find, rename, and move "Popularidade tracking" to the top
+          const popularidadeIndex = fetchedThemes.findIndex((t) => t.theme === "Popularidade tracking")
+          if (popularidadeIndex > -1) {
+            const popularidadeTheme = { ...fetchedThemes[popularidadeIndex], theme: "Avaliação do Governo" }
+            fetchedThemes.splice(popularidadeIndex, 1)
+            fetchedThemes.unshift(popularidadeTheme)
+          }
 
-          // Mapear e enriquecer os dados dos temas
-          const processedTemas = apiThemes.map((tema) => {
-            const config = themeConfig[tema.theme] || defaultThemeConfig
-            return {
-              id: tema.slug, // Usar o slug como ID
-              slug: tema.slug, // Manter o slug para a rota
-              apiTheme: tema.theme,
-              questionCount: tema.questionCount,
-              ...config,
-            }
-          })
-          setTemas(processedTemas)
+          setThemes(fetchedThemes)
         } else {
           setError("Não foi possível carregar os temas.")
         }
@@ -142,15 +49,19 @@ export default function HomePage() {
     }
 
     fetchThemes()
-  }, [surveyType]) // Adicionar surveyType como dependência
+  }, [])
 
-  const handleTemaClick = (tema) => {
-    navigate(`/theme/${surveyType}/${tema.slug}`)
+  const handleThemeClick = (theme) => {
+    navigate(`/theme/${surveyType}/${theme.slug}`)
   }
 
   const handleLogout = () => {
     logout()
     navigate("/login")
+  }
+
+  const getSurveyTypeTitle = () => {
+    return surveyType === "telefonica" ? "Pesquisas Telefônicas" : "Pesquisas Face-to-Face"
   }
 
   return (
@@ -170,15 +81,14 @@ export default function HomePage() {
             <Breadcrumb.Item linkAs={Link} linkProps={{ to: "/" }}>
               Tipos de Pesquisa
             </Breadcrumb.Item>
-            <Breadcrumb.Item active>
-              {surveyType === "telefonica" ? "Pesquisas Telefônicas" : "Pesquisas F2F"}
-            </Breadcrumb.Item>
+            <Breadcrumb.Item active>{getSurveyTypeTitle()}</Breadcrumb.Item>
           </Breadcrumb>
+
           <div className="page-title-section">
-            <Image src="/governo-federal-logo.png" alt="Governo Federal" className="gov-logo" />
-            <h1 className="main-title">PESQUISAS DE OPINIÃO PÚBLICA</h1>
-            <h2 className="main-subtitle">Selecione um Tema para Análise</h2>
-            <p className="main-description">Explore os dados das pesquisas organizados por área temática</p>
+            <h1 className="main-title">{getSurveyTypeTitle()}</h1>
+            <p className="main-description">
+              {loading ? "Carregando temas disponíveis..." : `Explore ${themes.length} temas de pesquisa disponíveis`}
+            </p>
           </div>
 
           {loading && (
@@ -191,32 +101,50 @@ export default function HomePage() {
           {error && (
             <div className="alert alert-danger text-center">
               <p className="mb-0">{error}</p>
+              <Button variant="primary" size="sm" className="mt-3" onClick={() => navigate("/")}>
+                Voltar ao Início
+              </Button>
             </div>
           )}
 
           {!loading && !error && (
-            <Row className="g-4 justify-content-center">
-              {temas.map((tema) => {
-                const IconComponent = tema.icon
-                return (
-                  <Col key={tema.id} lg={4} md={6} sm={12}>
-                    <Card className="theme-card" onClick={() => handleTemaClick(tema)}>
-                      <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center">
-                        <div className="theme-icon-wrapper">
-                          <IconComponent size={32} color="white" />
+            <Row className="g-4">
+              {themes.map((theme) => (
+                <Col key={theme.id || theme.slug} lg={4} md={6}>
+                  <Card className="theme-card h-100" onClick={() => handleThemeClick(theme)}>
+                    <Card.Body className="d-flex flex-column">
+                      <div className="theme-icon-wrapper mb-3">
+                        <Folder size={32} color="white" />
+                      </div>
+
+                      <div className="flex-grow-1">
+                        <h5 className="theme-title">{theme.theme}</h5>
+                        <p className="theme-description">
+                          Análise detalhada de dados relacionados a {theme.theme.toLowerCase()}
+                        </p>
+                      </div>
+
+                      <div className="theme-footer">
+                        <div className="d-flex justify-content-between align-items-center">
+                          <Badge bg="info" pill>
+                            {theme.questionCount} pergunta{theme.questionCount !== 1 ? "s" : ""}
+                          </Badge>
+                          <ChevronRight size={20} className="text-muted" />
                         </div>
-                        <h3 className="theme-card-title">{tema.title}</h3>
-                        <p className="theme-card-description">{tema.description}</p>
-                        <Button variant="dark" size="sm" className="view-analysis-btn">
-                          <BarChart3 size={14} className="me-2" />
-                          Ver Análises
-                        </Button>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                )
-              })}
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              ))}
             </Row>
+          )}
+
+          {!loading && !error && themes.length === 0 && (
+            <div className="text-center py-5">
+              <Search size={48} className="text-muted mb-3" />
+              <h4 className="text-muted">Nenhum tema encontrado</h4>
+              <p className="text-muted">Não há temas disponíveis para este tipo de pesquisa no momento.</p>
+            </div>
           )}
         </Container>
       </main>

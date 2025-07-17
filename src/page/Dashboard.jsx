@@ -2,14 +2,13 @@
 
 import { useState, useMemo, useRef, useEffect } from "react"
 import { useLocation } from "react-router-dom"
-import ApiBase from "../service/ApiBase"
+import ApiBase, { ApiMethods } from "../service/ApiBase"
 import { useQuery } from "@tanstack/react-query"
 import { ResponsiveLine } from "@nivo/line"
 import { Box, Typography, CircularProgress, IconButton, Button, LinearProgress } from "@mui/material"
 import { Download, PictureAsPdf, Menu as MenuIcon } from "@mui/icons-material"
 import OffcanvasNavigation from "../components/OffcanvasNavigation"
 import InteractiveBrazilMap from "../components/InteractiveBrazilMap"
-import DemographicFilters from "../components/DemographicFilters"
 import {
   groupResponses,
   shouldGroupResponses,
@@ -18,6 +17,7 @@ import {
   GROUPED_RESPONSE_ORDER,
   RESPONSE_ORDER,
 } from "../utils/chartUtils"
+import { DEMOGRAPHIC_LABELS } from "../utils/demographicUtils"
 import "./Dashboard.css"
 
 // Updated fetch function for the new API structure
@@ -39,8 +39,27 @@ const fetchQuestionData = async ({ queryKey }) => {
   }
 }
 
+
+
 // UF demographic key - adjust this if your API uses a different key for states
 const UF_DEMOGRAPHIC_KEY = "UF"
+
+const formatChartXAxis = (period, dateLabel) => {
+  const roundNumber = period ? period.split("-R")[1] : ""
+  if (dateLabel && roundNumber) {
+    return `${dateLabel} - R${roundNumber.padStart(2, '0')}`
+  }
+
+  if (period) {
+    const parts = period.split("-R")
+    if (parts.length === 2) {
+      const year = parts[0].slice(-2)
+      const round = parts[1].padStart(2, '0')
+      return `R${round}/${year}`
+    }
+  }
+  return period || ""
+}
 
 export default function Dashboard() {
   const chartRef = useRef(null)
@@ -57,26 +76,44 @@ export default function Dashboard() {
     return params.get("question")
   }, [location.search])
 
-  // Enhanced query with better timeout handling
-  const { data, error, status, isFetching } = useQuery({
+  const { data, error, status } = useQuery({
     queryKey: ["questionData", questionCode],
     queryFn: fetchQuestionData,
     enabled: !!questionCode,
-    staleTime: 1000 * 60 * 10, // 10 minutes - dados grandes não mudam frequentemente
-    cacheTime: 1000 * 60 * 15, // 15 minutes cache
+    staleTime: 1000 * 60 * 10, // 10 minutes
+    cacheTime: 1000 * 60 * 15, // 15 minutes
     refetchOnWindowFocus: false,
-    retry: 2, // Retry 2 times on failure
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   })
+
+  // Query atualizada para buscar todas as questões
+  const { data: allQuestionsData, isLoading: isLoadingAllQuestions } = useQuery({
+    queryKey: ["allQuestions"],
+    queryFn: ApiMethods.getAllQuestionsComplete,
+    staleTime: 1000 * 60 * 60, // 1 hour
+    cacheTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  })
+
+  const surveyDateMap = useMemo(() => {
+    if (!allQuestionsData?.data?.questions) return new Map()
+    const map = new Map()
+    allQuestionsData.data.questions.forEach((q) => {
+      if (q.surveyNumber && q.date && !map.has(q.surveyNumber.toString())) {
+        map.set(q.surveyNumber.toString(), q.date)
+      }
+    })
+    console.log("Survey Date Map criado:", map)
+    return map
+  }, [allQuestionsData])
 
   const { questionInfo, allHistoricalData, availableDemographics, mapRoundsWithData } = useMemo(() => {
     if (!data) {
       return { questionInfo: null, allHistoricalData: [], availableDemographics: [], mapRoundsWithData: [] }
     }
 
-    console.log("Processando dados históricos:", data.historicalData?.length || 0, "rodadas")
-
-    // Sort all rounds by period (most recent first)
     const sortedRounds = [...(data.historicalData || [])].sort((a, b) => {
       const [yearA, roundA] = a.period.split("-R").map(Number)
       const [yearB, roundB] = b.period.split("-R").map(Number)
@@ -84,22 +121,37 @@ export default function Dashboard() {
       return roundB - roundA
     })
 
-    // Filter rounds that have UF data for the map
-    const roundsWithMapData = sortedRounds.filter((round) => {
-      return round.distribution.some(
-        (dist) =>
-          dist.demographics &&
-          dist.demographics[UF_DEMOGRAPHIC_KEY] &&
-          dist.demographics[UF_DEMOGRAPHIC_KEY].length > 0,
-      )
+    const roundsWithMapData = sortedRounds.filter((round) =>
+      round.distribution.some((dist) => dist.demographics?.[UF_DEMOGRAPHIC_KEY]?.length > 0),
+    )
+
+    const demographicsMap = new Map()
+    ;(data.demographicFields || []).forEach((key) => {
+      if (key !== UF_DEMOGRAPHIC_KEY) {
+        demographicsMap.set(key, {
+          key,
+          label: DEMOGRAPHIC_LABELS[key] || key,
+          values: new Set(),
+        })
+      }
     })
 
-    console.log("Rodadas com dados de mapa:", roundsWithMapData.length)
-
-    // Generate availableDemographics from demographicFields
-    const demographics = (data.demographicFields || []).map((field) => {
-      return { key: field, label: field, values: [] }
+    sortedRounds.forEach((round) => {
+      round.distribution.forEach((dist) => {
+        if (dist.demographics) {
+          Object.entries(dist.demographics).forEach(([key, values]) => {
+            if (demographicsMap.has(key)) {
+              values.forEach((v) => demographicsMap.get(key).values.add(v.response))
+            }
+          })
+        }
+      })
     })
+
+    const demographics = Array.from(demographicsMap.values()).map((d) => ({
+      ...d,
+      values: Array.from(d.values).sort((a, b) => a.localeCompare(b)),
+    }))
 
     return {
       questionInfo: data.questionInfo,
@@ -109,28 +161,99 @@ export default function Dashboard() {
     }
   }, [data])
 
-  // Update range when data changes
+  const handleFilterChange = (demographicKey, value, checked) => {
+    setFilters((prevFilters) => {
+      // This logic allows multi-selection within a single demographic category.
+      // If a filter from a new category is selected, it clears the old one.
+      const newFilters = {}
+      const currentValues =
+        prevFilters[demographicKey] && Object.keys(prevFilters)[0] === demographicKey
+          ? [...prevFilters[demographicKey]]
+          : []
+
+      if (checked) {
+        if (!currentValues.includes(value)) {
+          currentValues.push(value)
+        }
+      } else {
+        const index = currentValues.indexOf(value)
+        if (index > -1) {
+          currentValues.splice(index, 1)
+        }
+      }
+
+      if (currentValues.length > 0) {
+        newFilters[demographicKey] = currentValues
+      }
+
+      return newFilters
+    })
+  }
+
+  const handleClearFilters = () => {
+    setFilters({})
+  }
+
+  const filteredHistoricalData = useMemo(() => {
+    if (!allHistoricalData || Object.keys(filters).length === 0) {
+      return allHistoricalData
+    }
+
+    const filterKey = Object.keys(filters)[0]
+    const filterValues = filters[filterKey]
+
+    if (!filterKey || !filterValues || filterValues.length === 0) {
+      return allHistoricalData
+    }
+
+    return allHistoricalData.map((round) => {
+      let totalForFilter = 0
+      const distributionForFilter = {}
+
+      round.distribution.forEach((dist) => {
+        const demoGroup = dist.demographics?.[filterKey]
+        if (demoGroup) {
+          demoGroup.forEach((demoValue) => {
+            if (filterValues.includes(demoValue.response)) {
+              totalForFilter += demoValue.weightedCount
+              distributionForFilter[dist.response] =
+                (distributionForFilter[dist.response] || 0) + demoValue.weightedCount
+            }
+          })
+        }
+      })
+
+      const newDistribution = round.distribution.map((dist) => ({
+        ...dist,
+        weightedCount: distributionForFilter[dist.response] || 0,
+      }))
+
+      return {
+        ...round,
+        distribution: newDistribution,
+        totalWeightedResponses: totalForFilter,
+      }
+    })
+  }, [allHistoricalData, filters])
+
   useEffect(() => {
     if (allHistoricalData.length > 0) {
       const maxIndex = Math.max(0, allHistoricalData.length - 1)
       setChartRangeStart(0)
       setChartRangeEnd(Math.min(9, maxIndex))
-      console.log(`Configurando range do gráfico: ${0} a ${Math.min(9, maxIndex)}`)
     }
   }, [allHistoricalData])
 
-  // Update selected map round index
   useEffect(() => {
     if (mapRoundsWithData.length > 0) {
       setSelectedMapRoundIndex(0)
-      console.log("Selecionando rodada mais recente para o mapa")
     }
   }, [mapRoundsWithData])
 
   const selectedChartData = useMemo(() => {
-    if (!allHistoricalData.length) return []
-    return allHistoricalData.slice(chartRangeStart, chartRangeEnd + 1)
-  }, [allHistoricalData, chartRangeStart, chartRangeEnd])
+    if (!filteredHistoricalData.length) return []
+    return filteredHistoricalData.slice(chartRangeStart, chartRangeEnd + 1).reverse()
+  }, [filteredHistoricalData, chartRangeStart, chartRangeEnd])
 
   const mapData = useMemo(() => {
     if (!mapRoundsWithData.length || selectedMapRoundIndex >= mapRoundsWithData.length || !questionInfo) {
@@ -146,35 +269,23 @@ export default function Dashboard() {
 
       if (ufDemographics) {
         ufDemographics.forEach((ufDemo) => {
-          // Create individual response entries for each count
           for (let i = 0; i < ufDemo.count; i++) {
             mapResponses.push({
               [questionInfo.variable]: responseValue,
-              UF: ufDemo.response, // This is the state name from API
+              UF: ufDemo.response,
             })
           }
         })
       }
     })
-
-    console.log("Dados do mapa processados:", mapResponses.length, "respostas")
     return mapResponses
   }, [mapRoundsWithData, selectedMapRoundIndex, questionInfo])
 
   const chartData = useMemo(() => {
     if (!selectedChartData || selectedChartData.length === 0) return []
 
-    const allPeriods = [...new Set(selectedChartData.map((d) => d.period))].filter(Boolean)
-    allPeriods.sort((a, b) => {
-      const [yearA, roundA] = a.split("-R").map(Number)
-      const [yearB, roundB] = b.split("-R").map(Number)
-      if (yearA !== yearB) return yearA - yearB
-      return roundA - roundB
-    })
-
-    if (allPeriods.length === 0) return []
-
     const dataByPeriod = new Map(selectedChartData.map((d) => [d.period, d]))
+    const allPeriods = Array.from(dataByPeriod.keys())
 
     const allActualResponses = new Set(selectedChartData.flatMap((r) => r.distribution.map((d) => d.response)))
     const useGrouping = shouldGroupResponses(Array.from(allActualResponses))
@@ -192,62 +303,56 @@ export default function Dashboard() {
 
     const series = Array.from(allSeriesIds).map((seriesId) => ({
       id: seriesId,
-      data: allPeriods
-        .map((period) => {
-          const rodada = dataByPeriod.get(period)
-          let yValue = 0
+      data: allPeriods.map((period) => {
+        const rodada = dataByPeriod.get(period)
+        let yValue = 0
 
-          if (rodada && rodada.totalResponses > 0) {
-            let count = 0
-            if (useGrouping) {
-              rodada.distribution.forEach((dist) => {
-                if (groupResponses(dist.response) === seriesId) {
-                  count += dist.count
-                }
-              })
-            } else {
-              const dist = rodada.distribution.find((d) => d.response === seriesId)
-              if (dist) {
-                count = dist.count
+        if (rodada && rodada.totalWeightedResponses > 0) {
+          let weightedCount = 0
+          if (useGrouping) {
+            rodada.distribution.forEach((dist) => {
+              if (groupResponses(dist.response) === seriesId) {
+                weightedCount += dist.weightedCount
               }
+            })
+          } else {
+            const dist = rodada.distribution.find((d) => d.response === seriesId)
+            if (dist) {
+              weightedCount = dist.weightedCount
             }
-            yValue = (count / rodada.totalResponses) * 100
           }
+          yValue = (weightedCount / rodada.totalWeightedResponses) * 100
+        }
 
-          return {
-            x: period,
-            y: Number.isFinite(yValue) ? yValue : 0,
-          }
-        })
-        .filter((point) => point.x && point.x !== ""),
+        const roundNumber = period.split("-R")[1]
+        const dateLabel = surveyDateMap.get(roundNumber)
+
+        return {
+          x: formatChartXAxis(period, dateLabel),
+          y: Number.isFinite(yValue) ? yValue : 0,
+        }
+      }),
     }))
 
-    const sortedSeries = series.sort((a, b) => {
-      const indexA = responseOrder.indexOf(a.id)
-      const indexB = responseOrder.indexOf(b.id)
-      if (indexA > -1 && indexB > -1) return indexA - indexB
-      if (indexA > -1) return -1
-      if (indexB > -1) return 1
-      return a.id.localeCompare(b.id)
-    })
+    return series
+      .sort((a, b) => {
+        const indexA = responseOrder.indexOf(a.id)
+        const indexB = responseOrder.indexOf(b.id)
+        if (indexA > -1 && indexB > -1) return indexA - indexB
+        if (indexA > -1) return -1
+        if (indexB > -1) return 1
+        return a.id.localeCompare(b.id)
+      })
+      .filter((serie) => serie.data && serie.data.length > 0)
+  }, [selectedChartData, surveyDateMap])
 
-    console.log("Dados do gráfico processados:", sortedSeries.length, "séries")
-    return sortedSeries.filter((serie) => serie.data && serie.data.length > 0)
-  }, [selectedChartData])
-
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => {
-      const newFilters = { ...prev }
-      if (newFilters[key] === value) {
-        delete newFilters[key]
-      } else {
-        newFilters[key] = value
-      }
-      return newFilters
-    })
+  const getXAxisLabel = (rodada) => {
+    if (!rodada || !surveyDateMap) return "N/A"
+    const roundNumber = rodada.period.split("-R")[1]
+    const dateLabel = surveyDateMap.get(roundNumber)
+    return formatChartXAxis(rodada.period, dateLabel)
   }
 
-  // Show loading screen until data is loaded
   if (status === "loading" || !data) {
     return (
       <Box className="loading-container">
@@ -268,18 +373,34 @@ export default function Dashboard() {
     )
   }
 
-  if (status === "error") {
-    const isTimeout = error?.code === "ECONNABORTED" || error?.message?.includes("timeout")
+  if (isLoadingAllQuestions) {
+    return (
+      <Box className="loading-container">
+        <CircularProgress size={60} />
+        <Typography variant="h6" color="text.secondary" sx={{ mt: 2, mb: 2 }}>
+          Carregando informações de datas...
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Buscando dados de todas as rodadas para formatação correta dos rótulos
+        </Typography>
+        <Box sx={{ width: "300px", mt: 2 }}>
+          <LinearProgress />
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+          Isso pode levar alguns segundos...
+        </Typography>
+      </Box>
+    )
+  }
 
+  if (status === "error") {
     return (
       <Box className="error-container">
         <Typography variant="h5" color="error" sx={{ mb: 2 }}>
-          {isTimeout ? "Timeout na Requisição" : "Erro ao carregar dados"}
+          Erro ao carregar dados
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-          {isTimeout
-            ? "A resposta da API está demorando mais que o esperado. Isso pode acontecer com grandes volumes de dados."
-            : `Erro: ${error.message}`}
+          {`Erro: ${error.message}`}
         </Typography>
         <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
           Tentar Novamente
@@ -300,8 +421,8 @@ export default function Dashboard() {
         onHide={() => setShowOffcanvas(false)}
         availableDemographics={availableDemographics}
         filters={filters}
-        onFilterChange={() => {}}
-        onClearFilters={() => setFilters({})}
+        onFilterChange={handleFilterChange}
+        onClearFilters={handleClearFilters}
       />
 
       <header className="dashboard-header">
@@ -323,7 +444,6 @@ export default function Dashboard() {
 
       <div className="dashboard-content">
         <div className="dashboard-grid">
-          {/* Left Column - Chart */}
           <div className="chart-card">
             <div className="chart-card-content">
               <Typography className="card-title-custom">
@@ -333,8 +453,8 @@ export default function Dashboard() {
               {allHistoricalData.length > 1 && (
                 <Box sx={{ mb: 3, px: 1 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: "block" }}>
-                    Período: {allHistoricalData[chartRangeEnd]?.period || "N/A"} até{" "}
-                    {allHistoricalData[chartRangeStart]?.period || "N/A"}
+                    Período: {getXAxisLabel(allHistoricalData[chartRangeEnd])} até{" "}
+                    {getXAxisLabel(allHistoricalData[chartRangeStart])}
                   </Typography>
 
                   <Box sx={{ position: "relative", height: "40px", mb: 1 }}>
@@ -357,7 +477,9 @@ export default function Dashboard() {
                         backgroundColor: "#1976d2",
                         borderRadius: "3px",
                         left: `${(chartRangeStart / Math.max(1, allHistoricalData.length - 1)) * 100}%`,
-                        width: `${((chartRangeEnd - chartRangeStart) / Math.max(1, allHistoricalData.length - 1)) * 100}%`,
+                        width: `${
+                          ((chartRangeEnd - chartRangeStart) / Math.max(1, allHistoricalData.length - 1)) * 100
+                        }%`,
                       }}
                     />
                     <input
@@ -372,17 +494,6 @@ export default function Dashboard() {
                         }
                       }}
                       className="range-slider range-slider-start"
-                      style={{
-                        position: "absolute",
-                        top: "0",
-                        left: "0",
-                        width: "100%",
-                        height: "40px",
-                        background: "transparent",
-                        outline: "none",
-                        cursor: "pointer",
-                        zIndex: 2,
-                      }}
                     />
                     <input
                       type="range"
@@ -396,26 +507,15 @@ export default function Dashboard() {
                         }
                       }}
                       className="range-slider range-slider-end"
-                      style={{
-                        position: "absolute",
-                        top: "0",
-                        left: "0",
-                        width: "100%",
-                        height: "40px",
-                        background: "transparent",
-                        outline: "none",
-                        cursor: "pointer",
-                        zIndex: 1,
-                      }}
                     />
                   </Box>
 
                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                     <Typography variant="caption" color="text.secondary">
-                      Mais recente
+                      Mais antiga
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Mais antiga
+                      Mais recente
                     </Typography>
                   </Box>
                 </Box>
@@ -475,7 +575,7 @@ export default function Dashboard() {
                 ) : (
                   <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
                     <Typography variant="body1" color="text.secondary">
-                      Nenhum dado disponível para o período selecionado
+                      Nenhum dado disponível para o período ou filtros selecionados
                     </Typography>
                   </Box>
                 )}
@@ -483,7 +583,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Right Column - Map */}
           <div className="map-card">
             <div className="map-card-content">
               <Typography className="card-title-custom">Mapa Interativo do Brasil</Typography>
@@ -494,7 +593,7 @@ export default function Dashboard() {
               {mapRoundsWithData.length > 1 && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-                    Rodada: {mapRoundsWithData[selectedMapRoundIndex]?.period || "N/A"}
+                    Rodada: {getXAxisLabel(mapRoundsWithData[selectedMapRoundIndex]) || "N/A"}
                   </Typography>
                   <input
                     type="range"
@@ -532,14 +631,6 @@ export default function Dashboard() {
                   </Box>
                 )}
               </div>
-              <DemographicFilters
-                availableDemographics={availableDemographics}
-                onFilterChange={handleFilterChange}
-                activeFilters={filters}
-              />
-              <Typography variant="caption" color="text.secondary" align="center" component="p" sx={{ mt: 2 }}>
-                Clique em um estado para filtrar | Passe o mouse para detalhes
-              </Typography>
             </div>
           </div>
         </div>
