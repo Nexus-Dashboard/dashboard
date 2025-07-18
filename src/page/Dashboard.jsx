@@ -44,7 +44,6 @@ const fetchAllQuestions = async () => {
   console.log("🔍 Iniciando busca COMPLETA de todas as questões...")
   
   try {
-    // Primeiro, vamos buscar a primeira página para entender a estrutura
     const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`)
     console.log("📋 Resposta da primeira página:", firstResponse.data)
     
@@ -58,7 +57,6 @@ const fetchAllQuestions = async () => {
     let allQuestions = [...firstResponse.data.data.questions]
     console.log(`✅ Primeira página carregada: ${allQuestions.length} questões`)
 
-    // Agora vamos buscar todas as outras páginas
     const promises = []
     for (let page = 2; page <= totalPages; page++) {
       promises.push(
@@ -77,14 +75,12 @@ const fetchAllQuestions = async () => {
     console.log(`⏳ Aguardando ${promises.length} requisições...`)
     const additionalPages = await Promise.all(promises)
     
-    // Combinar todos os resultados
     additionalPages.forEach(pageQuestions => {
       allQuestions = [...allQuestions, ...pageQuestions]
     })
 
     console.log(`🎉 SUCESSO! Total de questões carregadas: ${allQuestions.length}`)
     
-    // Vamos ver alguns exemplos do que foi carregado
     console.log("📋 Primeiros 3 exemplos:", allQuestions.slice(0, 3).map(q => ({
       surveyNumber: q.surveyNumber,
       date: q.date,
@@ -282,57 +278,62 @@ export default function Dashboard() {
 
   const filteredHistoricalData = useMemo(() => {
     if (!allHistoricalData || Object.keys(filters).length === 0) {
-      return allHistoricalData
+      return allHistoricalData;
     }
 
-    const filterKey = Object.keys(filters)[0]
-    const filterValues = filters[filterKey]
+    const filterKey = Object.keys(filters)[0];
+    const filterValues = filters[filterKey];
 
     if (!filterKey || !filterValues || filterValues.length === 0) {
-      return allHistoricalData
+      return allHistoricalData;
     }
 
     return allHistoricalData.map((round) => {
-      let totalForFilter = 0
-      const distributionForFilter = {}
+      let totalForFilter = 0;
+      const distributionForFilter = {};
 
       round.distribution.forEach((dist) => {
-        const demoGroup = dist.demographics?.[filterKey]
+        const demoGroup = dist.demographics?.[filterKey];
         if (demoGroup) {
           demoGroup.forEach((demoValue) => {
             if (filterValues.includes(demoValue.response)) {
-              totalForFilter += demoValue.weightedCount
+              totalForFilter += demoValue.weightedCount;
               distributionForFilter[dist.response] =
-                (distributionForFilter[dist.response] || 0) + demoValue.weightedCount
+                (distributionForFilter[dist.response] || 0) + demoValue.weightedCount;
             }
-          })
+          });
         }
-      })
+      });
 
       const newDistribution = round.distribution.map((dist) => ({
         ...dist,
         weightedCount: distributionForFilter[dist.response] || 0,
-      }))
+      }));
 
       return {
         ...round,
         distribution: newDistribution,
         totalWeightedResponses: totalForFilter,
-      }
-    })
-  }, [allHistoricalData, filters])
+      };
+    });
+  }, [allHistoricalData, filters]);
 
   useEffect(() => {
     if (allHistoricalData.length > 0) {
       const maxIndex = Math.max(0, allHistoricalData.length - 1)
-      setChartRangeStart(0)
-      setChartRangeEnd(Math.min(9, maxIndex))
+      const newEnd = Math.min(maxIndex, 9) // Set to show last 10 rounds
+      const newStart = Math.max(0, newEnd - 9) // Set start 10 positions before end
+      setChartRangeStart(newStart)
+      setChartRangeEnd(newEnd)
     }
   }, [allHistoricalData])
 
   useEffect(() => {
     if (mapRoundsWithData.length > 0) {
-      setSelectedMapRoundIndex(0)
+      const maxIndex = Math.max(0, mapRoundsWithData.length - 1)
+      const newEnd = Math.min(maxIndex, 9) // Set to show last 10 rounds
+      const newStart = Math.max(0, newEnd - 9) // Set start 10 positions before end
+      setSelectedMapRoundIndex(newStart)
     }
   }, [mapRoundsWithData])
 
@@ -566,19 +567,6 @@ export default function Dashboard() {
         </Box>
       </header>
 
-      {/* Debug Info */}
-      <Box sx={{ p: 2, bgcolor: "#f5f5f5", margin: 1 }}>
-        <Typography variant="caption" display="block">
-          🔍 DEBUG: Survey Date Map tem {surveyDateMap.size} entradas
-        </Typography>
-        <Typography variant="caption" display="block">
-          📊 Total questões carregadas: {allQuestionsData?.data?.questions?.length || 0}
-        </Typography>
-        <Typography variant="caption" display="block">
-          📈 Dados do gráfico: {chartData.length} séries
-        </Typography>
-      </Box>
-
       <div className="dashboard-content">
         <div className="dashboard-grid">
           <div className="chart-card">
@@ -614,9 +602,7 @@ export default function Dashboard() {
                         backgroundColor: "#1976d2",
                         borderRadius: "3px",
                         left: `${(chartRangeStart / Math.max(1, allHistoricalData.length - 1)) * 100}%`,
-                        width: `${
-                          ((chartRangeEnd - chartRangeStart) / Math.max(1, allHistoricalData.length - 1)) * 100
-                        }%`,
+                        width: `${((chartRangeEnd - chartRangeStart) / Math.max(1, allHistoricalData.length - 1)) * 100}%`,
                       }}
                     />
                     <input
@@ -735,7 +721,7 @@ export default function Dashboard() {
                   <input
                     type="range"
                     min={0}
-                    max={mapRoundsWithData.length - 1}
+                    max={Math.max(0, mapRoundsWithData.length - 1)}
                     value={selectedMapRoundIndex}
                     onChange={(e) => setSelectedMapRoundIndex(Number.parseInt(e.target.value))}
                     className="single-range-slider"
