@@ -1,210 +1,363 @@
 "use client"
 
-import { useState } from "react"
-import { Container, Row, Col, Card, Button, Image, Spinner, Breadcrumb, Badge } from "react-bootstrap"
-import { useNavigate, useParams, Link } from "react-router-dom"
-import { BarChart3, ChevronLeft, HelpCircle, List, Grid3x3 } from "lucide-react"
-import { useAuth } from "../contexts/AuthContext"
-import { useThemeQuestions } from "../hooks/useApiData"
-import { groupQuestionsByAnswerType } from "../utils/questionGrouping"
-import AnswerOptionsDisplay from "../components/AnswerOptionsDisplay"
+import { useState, useMemo, useCallback } from "react"
+import { Container, Row, Col, Card, Button, Alert, Badge, Form } from "react-bootstrap"
+import { useNavigate, useParams } from "react-router-dom"
+import { useQuery } from "@tanstack/react-query"
+import { ArrowLeft, Search, Layers, BarChart3, Users } from "lucide-react"
+
+// Componentes
+import LoadingState from "../components/LoadingState"
+
+// Serviços
+import ApiBase from "../service/ApiBase"
+
+// Estilos
 import "./ThemeQuestionsPage.css"
+
+// Função para buscar o nome real do tema usando o slug
+const fetchThemeNameBySlug = async (themeSlug) => {
+  console.log(`🔍 Buscando nome real do tema para slug: ${themeSlug}`)
+
+  try {
+    const { data } = await ApiBase.get("/api/data/themes")
+    console.log("📋 Temas recebidos:", data)
+
+    if (!data.success) {
+      throw new Error("Erro ao buscar temas")
+    }
+
+    const theme = data.themes.find((t) => t.slug === themeSlug)
+    if (!theme) {
+      throw new Error(`Tema não encontrado para slug: ${themeSlug}`)
+    }
+
+    console.log(`✅ Nome real encontrado: ${theme.theme}`)
+    return theme.theme
+  } catch (error) {
+    console.error("💥 Erro ao buscar nome do tema:", error.message)
+    throw error
+  }
+}
+
+// Função para buscar perguntas agrupadas do tema
+const fetchGroupedQuestions = async (themeName) => {
+  console.log(`🔍 Buscando perguntas agrupadas para tema: ${themeName}`)
+
+  try {
+    const { data } = await ApiBase.get(`/api/data/themes/${encodeURIComponent(themeName)}/questions-grouped`)
+    console.log("📊 Perguntas agrupadas recebidas:", data)
+
+    if (!data.success) {
+      throw new Error("Erro ao buscar perguntas agrupadas")
+    }
+
+    return data
+  } catch (error) {
+    console.error("💥 Erro ao buscar perguntas agrupadas:", error.message)
+    throw error
+  }
+}
 
 export default function ThemeQuestionsPage() {
   const navigate = useNavigate()
-  const { surveyType, themeSlug } = useParams()
-  const { logout } = useAuth()
-  const [viewMode, setViewMode] = useState("grouped") // "grouped" ou "list"
+  const { themeSlug } = useParams()
 
-  // Usar o hook personalizado
-  const { questions, themeName, loading, error } = useThemeQuestions(themeSlug)
+  // Estados
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedQuestions, setSelectedQuestions] = useState([])
 
-  // Agrupar perguntas por tipo de resposta
-  const groupedQuestions = groupQuestionsByAnswerType(questions)
+  // Query para buscar nome real do tema
+  const {
+    data: themeName,
+    isLoading: isLoadingTheme,
+    error: themeError,
+  } = useQuery({
+    queryKey: ["themeName", themeSlug],
+    queryFn: () => fetchThemeNameBySlug(themeSlug),
+    enabled: !!themeSlug,
+    staleTime: 1000 * 60 * 60, // 1 hour
+    cacheTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
+  })
 
-  const handleQuestionClick = (question) => {
-    navigate(`/dashboard?question=${question.variable}`)
+  // Query para buscar perguntas agrupadas
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["groupedQuestions", themeName],
+    queryFn: () => fetchGroupedQuestions(themeName),
+    enabled: !!themeName,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    cacheTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false,
+  })
+
+  const questionGroups = data?.questionGroups || []
+  const totalGroups = data?.totalGroups || 0
+  const totalQuestions = data?.totalQuestions || 0
+
+  // Filtrar grupos por termo de busca
+  const filteredGroups = useMemo(() => {
+    if (!searchTerm.trim()) return questionGroups
+
+    const term = searchTerm.toLowerCase()
+    return questionGroups.filter(
+      (group) =>
+        group.questionText.toLowerCase().includes(term) ||
+        group.shortText.toLowerCase().includes(term) ||
+        group.variables.some((variable) => variable.toLowerCase().includes(term)),
+    )
+  }, [questionGroups, searchTerm])
+
+  // Handlers
+  const handleBack = useCallback(() => {
+    navigate(-1)
+  }, [navigate])
+
+  const handleSearchChange = useCallback((e) => {
+    setSearchTerm(e.target.value)
+  }, [])
+
+  const handleQuestionClick = useCallback(
+    (group) => {
+      const params = new URLSearchParams({
+        theme: themeName,
+        questionText: group.questionText,
+        groupId: group.id,
+      })
+
+      navigate(`/dashboard?${params.toString()}`)
+    },
+    [navigate, themeName],
+  )
+
+  const handleRefresh = useCallback(() => {
+    refetch()
+  }, [refetch])
+
+  // Estados de loading e erro
+  if (isLoadingTheme) {
+    return <LoadingState message="Carregando informações do tema..." />
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate("/login")
+  if (themeError) {
+    return (
+      <Container className="mt-4">
+        <Alert variant="danger">
+          <Alert.Heading>Erro ao carregar tema</Alert.Heading>
+          <p>{themeError.message}</p>
+          <Button variant="secondary" onClick={handleBack}>
+            Voltar
+          </Button>
+        </Alert>
+      </Container>
+    )
   }
 
-  const toggleViewMode = () => {
-    setViewMode(viewMode === "grouped" ? "list" : "grouped")
+  if (isLoading) {
+    return <LoadingState message="Carregando perguntas agrupadas..." />
+  }
+
+  if (error) {
+    return (
+      <Container className="mt-4">
+        <Alert variant="danger">
+          <Alert.Heading>Erro ao carregar perguntas</Alert.Heading>
+          <p>{error.message}</p>
+          <div className="d-flex gap-2">
+            <Button variant="outline-danger" onClick={handleRefresh}>
+              Tentar novamente
+            </Button>
+            <Button variant="secondary" onClick={handleBack}>
+              Voltar
+            </Button>
+          </div>
+        </Alert>
+      </Container>
+    )
   }
 
   return (
-    <div className="questions-page-wrapper">
-      <header className="main-header">
-        <Container className="d-flex justify-content-between align-items-center">
-          <Image src="/nexus-logo.png" alt="Nexus Logo" className="header-logo-nexus" />
-          <Button variant="outline-light" size="sm" onClick={handleLogout}>
-            Sair
-          </Button>
-        </Container>
-      </header>
-
-      <main className="content-area">
+    <div className="theme-questions-wrapper">
+      {/* Header */}
+      <div className="theme-questions-header">
         <Container>
-          <Breadcrumb className="mb-4 custom-breadcrumb">
-            <Breadcrumb.Item linkAs={Link} linkProps={{ to: "/" }}>
-              Tipos de Pesquisa
-            </Breadcrumb.Item>
-            <Breadcrumb.Item linkAs={Link} linkProps={{ to: `/themes/${surveyType}` }}>
-              {surveyType === "telefonica" ? "Pesquisas Telefônicas" : "Pesquisas F2F"}
-            </Breadcrumb.Item>
-            <Breadcrumb.Item active>{loading ? "Carregando..." : themeName}</Breadcrumb.Item>
-          </Breadcrumb>
+          <div className="d-flex justify-content-between align-items-start">
+            <div className="header-content">
+              <Button variant="outline-secondary" size="sm" onClick={handleBack} className="mb-3">
+                <ArrowLeft size={16} className="me-2" />
+                Voltar
+              </Button>
 
-          <div className="page-title-section">
-            <div className="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-3">
-              <div className="title-content">
-                <h1 className="main-title">{loading ? "Carregando Tema..." : themeName}</h1>
-                <p className="main-description">
-                  {loading
-                    ? "Buscando perguntas..."
-                    : `${questions.length} perguntas disponíveis organizadas por tipo de resposta`}
+              <div className="theme-info">
+                <div className="d-flex align-items-center gap-2 mb-2">
+                  <Layers size={20} className="text-primary" />
+                  <Badge bg="primary" pill>
+                    Perguntas Agrupadas
+                  </Badge>
+                  <Badge bg="info" pill>
+                    {totalGroups} grupos
+                  </Badge>
+                  <Badge bg="success" pill>
+                    {totalQuestions} questões
+                  </Badge>
+                </div>
+
+                <h1 className="theme-title">{themeName}</h1>
+                <p className="theme-description">
+                  Visualize perguntas agrupadas por conteúdo similar para análise consolidada
                 </p>
               </div>
-
-              {!loading && !error && questions.length > 0 && (
-                <Button 
-                  variant="outline-dark" 
-                  onClick={toggleViewMode} 
-                  className="view-toggle-btn d-flex align-items-center gap-2"
-                >
-                  {viewMode === "grouped" ? <List size={16} /> : <Grid3x3 size={16} />}
-                  {viewMode === "grouped" ? "Ver Lista" : "Ver Agrupado"}
-                </Button>
-              )}
             </div>
           </div>
+        </Container>
+      </div>
 
-          {loading && (
-            <div className="loading-state">
-              <Spinner animation="border" variant="primary" />
-              <p className="mt-3 text-muted">Carregando perguntas...</p>
-            </div>
-          )}
+      {/* Estatísticas */}
+      <section className="stats-section">
+        <Container>
+          <Row>
+            <Col md={4}>
+              <Card className="stat-card">
+                <Card.Body className="text-center">
+                  <Layers size={32} className="stat-icon text-primary" />
+                  <h3 className="stat-number">{totalGroups}</h3>
+                  <p className="stat-label">Grupos de Perguntas</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={4}>
+              <Card className="stat-card">
+                <Card.Body className="text-center">
+                  <BarChart3 size={32} className="stat-icon text-success" />
+                  <h3 className="stat-number">{totalQuestions}</h3>
+                  <p className="stat-label">Total de Questões</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={4}>
+              <Card className="stat-card">
+                <Card.Body className="text-center">
+                  <Users size={32} className="stat-icon text-info" />
+                  <h3 className="stat-number">{filteredGroups.length}</h3>
+                  <p className="stat-label">Grupos Filtrados</p>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </Container>
+      </section>
 
-          {error && (
-            <div className="alert alert-danger">
-              <p className="mb-0">{error}</p>
-              <Button variant="primary" size="sm" className="mt-3" onClick={() => navigate(`/themes/${surveyType}`)}>
-                <ChevronLeft size={16} className="me-2" />
-                Voltar para Temas
-              </Button>
-            </div>
-          )}
+      {/* Filtros */}
+      <section className="filters-section">
+        <Container>
+          <Card>
+            <Card.Header>
+              <h5 className="mb-0">Filtros de Busca</h5>
+            </Card.Header>
+            <Card.Body>
+              <Row>
+                <Col md={8}>
+                  <Form.Group>
+                    <Form.Label>Buscar por texto da pergunta ou variável</Form.Label>
+                    <div className="position-relative">
+                      <Search size={16} className="search-icon" />
+                      <Form.Control
+                        type="text"
+                        placeholder="Digite para buscar..."
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                        className="ps-5"
+                      />
+                    </div>
+                  </Form.Group>
+                </Col>
+                <Col md={4} className="d-flex align-items-end">
+                  <Button variant="outline-secondary" onClick={() => setSearchTerm("")} disabled={!searchTerm}>
+                    Limpar Filtros
+                  </Button>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        </Container>
+      </section>
 
-          {!loading && !error && viewMode === "list" && (
-            <div className="questions-list">
-              {questions.map((question) => (
-                <Card key={question.variable} className="question-card mb-3" onClick={() => handleQuestionClick(question)}>
-                  <Card.Body>
-                    <div className="question-card-content">
-                      <div className="question-icon-wrapper">
-                        <HelpCircle size={24} color="white" />
+      {/* Lista de Grupos de Perguntas */}
+      <section className="questions-section">
+        <Container>
+          {filteredGroups.length === 0 ? (
+            <Alert variant="info">
+              <Alert.Heading>Nenhum grupo encontrado</Alert.Heading>
+              <p>
+                {searchTerm
+                  ? `Não foram encontrados grupos que correspondam ao termo "${searchTerm}".`
+                  : "Não há grupos de perguntas disponíveis para este tema."}
+              </p>
+              {searchTerm && (
+                <Button variant="outline-info" onClick={() => setSearchTerm("")}>
+                  Limpar busca
+                </Button>
+              )}
+            </Alert>
+          ) : (
+            <Row>
+              {filteredGroups.map((group) => (
+                <Col lg={6} className="mb-4" key={group.id}>
+                  <Card className="question-group-card h-100">
+                    <Card.Header className="d-flex justify-content-between align-items-start">
+                      <div className="d-flex align-items-center gap-2">
+                        <Layers size={16} className="text-primary" />
+                        <small className="text-muted">Grupo #{group.id.split("-").pop()}</small>
                       </div>
-                      <div className="question-text-wrapper">
-                        <p className="question-text">{question.questionText || question.label}</p>
-                        <div className="question-meta">
-                          <Badge bg="secondary" pill className="me-2">
-                            {question.variable}
-                          </Badge>
-                          <AnswerOptionsDisplay possibleAnswers={question.possibleAnswers} maxDisplay={2} />
+                      <div className="d-flex gap-1">
+                        <Badge bg="primary" pill>
+                          {group.totalVariations} variações
+                        </Badge>
+                        <Badge bg="info" pill>
+                          {group.variables.length} variáveis
+                        </Badge>
+                        <Badge bg="success" pill>
+                          {group.rounds.length} rodadas
+                        </Badge>
+                      </div>
+                    </Card.Header>
+
+                    <Card.Body>
+                      <h6 className="question-text mb-3">{group.shortText}</h6>
+
+                      <div className="question-meta mb-3">
+                        <div className="meta-item">
+                          <strong>Variáveis:</strong> {group.variables.join(", ")}
+                        </div>
+                        <div className="meta-item">
+                          <strong>Rodadas:</strong> {group.rounds.join(", ")}
                         </div>
                       </div>
-                      <Button variant="dark" size="sm" className="view-question-btn">
-                        <BarChart3 size={14} className="me-2" />
-                        Analisar
+
+                      {group.variations && group.variations.length > 0 && (
+                        <div className="variations-preview mb-3">
+                          <small className="text-muted">
+                            <strong>Exemplo de variação:</strong>
+                            <br />
+                            {group.variations[0].surveyName} - {group.variations[0].date}
+                          </small>
+                        </div>
+                      )}
+                    </Card.Body>
+
+                    <Card.Footer>
+                      <Button variant="primary" size="sm" onClick={() => handleQuestionClick(group)} className="w-100">
+                        <BarChart3 size={16} className="me-2" />
+                        Visualizar Dashboard
                       </Button>
-                    </div>
-                  </Card.Body>
-                </Card>
+                    </Card.Footer>
+                  </Card>
+                </Col>
               ))}
-            </div>
-          )}
-
-          {!loading && !error && viewMode === "grouped" && (
-            <div className="grouped-questions">
-              {Object.values(groupedQuestions).map((group) => (
-                <Card key={group.key} className="group-card">
-                  <Card.Header className="group-header">
-                    <div className="d-flex justify-content-between align-items-center">
-                      <div className="group-info">
-                        <h5 className="group-title">{group.title}</h5>
-                        <small className="group-description">{group.description}</small>
-                      </div>
-                      <Badge bg={group.color} pill className="group-badge">
-                        {group.questions.length} pergunta{group.questions.length !== 1 ? "s" : ""}
-                      </Badge>
-                    </div>
-                  </Card.Header>
-
-                  <Card.Body className="group-body">
-                    {/* Mostrar exemplo das respostas possíveis */}
-                    {group.sampleAnswers.length > 0 && (
-                      <div className="answer-options-section">
-                        <small className="text-muted d-block mb-2">Opções de resposta:</small>
-                        <AnswerOptionsDisplay
-                          possibleAnswers={group.sampleAnswers}
-                          maxDisplay={5}
-                          variant={group.color}
-                        />
-                      </div>
-                    )}
-
-                    {/* Lista de perguntas do grupo */}
-                    <div className="group-questions-list">
-                      {group.questions.map((question) => (
-                        <Card
-                          key={question.variable}
-                          className="question-card-small"
-                          onClick={() => handleQuestionClick(question)}
-                        >
-                          <Card.Body>
-                            <div className="question-small-content">
-                              <div className="question-icon-wrapper-small">
-                                <HelpCircle size={18} color="white" />
-                              </div>
-                              <div className="question-small-text-wrapper">
-                                <p className="question-text-small">{question.questionText || question.label}</p>
-                                <Badge bg="secondary" pill className="question-variable-badge">
-                                  {question.variable}
-                                </Badge>
-                              </div>
-                              <Button variant="outline-dark" size="sm" className="question-analyze-btn">
-                                <BarChart3 size={14} />
-                              </Button>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      ))}
-                    </div>
-                  </Card.Body>
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {!loading && !error && questions.length === 0 && (
-            <div className="empty-state">
-              <HelpCircle size={48} className="text-muted mb-3" />
-              <h4 className="text-dark">Nenhuma pergunta encontrada</h4>
-              <p className="text-muted">Não há perguntas disponíveis para este tema no momento.</p>
-            </div>
+            </Row>
           )}
         </Container>
-      </main>
-
-      <footer className="page-footer">
-        <Container>
-          <p className="footer-text">Dados atualizados em tempo real • Sistema de Monitoramento Secom/PR</p>
-        </Container>
-      </footer>
+      </section>
     </div>
   )
 }

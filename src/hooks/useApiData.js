@@ -54,11 +54,12 @@ export const useThemeQuestions = (themeSlug) => {
         if (response.data && response.data.success) {
           setThemeName(response.data.theme)
 
-          // Filtrar para obter apenas perguntas únicas baseadas na 'variable'
+          // Filtrar para obter apenas perguntas únicas baseadas na 'variable' e 'questionText'
           const uniqueQuestionsMap = new Map()
           response.data.questions.forEach((question) => {
-            if (!uniqueQuestionsMap.has(question.variable)) {
-              uniqueQuestionsMap.set(question.variable, question)
+            const key = `${question.variable}-${question.questionText}`
+            if (!uniqueQuestionsMap.has(key)) {
+              uniqueQuestionsMap.set(key, question)
             }
           })
           const uniqueQuestions = Array.from(uniqueQuestionsMap.values())
@@ -81,20 +82,20 @@ export const useThemeQuestions = (themeSlug) => {
 }
 
 // Hook para buscar dados de uma pergunta
-export const useQuestionData = (questionCode) => {
+export const useQuestionData = (questionCode, theme) => {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (!questionCode) return
+    if (!questionCode || !theme) return
 
     const fetchQuestionData = async () => {
       try {
         setLoading(true)
         setError(null)
 
-        const response = await ApiMethods.getQuestionResponses(questionCode)
+        const response = await ApiMethods.getQuestionResponses(questionCode, { theme })
 
         if (response.data && response.data.success) {
           setData(response.data)
@@ -110,7 +111,7 @@ export const useQuestionData = (questionCode) => {
     }
 
     fetchQuestionData()
-  }, [questionCode])
+  }, [questionCode, theme])
 
   return { data, loading, error }
 }

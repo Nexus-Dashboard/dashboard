@@ -20,21 +20,118 @@ import {
 import { DEMOGRAPHIC_LABELS } from "../utils/demographicUtils"
 import "./Dashboard.css"
 
-// Updated fetch function for the new API structure
-const fetchQuestionData = async ({ queryKey }) => {
-  const [, questionCode] = queryKey
-  console.log(`Iniciando busca para pergunta: ${questionCode}`)
+// Função temporária para buscar dados usando a API individual até a API agrupada estar disponível
+const fetchQuestionDataFallback = async ({ queryKey }) => {
+  const [, theme, questionText] = queryKey
+  console.log(`🔄 Usando fallback - buscando dados individuais para tema: ${theme}`)
+  console.log(`Question Text: ${questionText}`)
 
   try {
-    const { data } = await ApiBase.get(`/api/data/question/${questionCode}/responses`)
-    console.log("Dados recebidos com sucesso")
+    // Primeiro, buscar todas as perguntas do tema para encontrar as variáveis relacionadas
+    const { data: themeData } = await ApiBase.get(`/api/data/themes/${encodeURIComponent(theme)}/questions-grouped`)
 
-    if (!data.success) {
-      throw new Error("API returned an error")
+    if (!themeData.success) {
+      throw new Error("Erro ao buscar dados do tema")
     }
-    return data
+
+    // Encontrar o grupo de perguntas correspondente
+    const questionGroup = themeData.questionGroups.find((group) => group.questionText === questionText)
+
+    if (!questionGroup) {
+      throw new Error("Grupo de perguntas não encontrado")
+    }
+
+    console.log("📊 Grupo encontrado:", questionGroup)
+
+    // Buscar dados para cada variável do grupo
+    const allHistoricalData = []
+    const demographicFieldsSet = new Set()
+
+    for (const variable of questionGroup.variables) {
+      try {
+        console.log(`🔍 Buscando dados para variável: ${variable}`)
+        const { data: variableData } = await ApiBase.post(`/api/data/question/${variable}/responses`, {
+          theme: theme,
+          questionText: questionText,
+        })
+
+        if (variableData.success && variableData.historicalData) {
+          // Adicionar dados históricos
+          variableData.historicalData.forEach((round) => {
+            // Verificar se já existe uma rodada com o mesmo período
+            const existingRound = allHistoricalData.find((r) => r.period === round.period)
+
+            if (existingRound) {
+              // Combinar distribuições
+              round.distribution.forEach((dist) => {
+                const existingDist = existingRound.distribution.find((d) => d.response === dist.response)
+                if (existingDist) {
+                  existingDist.weightedCount += dist.weightedCount
+                  existingDist.count += dist.count
+
+                  // Combinar demographics
+                  if (dist.demographics) {
+                    Object.entries(dist.demographics).forEach(([key, values]) => {
+                      if (!existingDist.demographics[key]) {
+                        existingDist.demographics[key] = []
+                      }
+                      existingDist.demographics[key] = [...existingDist.demographics[key], ...values]
+                    })
+                  }
+                } else {
+                  existingRound.distribution.push({ ...dist })
+                }
+              })
+
+              existingRound.totalWeightedResponses += round.totalWeightedResponses
+              existingRound.totalResponses += round.totalResponses
+            } else {
+              allHistoricalData.push({
+                ...round,
+                variable: variable, // Adicionar referência da variável
+              })
+            }
+          })
+
+          // Adicionar campos demográficos
+          if (variableData.demographicFields) {
+            variableData.demographicFields.forEach((field) => demographicFieldsSet.add(field))
+          }
+        }
+      } catch (variableError) {
+        console.warn(`⚠️ Erro ao buscar dados para variável ${variable}:`, variableError.message)
+      }
+    }
+
+    // Ordenar dados históricos por período
+    allHistoricalData.sort((a, b) => {
+      const [yearA, roundA] = a.period.split("-R").map(Number)
+      const [yearB, roundB] = b.period.split("-R").map(Number)
+      if (yearA !== yearB) return yearA - yearB
+      return roundA - roundB
+    })
+
+    console.log(`✅ Dados combinados: ${allHistoricalData.length} rodadas`)
+
+    return {
+      success: true,
+      searchMethod: "Dados agrupados via fallback",
+      theme: theme,
+      questionInfo: {
+        variables: questionGroup.variables,
+        rounds: questionGroup.rounds,
+        totalVariations: questionGroup.totalVariations,
+        variablesByRound:
+          questionGroup.variations?.reduce((acc, variation) => {
+            acc[variation.surveyNumber] = variation.variable
+            return acc
+          }, {}) || {},
+      },
+      historicalData: allHistoricalData,
+      demographicFields: Array.from(demographicFieldsSet),
+    }
   } catch (error) {
-    console.error("Erro na busca de dados:", error.message)
+    console.error("💥 Erro no fallback:", error.message)
     throw error
   }
 }
@@ -42,11 +139,11 @@ const fetchQuestionData = async ({ queryKey }) => {
 // Função para buscar TODAS as questões de forma mais robusta
 const fetchAllQuestions = async () => {
   console.log("🔍 Iniciando busca COMPLETA de todas as questões...")
-  
+
   try {
     const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`)
     console.log("📋 Resposta da primeira página:", firstResponse.data)
-    
+
     if (!firstResponse.data?.success) {
       throw new Error("API returned an error")
     }
@@ -61,38 +158,41 @@ const fetchAllQuestions = async () => {
     for (let page = 2; page <= totalPages; page++) {
       promises.push(
         ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
-          .then(response => {
+          .then((response) => {
             console.log(`✅ Página ${page} carregada: ${response.data?.data?.questions?.length || 0} questões`)
             return response.data?.success ? response.data.data.questions : []
           })
-          .catch(error => {
+          .catch((error) => {
             console.error(`❌ Erro na página ${page}:`, error.message)
             return []
-          })
+          }),
       )
     }
 
     console.log(`⏳ Aguardando ${promises.length} requisições...`)
     const additionalPages = await Promise.all(promises)
-    
-    additionalPages.forEach(pageQuestions => {
+
+    additionalPages.forEach((pageQuestions) => {
       allQuestions = [...allQuestions, ...pageQuestions]
     })
 
     console.log(`🎉 SUCESSO! Total de questões carregadas: ${allQuestions.length}`)
-    
-    console.log("📋 Primeiros 3 exemplos:", allQuestions.slice(0, 3).map(q => ({
-      surveyNumber: q.surveyNumber,
-      date: q.date,
-      variable: q.variable
-    })))
+
+    console.log(
+      "📋 Primeiros 3 exemplos:",
+      allQuestions.slice(0, 3).map((q) => ({
+        surveyNumber: q.surveyNumber,
+        date: q.date,
+        variable: q.variable,
+      })),
+    )
 
     return {
       success: true,
       data: {
         questions: allQuestions,
-        pagination: firstResponse.data.data.pagination
-      }
+        pagination: firstResponse.data.data.pagination,
+      },
     }
   } catch (error) {
     console.error("💥 Erro na busca completa:", error.message)
@@ -105,11 +205,11 @@ const UF_DEMOGRAPHIC_KEY = "UF"
 
 const formatChartXAxis = (period, dateLabel) => {
   console.log(`🔧 Formatando eixo X - period: ${period}, dateLabel: ${dateLabel}`)
-  
+
   const roundNumber = period ? period.split("-R")[1] : ""
-  
+
   if (dateLabel && roundNumber) {
-    const formatted = `${dateLabel} - R${roundNumber.padStart(2, '0')}`
+    const formatted = `${dateLabel} - R${roundNumber.padStart(2, "0")}`
     console.log(`✅ Formato com data: ${formatted}`)
     return formatted
   }
@@ -118,13 +218,13 @@ const formatChartXAxis = (period, dateLabel) => {
     const parts = period.split("-R")
     if (parts.length === 2) {
       const year = parts[0].slice(-2)
-      const round = parts[1].padStart(2, '0')
+      const round = parts[1].padStart(2, "0")
       const formatted = `R${round}/${year}`
       console.log(`⚠️ Formato sem data: ${formatted}`)
       return formatted
     }
   }
-  
+
   console.log(`❌ Formato padrão: ${period}`)
   return period || ""
 }
@@ -139,15 +239,25 @@ export default function Dashboard() {
   const [chartRangeEnd, setChartRangeEnd] = useState(9)
   const [selectedMapRoundIndex, setSelectedMapRoundIndex] = useState(0)
 
-  const questionCode = useMemo(() => {
+  const theme = useMemo(() => {
     const params = new URLSearchParams(location.search)
-    return params.get("question")
+    return params.get("theme")
+  }, [location.search])
+
+  const questionText = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get("questionText")
+  }, [location.search])
+
+  const groupId = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get("groupId")
   }, [location.search])
 
   const { data, error, status } = useQuery({
-    queryKey: ["questionData", questionCode],
-    queryFn: fetchQuestionData,
-    enabled: !!questionCode,
+    queryKey: ["groupedQuestionDataFallback", theme, questionText],
+    queryFn: fetchQuestionDataFallback,
+    enabled: !!theme && !!questionText,
     staleTime: 1000 * 60 * 10, // 10 minutes
     cacheTime: 1000 * 60 * 15, // 15 minutes
     refetchOnWindowFocus: false,
@@ -155,7 +265,11 @@ export default function Dashboard() {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   })
 
-  const { data: allQuestionsData, isLoading: isLoadingAllQuestions, error: allQuestionsError } = useQuery({
+  const {
+    data: allQuestionsData,
+    isLoading: isLoadingAllQuestions,
+    error: allQuestionsError,
+  } = useQuery({
     queryKey: ["allQuestions"],
     queryFn: fetchAllQuestions,
     staleTime: 1000 * 60 * 60, // 1 hour
@@ -166,17 +280,17 @@ export default function Dashboard() {
 
   const surveyDateMap = useMemo(() => {
     console.log("🗺️ Criando Survey Date Map...")
-    
+
     if (!allQuestionsData?.data?.questions) {
       console.log("❌ Sem dados de questões para criar o mapa")
       return new Map()
     }
-    
+
     const map = new Map()
     const questions = allQuestionsData.data.questions
-    
+
     console.log(`📊 Processando ${questions.length} questões...`)
-    
+
     questions.forEach((q, index) => {
       if (q.surveyNumber && q.date) {
         const key = q.surveyNumber.toString()
@@ -186,16 +300,27 @@ export default function Dashboard() {
         }
       }
     })
-    
+
     console.log("🎯 Survey Date Map final:", Array.from(map.entries()))
     console.log(`📈 Total de mapeamentos: ${map.size}`)
-    
+
     return map
   }, [allQuestionsData])
 
   const { questionInfo, allHistoricalData, availableDemographics, mapRoundsWithData } = useMemo(() => {
     if (!data) {
       return { questionInfo: null, allHistoricalData: [], availableDemographics: [], mapRoundsWithData: [] }
+    }
+
+    // Adaptar para a nova estrutura de dados agrupados
+    const questionInfo = {
+      questionText: questionText,
+      label: questionText,
+      variable: data.questionInfo?.variables?.[0] || "GROUPED", // Usar primeira variável ou placeholder
+      variables: data.questionInfo?.variables || [],
+      rounds: data.questionInfo?.rounds || [],
+      totalVariations: data.questionInfo?.totalVariations || 0,
+      variablesByRound: data.questionInfo?.variablesByRound || {},
     }
 
     const sortedRounds = [...(data.historicalData || [])].sort((a, b) => {
@@ -206,12 +331,14 @@ export default function Dashboard() {
     })
 
     const roundsWithMapData = sortedRounds.filter((round) =>
-      round.distribution.some((dist) => dist.demographics?.[UF_DEMOGRAPHIC_KEY]?.length > 0),
+      round.distribution.some(
+        (dist) => dist.demographics?.[UF_DEMOGRAPHIC_KEY]?.length > 0 || dist.demographics?.["PF10"]?.length > 0,
+      ),
     )
 
     const demographicsMap = new Map()
     ;(data.demographicFields || []).forEach((key) => {
-      if (key !== UF_DEMOGRAPHIC_KEY) {
+      if (key !== UF_DEMOGRAPHIC_KEY && key !== "PF10") {
         demographicsMap.set(key, {
           key,
           label: DEMOGRAPHIC_LABELS[key] || key,
@@ -238,12 +365,12 @@ export default function Dashboard() {
     }))
 
     return {
-      questionInfo: data.questionInfo,
+      questionInfo: questionInfo,
       allHistoricalData: sortedRounds,
       availableDemographics: demographics,
       mapRoundsWithData: roundsWithMapData,
     }
-  }, [data])
+  }, [data, questionText])
 
   const handleFilterChange = (demographicKey, value, checked) => {
     setFilters((prevFilters) => {
@@ -278,45 +405,45 @@ export default function Dashboard() {
 
   const filteredHistoricalData = useMemo(() => {
     if (!allHistoricalData || Object.keys(filters).length === 0) {
-      return allHistoricalData;
+      return allHistoricalData
     }
 
-    const filterKey = Object.keys(filters)[0];
-    const filterValues = filters[filterKey];
+    const filterKey = Object.keys(filters)[0]
+    const filterValues = filters[filterKey]
 
     if (!filterKey || !filterValues || filterValues.length === 0) {
-      return allHistoricalData;
+      return allHistoricalData
     }
 
     return allHistoricalData.map((round) => {
-      let totalForFilter = 0;
-      const distributionForFilter = {};
+      let totalForFilter = 0
+      const distributionForFilter = {}
 
       round.distribution.forEach((dist) => {
-        const demoGroup = dist.demographics?.[filterKey];
+        const demoGroup = dist.demographics?.[filterKey]
         if (demoGroup) {
           demoGroup.forEach((demoValue) => {
             if (filterValues.includes(demoValue.response)) {
-              totalForFilter += demoValue.weightedCount;
+              totalForFilter += demoValue.weightedCount
               distributionForFilter[dist.response] =
-                (distributionForFilter[dist.response] || 0) + demoValue.weightedCount;
+                (distributionForFilter[dist.response] || 0) + demoValue.weightedCount
             }
-          });
+          })
         }
-      });
+      })
 
       const newDistribution = round.distribution.map((dist) => ({
         ...dist,
         weightedCount: distributionForFilter[dist.response] || 0,
-      }));
+      }))
 
       return {
         ...round,
         distribution: newDistribution,
         totalWeightedResponses: totalForFilter,
-      };
-    });
-  }, [allHistoricalData, filters]);
+      }
+    })
+  }, [allHistoricalData, filters])
 
   useEffect(() => {
     if (allHistoricalData.length > 0) {
@@ -352,7 +479,8 @@ export default function Dashboard() {
 
     selectedRound.distribution.forEach((dist) => {
       const responseValue = dist.response
-      const ufDemographics = dist.demographics?.[UF_DEMOGRAPHIC_KEY]
+      // Primeiro tenta UF, se não existir, usa PF10
+      const ufDemographics = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
 
       if (ufDemographics) {
         ufDemographics.forEach((ufDemo) => {
@@ -370,7 +498,7 @@ export default function Dashboard() {
 
   const chartData = useMemo(() => {
     console.log("🎨 Criando dados do gráfico...")
-    
+
     if (!selectedChartData || selectedChartData.length === 0) {
       console.log("❌ Sem dados selecionados para o gráfico")
       return []
@@ -380,7 +508,7 @@ export default function Dashboard() {
 
     const dataByPeriod = new Map(selectedChartData.map((d) => [d.period, d]))
     const allPeriods = Array.from(dataByPeriod.keys())
-    
+
     console.log("🕐 Períodos encontrados:", allPeriods)
 
     const allActualResponses = new Set(selectedChartData.flatMap((r) => r.distribution.map((d) => d.response)))
@@ -422,7 +550,7 @@ export default function Dashboard() {
 
         const roundNumber = period.split("-R")[1]
         const dateLabel = surveyDateMap.get(roundNumber)
-        
+
         console.log(`🔍 Buscando data para rodada ${roundNumber}:`, dateLabel)
 
         const xLabel = formatChartXAxis(period, dateLabel)
@@ -467,16 +595,16 @@ export default function Dashboard() {
       <Box className="loading-container">
         <CircularProgress size={60} />
         <Typography variant="h6" color="text.secondary" sx={{ mt: 2, mb: 2 }}>
-          Carregando dados da pergunta...
+          Carregando dados agrupados da pergunta...
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Esta operação pode levar até 2 minutos devido ao volume de dados
+          Usando método de fallback para combinar dados de múltiplas variáveis
         </Typography>
         <Box sx={{ width: "300px", mt: 2 }}>
           <LinearProgress />
         </Box>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-          Processando dados históricos e demográficos...
+          Processando dados históricos e demográficos agrupados...
         </Typography>
       </Box>
     )
@@ -490,7 +618,8 @@ export default function Dashboard() {
           🔄 Carregando informações de datas...
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Buscando dados de todas as {allQuestionsData?.data?.pagination?.totalQuestions || "37"} páginas para formatação correta dos rótulos
+          Buscando dados de todas as {allQuestionsData?.data?.pagination?.totalQuestions || "1883"} questões para
+          formatação correta dos rótulos
         </Typography>
         <Box sx={{ width: "300px", mt: 2 }}>
           <LinearProgress />
@@ -506,7 +635,7 @@ export default function Dashboard() {
     return (
       <Box className="error-container">
         <Typography variant="h5" color="error" sx={{ mb: 2 }}>
-          Erro ao carregar dados
+          Erro ao carregar dados agrupados
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
           {`Erro: ${error.message}`}
@@ -574,6 +703,19 @@ export default function Dashboard() {
               <Typography className="card-title-custom">
                 {questionInfo?.label || questionInfo?.questionText || "Análise Temporal"}
               </Typography>
+
+              {/* Mostrar informações sobre o agrupamento */}
+              {questionInfo?.totalVariations > 1 && (
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: "block" }}>
+                  Dados agrupados de {questionInfo.totalVariations} variações: {questionInfo.variables?.join(", ")}
+                </Typography>
+              )}
+
+              {data?.searchMethod && (
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: "block" }}>
+                  Método: {data.searchMethod}
+                </Typography>
+              )}
 
               {allHistoricalData.length > 1 && (
                 <Box sx={{ mb: 3, px: 1 }}>
