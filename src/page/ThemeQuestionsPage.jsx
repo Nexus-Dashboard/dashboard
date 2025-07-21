@@ -30,6 +30,9 @@ export default function ThemeQuestionsPage() {
   const { logout } = useAuth()
 
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedRound, setSelectedRound] = useState("")
+  const [availableRounds, setAvailableRounds] = useState([])
+
 
   const {
     data: themeName,
@@ -158,44 +161,62 @@ export default function ThemeQuestionsPage() {
           </div>
 
           <Card className="filters-card">
-            <Card.Header>
-              <div className="d-flex align-items-center">
-                <Filter size={16} className="me-2" />
-                <h5 className="mb-0">Filtro de Perguntas</h5>
-              </div>
-            </Card.Header>
-            <Card.Body>
-              <Row className="align-items-end g-3">
-                <Col md={10}>
-                  <Form.Group>
-                    <Form.Label>Buscar por texto, código ou variável</Form.Label>
-                    <InputGroup>
-                      <InputGroup.Text>
-                        <Search size={16} />
-                      </InputGroup.Text>
-                      <Form.Control
-                        type="text"
-                        placeholder="Digite para buscar..."
-                        value={searchTerm}
-                        onChange={handleSearchChange}
-                      />
-                    </InputGroup>
-                  </Form.Group>
-                </Col>
-                <Col md={2}>
-                  <Button
-                    variant="outline-secondary"
-                    onClick={handleClearFilters}
-                    disabled={!searchTerm}
-                    className="w-100"
-                  >
-                    <XCircle size={16} className="me-2" />
-                    Limpar
-                  </Button>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
+  <Card.Body>
+    <div className="filters-header">
+      <Filter size={20} className="text-primary" />
+      <h6>Filtros de Busca</h6>
+    </div>
+
+    <div className="filters-row">
+      <div className="filter-search">
+        <Form.Group>
+          <Form.Label>Buscar por texto, código ou variável</Form.Label>
+          <InputGroup>
+            <InputGroup.Text>
+              <Search size={16} />
+            </InputGroup.Text>
+            <Form.Control
+              type="text"
+              placeholder="Digite para buscar..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
+          </InputGroup>
+        </Form.Group>
+      </div>
+
+      <div className="filter-round">
+        <Form.Group>
+          <Form.Label>Filtrar por rodada</Form.Label>
+          <Form.Select 
+            value={selectedRound} 
+            onChange={(e) => setSelectedRound(e.target.value)}
+          >
+            <option value="">Todas as rodadas</option>
+            {availableRounds.map((round) => (
+              <option key={round} value={round}>
+                Rodada {round}
+              </option>
+            ))}
+          </Form.Select>
+        </Form.Group>
+      </div>
+
+      <div className="filter-clear">
+        <Form.Label>&nbsp;</Form.Label>
+        <Button
+          variant="outline-secondary"
+          onClick={handleClearFilters}
+          className="clear-filters-btn d-block w-100"
+          disabled={!searchTerm && !selectedRound}
+        >
+          Limpar
+        </Button>
+      </div>
+    </div>
+  </Card.Body>
+</Card>
+
 
           {filteredMultiple.length === 0 && filteredTextGrouped.length === 0 ? (
             <div className="empty-state">
@@ -216,7 +237,8 @@ export default function ThemeQuestionsPage() {
                     <Layers />
                     <h4>Perguntas de Matriz (Múltiplas)</h4>
                   </div>
-                  {filteredMultiple.map((group) => (
+                  <div className="questions-grid">
+                    {filteredMultiple.map((group) => (
                     <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
                       <Card.Body>
                         <div className="question-card-header">
@@ -251,6 +273,7 @@ export default function ThemeQuestionsPage() {
                       </Card.Body>
                     </Card>
                   ))}
+                  </div>
                 </section>
               )}
 
@@ -260,7 +283,8 @@ export default function ThemeQuestionsPage() {
                     <FileText />
                     <h4>Perguntas Individuais (Agrupadas por Texto)</h4>
                   </div>
-                  {filteredTextGrouped.map((group) => (
+                  <div className="questions-grid">
+                    {filteredTextGrouped.map((group) => (
                     <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
                       <Card.Body>
                         <h6 className="question-card-title">{group.shortText || group.questionText}</h6>
@@ -277,6 +301,7 @@ export default function ThemeQuestionsPage() {
                       </Card.Body>
                     </Card>
                   ))}
+                  </div>
                 </section>
               )}
             </>

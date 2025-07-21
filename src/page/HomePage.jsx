@@ -160,15 +160,17 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Filters Card */}
+          
+          {/* Filters Card - CORRIGIDO */}
           <Card className="filters-card">
             <Card.Body>
-              <div className="d-flex align-items-center">
+              <div className="filters-header">
                 <Filter size={20} className="text-primary" />
-                <h6 className="fw-semibold">Filtros de Busca</h6>
+                <h6>Filtros de Busca</h6>
               </div>
-              <Row>
-                <Col md={6} >
+              
+              <div className="filters-row">
+                <div className="filter-search">
                   <Form.Group>
                     <Form.Label>Buscar tema</Form.Label>
                     <InputGroup>
@@ -183,11 +185,15 @@ export default function HomePage() {
                       />
                     </InputGroup>
                   </Form.Group>
-                </Col>
-                <Col md={4}>
+                </div>
+                
+                <div className="filter-round">
                   <Form.Group>
                     <Form.Label>Filtrar por rodada</Form.Label>
-                    <Form.Select value={selectedRound} onChange={(e) => setSelectedRound(e.target.value)}>
+                    <Form.Select 
+                      value={selectedRound} 
+                      onChange={(e) => setSelectedRound(e.target.value)}
+                    >
                       <option value="">Todas as rodadas</option>
                       {availableRounds.map((round) => (
                         <option key={round} value={round}>
@@ -196,19 +202,20 @@ export default function HomePage() {
                       ))}
                     </Form.Select>
                   </Form.Group>
-                </Col>
-                <Col md={2}>
+                </div>
+                
+                <div className="filter-clear">
+                  <Form.Label>&nbsp;</Form.Label>
                   <Button
                     variant="outline-secondary"
                     onClick={handleClearFilters}
-                    className="w-100"
+                    className="clear-filters-btn d-block w-100"
                     disabled={!searchTerm && !selectedRound}
                   >
-                    <X size={16} className="me-1" />
                     Limpar
                   </Button>
-                </Col>
-              </Row>
+                </div>
+              </div>
             </Card.Body>
           </Card>
 

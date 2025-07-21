@@ -1,7 +1,7 @@
 /* General Page Wrapper */
 .single-mention-wrapper {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #ffff;
   display: flex;
   flex-direction: column;
 }
