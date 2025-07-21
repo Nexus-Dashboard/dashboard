@@ -17,6 +17,11 @@
   width: auto;
 }
 
+.gov-logo {
+  height: 150px;
+  width: auto;
+}
+
 .content-area {
   flex: 1;
   display: flex;
@@ -30,11 +35,11 @@
 }
 
 .main-title {
-  color: black;
+  color: #000000; /* Garantindo que seja preto */
   font-size: 2.5rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  text-shadow: none; /* Removendo sombra que pode afetar a cor */
 }
 
 .main-subtitle {
@@ -129,19 +134,21 @@
   flex-grow: 1;
 }
 
+/* Botões em preto */
 .select-button {
-  background: #2d3748;
+  background: #000000; /* Preto em vez de #2d3748 */
   border: none;
   border-radius: 25px;
   padding: 0.5rem 1.5rem;
   font-weight: 500;
   transition: all 0.3s ease;
-  color: black;
+  color: white; /* Texto branco */
 }
 
 .select-button:hover {
-  background: #1a202c;
+  background: #333333; /* Cinza escuro no hover */
   transform: scale(1.05);
+  color: white; /* Mantém texto branco no hover */
 }
 
 /* Footer original */

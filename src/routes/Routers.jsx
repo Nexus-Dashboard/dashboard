@@ -1,15 +1,17 @@
 "use client"
-
 import { Routes, Route, Navigate } from "react-router-dom"
-import HomePage from "../page/HomePage"
-import Upload from "../page/upload"
-import Dashboard from "../page/Dashboard"
+import { useAuth } from "../contexts/AuthContext"
 import Login from "../page/Login"
 import Register from "../page/Register"
-import { useAuth } from "../contexts/AuthContext"
+import HomePage from "../page/HomePage"
+import Dashboard from "../page/Dashboard"
+import SingleMentionDashboard from "../page/SingleMentionDashboard"
+import MatrixDashboard from "../page/MatrixDashboard"
 import ThemeQuestionsPage from "../page/ThemeQuestionsPage"
 import SurveyTypePage from "../page/SurveyTypePage"
 import UserManagementPage from "../page/UserManagementPage"
+import Upload from "../page/upload"
+
 
 // Componente de Rota Protegida
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -121,6 +123,22 @@ const Routers = () => (
       }
     />
     <Route
+      path="/dashboard/single-mention"
+      element={
+        <ProtectedRoute>
+          <SingleMentionDashboard />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+        path="/dashboard/matrix"
+        element={
+          <ProtectedRoute>
+            <MatrixDashboard />
+          </ProtectedRoute>
+        }
+      />
+    <Route
       path="/admin/users"
       element={
         <ProtectedRoute adminOnly={true}>
@@ -128,6 +146,14 @@ const Routers = () => (
         </ProtectedRoute>
       }
     />
+    <Route
+        path="/user-management"
+        element={
+          <ProtectedRoute>
+            <UserManagementPage />
+          </ProtectedRoute>
+        }
+      />
     <Route
       path="/upload"
       element={

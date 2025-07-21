@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Container, Row, Col, Card, Button, Image, Spinner, Breadcrumb, Badge } from "react-bootstrap"
-import { useNavigate, useParams, Link } from "react-router-dom"
-import { Folder, ChevronRight, Search } from "lucide-react"
+import { Container, Row, Col, Card, Button, Image, Spinner, Form, InputGroup } from "react-bootstrap"
+import { useNavigate, useParams } from "react-router-dom"
+import { Folder, ChevronRight, Search, ArrowLeft, Filter, X } from "lucide-react"
 import ApiBase from "../service/ApiBase"
 import { useAuth } from "../contexts/AuthContext"
 import "./HomePage.css"
@@ -14,11 +14,15 @@ export default function HomePage() {
   const { logout } = useAuth()
 
   const [themes, setThemes] = useState([])
+  const [filteredThemes, setFilteredThemes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedRound, setSelectedRound] = useState("")
+  const [availableRounds, setAvailableRounds] = useState([])
 
   useEffect(() => {
-    const fetchThemesWithUniqueQuestions = async () => {
+    const fetchThemes = async () => {
       try {
         setLoading(true)
         setError(null)
@@ -28,51 +32,56 @@ export default function HomePage() {
         if (response.data && response.data.success) {
           const fetchedThemes = response.data.themes
 
-          // Para cada tema, buscar as perguntas e contar apenas as únicas
-          const themesWithUniqueCount = await Promise.all(
-            fetchedThemes.map(async (theme) => {
-              try {
-                const questionsResponse = await ApiBase.get(`/api/data/themes/${theme.slug}/questions`)
+          // Processar os temas vindos da API
+          const processedThemes = fetchedThemes.map((theme) => {
+            // Renomear "Popularidade tracking" para "Avaliação do Governo"
+            const themeName = theme.theme === "Popularidade tracking" ? "Avaliação do Governo" : theme.theme
 
-                if (questionsResponse.data && questionsResponse.data.success) {
-                  // Filtrar para obter apenas perguntas únicas baseadas na 'variable'
-                  const uniqueQuestionsMap = new Map()
-                  questionsResponse.data.questions.forEach((question) => {
-                    if (!uniqueQuestionsMap.has(question.variable)) {
-                      uniqueQuestionsMap.set(question.variable, question)
-                    }
-                  })
-                  const uniqueQuestionCount = uniqueQuestionsMap.size
+            return {
+              ...theme,
+              theme: themeName,
+              rounds: theme.Rodadas || [], // Usar o campo Rodadas da API
+              id: theme.id || theme.slug,
+            }
+          })
 
-                  return {
-                    ...theme,
-                    questionCount: uniqueQuestionCount,
-                  }
-                } else {
-                  return {
-                    ...theme,
-                    questionCount: 0,
-                  }
-                }
-              } catch (err) {
-                console.error(`Erro ao buscar perguntas para o tema ${theme.slug}:`, err)
-                return {
-                  ...theme,
-                  questionCount: 0,
-                }
-              }
-            }),
-          )
+          // Separar "Avaliação do Governo" dos demais temas
+          const avaliacaoIndex = processedThemes.findIndex((t) => t.theme === "Avaliação do Governo")
+          let avaliacaoTheme = null
+          let otherThemes = processedThemes
 
-          // Find, rename, and move "Popularidade tracking" to the top
-          const popularidadeIndex = themesWithUniqueCount.findIndex((t) => t.theme === "Popularidade tracking")
-          if (popularidadeIndex > -1) {
-            const popularidadeTheme = { ...themesWithUniqueCount[popularidadeIndex], theme: "Avaliação do Governo" }
-            themesWithUniqueCount.splice(popularidadeIndex, 1)
-            themesWithUniqueCount.unshift(popularidadeTheme)
+          if (avaliacaoIndex > -1) {
+            avaliacaoTheme = processedThemes[avaliacaoIndex]
+            otherThemes = processedThemes.filter((_, index) => index !== avaliacaoIndex)
           }
 
-          setThemes(themesWithUniqueCount)
+          // Ordenar os demais temas por quantidade de rodadas (decrescente) e depois por nome
+          otherThemes.sort((a, b) => {
+            const roundsCountA = a.rounds.length
+            const roundsCountB = b.rounds.length
+            
+            // Primeiro critério: quantidade de rodadas (decrescente)
+            if (roundsCountB !== roundsCountA) {
+              return roundsCountB - roundsCountA
+            }
+            
+            // Segundo critério: ordem alfabética
+            return a.theme.localeCompare(b.theme, 'pt-BR')
+          })
+
+          // Recompor a lista final com "Avaliação do Governo" no topo
+          const finalThemes = avaliacaoTheme ? [avaliacaoTheme, ...otherThemes] : otherThemes
+
+          // Extrair todas as rodadas disponíveis
+          const allRounds = new Set()
+          finalThemes.forEach((theme) => {
+            theme.rounds.forEach((round) => allRounds.add(round))
+          })
+          const sortedRounds = Array.from(allRounds).sort((a, b) => b - a)
+
+          setThemes(finalThemes)
+          setFilteredThemes(finalThemes)
+          setAvailableRounds(sortedRounds)
         } else {
           setError("Não foi possível carregar os temas.")
         }
@@ -84,16 +93,41 @@ export default function HomePage() {
       }
     }
 
-    fetchThemesWithUniqueQuestions()
+    fetchThemes()
   }, [])
+
+  useEffect(() => {
+    let filtered = themes
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      filtered = filtered.filter((theme) => theme.theme.toLowerCase().includes(searchTerm.toLowerCase()))
+    }
+
+    // Filter by specific round
+    if (selectedRound) {
+      filtered = filtered.filter((theme) => theme.rounds.includes(Number.parseInt(selectedRound)))
+    }
+
+    setFilteredThemes(filtered)
+  }, [themes, searchTerm, selectedRound])
 
   const handleThemeClick = (theme) => {
     navigate(`/theme/${surveyType}/${theme.slug}`)
   }
 
+  const handleBackClick = () => {
+    navigate("/")
+  }
+
   const handleLogout = () => {
     logout()
     navigate("/login")
+  }
+
+  const handleClearFilters = () => {
+    setSearchTerm("")
+    setSelectedRound("")
   }
 
   const getSurveyTypeTitle = () => {
@@ -113,31 +147,82 @@ export default function HomePage() {
 
       <main className="content-area">
         <Container>
-          <Breadcrumb className="mb-4 custom-breadcrumb">
-            <Breadcrumb.Item linkAs={Link} linkProps={{ to: "/" }}>
-              Tipos de Pesquisa
-            </Breadcrumb.Item>
-            <Breadcrumb.Item active>{getSurveyTypeTitle()}</Breadcrumb.Item>
-          </Breadcrumb>
-
-          <div className="page-title-section">
-            <h1 className="main-title">{getSurveyTypeTitle()}</h1>
-            <p className="main-description">
-              {loading ? "Carregando temas disponíveis..." : `Explore ${themes.length} temas de pesquisa disponíveis`}
+          <div className="page-header">
+            <Button variant="outline-secondary" size="sm" onClick={handleBackClick} className="back-button">
+              <ArrowLeft size={16} className="me-2" />
+              Voltar para Tipos de Pesquisa
+            </Button>
+            <h1 className="page-title">{getSurveyTypeTitle()}</h1>
+            <p className="page-description">
+              {loading
+                ? "Carregando temas disponíveis..."
+                : `Explore ${filteredThemes.length} temas de pesquisa disponíveis`}
             </p>
           </div>
+
+          {/* Filters Card */}
+          <Card className="filters-card">
+            <Card.Body>
+              <div className="d-flex align-items-center">
+                <Filter size={20} className="text-primary" />
+                <h6 className="fw-semibold">Filtros de Busca</h6>
+              </div>
+              <Row>
+                <Col md={6} >
+                  <Form.Group>
+                    <Form.Label>Buscar tema</Form.Label>
+                    <InputGroup>
+                      <InputGroup.Text>
+                        <Search size={16} />
+                      </InputGroup.Text>
+                      <Form.Control
+                        type="text"
+                        placeholder="Digite para buscar..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </InputGroup>
+                  </Form.Group>
+                </Col>
+                <Col md={4}>
+                  <Form.Group>
+                    <Form.Label>Filtrar por rodada</Form.Label>
+                    <Form.Select value={selectedRound} onChange={(e) => setSelectedRound(e.target.value)}>
+                      <option value="">Todas as rodadas</option>
+                      {availableRounds.map((round) => (
+                        <option key={round} value={round}>
+                          Rodada {round}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={2}>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={handleClearFilters}
+                    className="w-100"
+                    disabled={!searchTerm && !selectedRound}
+                  >
+                    <X size={16} className="me-1" />
+                    Limpar
+                  </Button>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
 
           {loading && (
             <div className="loading-state">
               <Spinner animation="border" variant="primary" />
-              <p className="mt-3 text-muted">Carregando temas e contando perguntas únicas...</p>
+              <p className="mt-3 text-muted">Carregando temas disponíveis...</p>
             </div>
           )}
 
           {error && (
             <div className="alert alert-danger">
               <p className="mb-0">{error}</p>
-              <Button variant="primary" size="sm" className="mt-3" onClick={() => navigate("/")}>
+              <Button variant="primary" size="sm" className="mt-3" onClick={handleBackClick}>
                 Voltar ao Início
               </Button>
             </div>
@@ -145,47 +230,49 @@ export default function HomePage() {
 
           {!loading && !error && (
             <div className="themes-grid">
-              <Row className="g-4">
-                {themes.map((theme) => (
-                  <Col key={theme.id || theme.slug} lg={4} md={6}>
-                    <Card className="theme-card" onClick={() => handleThemeClick(theme)}>
-                      <Card.Body>
-                        <div className="theme-icon-wrapper">
-                          <Folder size={24} color="white" />
-                        </div>
+              <div className="themes-header mb-3">
+                <h5 className="mb-0">
+                  {filteredThemes.length} tema{filteredThemes.length !== 1 ? "s" : ""} encontrado
+                  {filteredThemes.length !== 1 ? "s" : ""}
+                  {selectedRound && ` na rodada ${selectedRound}`}
+                </h5>
+              </div>
 
-                        <div className="flex-grow-1">
-                          <h5 className="theme-card-title">{theme.theme}</h5>
-                          <p className="theme-card-description">
-                            Análise detalhada de dados relacionados a {theme.theme.toLowerCase()}
-                          </p>
-                        </div>
-
-                        <div className="theme-footer">
-                          <div className="d-flex justify-content-between align-items-center mb-3">
-                            <Badge bg="info" pill>
-                              {theme.questionCount} pergunta{theme.questionCount !== 1 ? "s" : ""} única
-                              {theme.questionCount !== 1 ? "s" : ""}
-                            </Badge>
-                            <ChevronRight size={20} className="text-muted" />
+              {filteredThemes.length === 0 ? (
+                <div className="empty-state">
+                  <Search size={48} className="text-muted mb-3" />
+                  <h4 className="text-muted">Nenhum tema encontrado</h4>
+                  <p className="text-muted">Tente ajustar os filtros ou termos de busca.</p>
+                </div>
+              ) : (
+                <Row className="g-4">
+                  {filteredThemes.map((theme) => (
+                    <Col key={theme.id} lg={4} md={6}>
+                      <Card className="theme-card" onClick={() => handleThemeClick(theme)}>
+                        <Card.Body>
+                          <div className="theme-icon-wrapper">
+                            <Folder size={24} color="white" />
                           </div>
-                          <Button variant="dark" size="sm" className="view-analysis-btn w-100">
-                            Ver Análises
-                          </Button>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
-            </div>
-          )}
 
-          {!loading && !error && themes.length === 0 && (
-            <div className="empty-state">
-              <Search size={48} className="text-muted mb-3" />
-              <h4 className="text-muted">Nenhum tema encontrado</h4>
-              <p className="text-muted">Não há temas disponíveis para este tipo de pesquisa no momento.</p>
+                          <div className="flex-grow-1">
+                            <h5 className="theme-card-title">{theme.theme}</h5>
+                            <p className="theme-card-description">
+                              Análise detalhada de dados relacionados a {theme.theme.toLowerCase()}
+                            </p>
+                          </div>
+
+                          <div className="theme-footer">
+                            
+                            <Button variant="dark" size="sm" className="view-analysis-btn w-100">
+                              Ver Análises
+                            </Button>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              )}
             </div>
           )}
         </Container>

@@ -1,73 +1,36 @@
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
-import { Container, Row, Col, Card, Button, Alert, Badge, Form } from "react-bootstrap"
+import { Container, Row, Col, Card, Button, Alert, Form, InputGroup, Image, Badge } from "react-bootstrap"
 import { useNavigate, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, Search, Layers, BarChart3, Users } from "lucide-react"
-
-// Componentes
+import { ArrowLeft, Search, BarChart3, Filter, XCircle, Layers, FileText } from "lucide-react"
+import { useAuth } from "../contexts/AuthContext"
 import LoadingState from "../components/LoadingState"
-
-// Serviços
 import ApiBase from "../service/ApiBase"
-
-// Estilos
 import "./ThemeQuestionsPage.css"
 
-// Função para buscar o nome real do tema usando o slug
 const fetchThemeNameBySlug = async (themeSlug) => {
-  console.log(`🔍 Buscando nome real do tema para slug: ${themeSlug}`)
-
-  try {
-    const { data } = await ApiBase.get("/api/data/themes")
-    console.log("📋 Temas recebidos:", data)
-
-    if (!data.success) {
-      throw new Error("Erro ao buscar temas")
-    }
-
-    const theme = data.themes.find((t) => t.slug === themeSlug)
-    if (!theme) {
-      throw new Error(`Tema não encontrado para slug: ${themeSlug}`)
-    }
-
-    console.log(`✅ Nome real encontrado: ${theme.theme}`)
-    return theme.theme
-  } catch (error) {
-    console.error("💥 Erro ao buscar nome do tema:", error.message)
-    throw error
-  }
+  const { data } = await ApiBase.get("/api/data/themes")
+  if (!data.success) throw new Error("Erro ao buscar temas")
+  const theme = data.themes.find((t) => t.slug === themeSlug)
+  if (!theme) throw new Error(`Tema não encontrado para slug: ${themeSlug}`)
+  return theme.theme
 }
 
-// Função para buscar perguntas agrupadas do tema
 const fetchGroupedQuestions = async (themeName) => {
-  console.log(`🔍 Buscando perguntas agrupadas para tema: ${themeName}`)
-
-  try {
-    const { data } = await ApiBase.get(`/api/data/themes/${encodeURIComponent(themeName)}/questions-grouped`)
-    console.log("📊 Perguntas agrupadas recebidas:", data)
-
-    if (!data.success) {
-      throw new Error("Erro ao buscar perguntas agrupadas")
-    }
-
-    return data
-  } catch (error) {
-    console.error("💥 Erro ao buscar perguntas agrupadas:", error.message)
-    throw error
-  }
+  const { data } = await ApiBase.get(`/api/data/themes/${encodeURIComponent(themeName)}/questions-grouped`)
+  if (!data.success) throw new Error("Erro ao buscar perguntas agrupadas")
+  return data
 }
 
 export default function ThemeQuestionsPage() {
   const navigate = useNavigate()
   const { themeSlug } = useParams()
+  const { logout } = useAuth()
 
-  // Estados
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedQuestions, setSelectedQuestions] = useState([])
 
-  // Query para buscar nome real do tema
   const {
     data: themeName,
     isLoading: isLoadingTheme,
@@ -76,75 +39,90 @@ export default function ThemeQuestionsPage() {
     queryKey: ["themeName", themeSlug],
     queryFn: () => fetchThemeNameBySlug(themeSlug),
     enabled: !!themeSlug,
-    staleTime: 1000 * 60 * 60, // 1 hour
-    cacheTime: 1000 * 60 * 60,
+    staleTime: 1000 * 60 * 60,
     refetchOnWindowFocus: false,
   })
 
-  // Query para buscar perguntas agrupadas
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["groupedQuestions", themeName],
     queryFn: () => fetchGroupedQuestions(themeName),
     enabled: !!themeName,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    cacheTime: 1000 * 60 * 10, // 10 minutes
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   })
 
-  const questionGroups = data?.questionGroups || []
-  const totalGroups = data?.totalGroups || 0
-  const totalQuestions = data?.totalQuestions || 0
+  const { multipleQuestions, textGroupedQuestions } = useMemo(() => {
+    const allGroups = data?.questionGroups || []
+    return {
+      multipleQuestions: allGroups.filter((g) => g.type === "multiple") || [],
+      textGroupedQuestions: allGroups.filter((g) => g.type === "text-grouped") || [],
+    }
+  }, [data])
 
-  // Filtrar grupos por termo de busca
-  const filteredGroups = useMemo(() => {
-    if (!searchTerm.trim()) return questionGroups
-
+  const filteredMultiple = useMemo(() => {
+    if (!searchTerm.trim()) return multipleQuestions
     const term = searchTerm.toLowerCase()
-    return questionGroups.filter(
-      (group) =>
-        group.questionText.toLowerCase().includes(term) ||
-        group.shortText.toLowerCase().includes(term) ||
-        group.variables.some((variable) => variable.toLowerCase().includes(term)),
+    return multipleQuestions.filter(
+      (g) =>
+        g.questionText?.toLowerCase().includes(term) ||
+        g.baseCode?.toLowerCase().includes(term) ||
+        (g.subQuestions || []).some((sq) => sq.label?.toLowerCase().includes(term)),
     )
-  }, [questionGroups, searchTerm])
+  }, [multipleQuestions, searchTerm])
 
-  // Handlers
-  const handleBack = useCallback(() => {
-    navigate(-1)
-  }, [navigate])
-
-  const handleSearchChange = useCallback((e) => {
-    setSearchTerm(e.target.value)
-  }, [])
+  const filteredTextGrouped = useMemo(() => {
+    if (!searchTerm.trim()) return textGroupedQuestions
+    const term = searchTerm.toLowerCase()
+    return textGroupedQuestions.filter(
+      (g) =>
+        g.questionText?.toLowerCase().includes(term) ||
+        (g.shortText && g.shortText.toLowerCase().includes(term)) ||
+        (g.variables || []).some((v) => v.toLowerCase().includes(term)),
+    )
+  }, [textGroupedQuestions, searchTerm])
 
   const handleQuestionClick = useCallback(
     (group) => {
-      const params = new URLSearchParams({
-        theme: themeName,
-        questionText: group.questionText,
-        groupId: group.id,
-      })
+      const params = new URLSearchParams({ theme: themeName })
+      if (group.type === "multiple") {
+        params.append("baseCode", group.baseCode)
+        params.append("variables", JSON.stringify(group.variables))
+        navigate(`/dashboard/matrix?${params.toString()}`)
+      } else {
+        // type === 'text-grouped'
+        params.append("questionText", group.questionText)
 
-      navigate(`/dashboard?${params.toString()}`)
+        // Check if it's a single-round question
+        if ((group.rounds || []).length === 1 && (group.variables || []).length === 1) {
+          // Navigate to SingleMentionDashboard with parameters for a GET request
+          params.append("questionCode", group.variables[0])
+          params.append("surveyNumber", group.rounds[0])
+          navigate(`/dashboard/single-mention?${params.toString()}`)
+        } else {
+          // Navigate to the main Dashboard for historical view (multi-round)
+          // This uses a POST request with theme and questionText
+          navigate(`/dashboard?${params.toString()}`)
+        }
+      }
     },
     [navigate, themeName],
   )
 
-  const handleRefresh = useCallback(() => {
-    refetch()
-  }, [refetch])
-
-  // Estados de loading e erro
-  if (isLoadingTheme) {
-    return <LoadingState message="Carregando informações do tema..." />
+  const handleBack = useCallback(() => navigate(-1), [navigate])
+  const handleSearchChange = useCallback((e) => setSearchTerm(e.target.value), [])
+  const handleClearFilters = useCallback(() => setSearchTerm(""), [])
+  const handleLogout = () => {
+    logout()
+    navigate("/login")
   }
 
-  if (themeError) {
+  if (isLoadingTheme || isLoading) return <LoadingState message="Carregando dados do tema e perguntas..." />
+  if (themeError || error) {
     return (
       <Container className="mt-4">
         <Alert variant="danger">
-          <Alert.Heading>Erro ao carregar tema</Alert.Heading>
-          <p>{themeError.message}</p>
+          <Alert.Heading>Erro ao carregar dados</Alert.Heading>
+          <p>{themeError?.message || error?.message}</p>
           <Button variant="secondary" onClick={handleBack}>
             Voltar
           </Button>
@@ -153,211 +131,164 @@ export default function ThemeQuestionsPage() {
     )
   }
 
-  if (isLoading) {
-    return <LoadingState message="Carregando perguntas agrupadas..." />
-  }
-
-  if (error) {
-    return (
-      <Container className="mt-4">
-        <Alert variant="danger">
-          <Alert.Heading>Erro ao carregar perguntas</Alert.Heading>
-          <p>{error.message}</p>
-          <div className="d-flex gap-2">
-            <Button variant="outline-danger" onClick={handleRefresh}>
-              Tentar novamente
-            </Button>
-            <Button variant="secondary" onClick={handleBack}>
-              Voltar
-            </Button>
-          </div>
-        </Alert>
-      </Container>
-    )
-  }
-
   return (
-    <div className="theme-questions-wrapper">
-      {/* Header */}
-      <div className="theme-questions-header">
+    <div className="questions-page-wrapper">
+      <header className="main-header">
+        <Container className="d-flex justify-content-between align-items-center">
+          <Image src="/nexus-logo.png" alt="Nexus Logo" className="header-logo-nexus" />
+          <Button variant="outline-light" size="sm" onClick={handleLogout}>
+            Sair
+          </Button>
+        </Container>
+      </header>
+
+      <main className="content-area">
         <Container>
-          <div className="d-flex justify-content-between align-items-start">
-            <div className="header-content">
-              <Button variant="outline-secondary" size="sm" onClick={handleBack} className="mb-3">
+          <div className="page-title-section">
+            <div className="d-flex align-items-center justify-content-between">
+              <div>
+                <h1 className="main-title">{themeName}</h1>
+                <p className="main-description">Explore as perguntas disponíveis para análise.</p>
+              </div>
+              <Button variant="outline-secondary" onClick={handleBack} className="back-button">
                 <ArrowLeft size={16} className="me-2" />
                 Voltar
               </Button>
-
-              <div className="theme-info">
-                <div className="d-flex align-items-center gap-2 mb-2">
-                  <Layers size={20} className="text-primary" />
-                  <Badge bg="primary" pill>
-                    Perguntas Agrupadas
-                  </Badge>
-                  <Badge bg="info" pill>
-                    {totalGroups} grupos
-                  </Badge>
-                  <Badge bg="success" pill>
-                    {totalQuestions} questões
-                  </Badge>
-                </div>
-
-                <h1 className="theme-title">{themeName}</h1>
-                <p className="theme-description">
-                  Visualize perguntas agrupadas por conteúdo similar para análise consolidada
-                </p>
-              </div>
             </div>
           </div>
-        </Container>
-      </div>
 
-      {/* Estatísticas */}
-      <section className="stats-section">
-        <Container>
-          <Row>
-            <Col md={4}>
-              <Card className="stat-card">
-                <Card.Body className="text-center">
-                  <Layers size={32} className="stat-icon text-primary" />
-                  <h3 className="stat-number">{totalGroups}</h3>
-                  <p className="stat-label">Grupos de Perguntas</p>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col md={4}>
-              <Card className="stat-card">
-                <Card.Body className="text-center">
-                  <BarChart3 size={32} className="stat-icon text-success" />
-                  <h3 className="stat-number">{totalQuestions}</h3>
-                  <p className="stat-label">Total de Questões</p>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col md={4}>
-              <Card className="stat-card">
-                <Card.Body className="text-center">
-                  <Users size={32} className="stat-icon text-info" />
-                  <h3 className="stat-number">{filteredGroups.length}</h3>
-                  <p className="stat-label">Grupos Filtrados</p>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Container>
-      </section>
-
-      {/* Filtros */}
-      <section className="filters-section">
-        <Container>
-          <Card>
+          <Card className="filters-card">
             <Card.Header>
-              <h5 className="mb-0">Filtros de Busca</h5>
+              <div className="d-flex align-items-center">
+                <Filter size={16} className="me-2" />
+                <h5 className="mb-0">Filtro de Perguntas</h5>
+              </div>
             </Card.Header>
             <Card.Body>
-              <Row>
-                <Col md={8}>
+              <Row className="align-items-end g-3">
+                <Col md={10}>
                   <Form.Group>
-                    <Form.Label>Buscar por texto da pergunta ou variável</Form.Label>
-                    <div className="position-relative">
-                      <Search size={16} className="search-icon" />
+                    <Form.Label>Buscar por texto, código ou variável</Form.Label>
+                    <InputGroup>
+                      <InputGroup.Text>
+                        <Search size={16} />
+                      </InputGroup.Text>
                       <Form.Control
                         type="text"
                         placeholder="Digite para buscar..."
                         value={searchTerm}
                         onChange={handleSearchChange}
-                        className="ps-5"
                       />
-                    </div>
+                    </InputGroup>
                   </Form.Group>
                 </Col>
-                <Col md={4} className="d-flex align-items-end">
-                  <Button variant="outline-secondary" onClick={() => setSearchTerm("")} disabled={!searchTerm}>
-                    Limpar Filtros
+                <Col md={2}>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={handleClearFilters}
+                    disabled={!searchTerm}
+                    className="w-100"
+                  >
+                    <XCircle size={16} className="me-2" />
+                    Limpar
                   </Button>
                 </Col>
               </Row>
             </Card.Body>
           </Card>
-        </Container>
-      </section>
 
-      {/* Lista de Grupos de Perguntas */}
-      <section className="questions-section">
-        <Container>
-          {filteredGroups.length === 0 ? (
-            <Alert variant="info">
-              <Alert.Heading>Nenhum grupo encontrado</Alert.Heading>
+          {filteredMultiple.length === 0 && filteredTextGrouped.length === 0 ? (
+            <div className="empty-state">
+              <h4>Nenhuma pergunta encontrada</h4>
               <p>
-                {searchTerm
-                  ? `Não foram encontrados grupos que correspondam ao termo "${searchTerm}".`
-                  : "Não há grupos de perguntas disponíveis para este tema."}
+                Não foram encontradas perguntas que correspondam à sua busca. Tente um termo diferente ou limpe o
+                filtro.
               </p>
-              {searchTerm && (
-                <Button variant="outline-info" onClick={() => setSearchTerm("")}>
-                  Limpar busca
-                </Button>
-              )}
-            </Alert>
+              <Button variant="primary" onClick={handleClearFilters}>
+                Limpar busca
+              </Button>
+            </div>
           ) : (
-            <Row>
-              {filteredGroups.map((group) => (
-                <Col lg={6} className="mb-4" key={group.id}>
-                  <Card className="question-group-card h-100">
-                    <Card.Header className="d-flex justify-content-between align-items-start">
-                      <div className="d-flex align-items-center gap-2">
-                        <Layers size={16} className="text-primary" />
-                        <small className="text-muted">Grupo #{group.id.split("-").pop()}</small>
-                      </div>
-                      <div className="d-flex gap-1">
-                        <Badge bg="primary" pill>
-                          {group.totalVariations} variações
-                        </Badge>
-                        <Badge bg="info" pill>
-                          {group.variables.length} variáveis
-                        </Badge>
-                        <Badge bg="success" pill>
-                          {group.rounds.length} rodadas
-                        </Badge>
-                      </div>
-                    </Card.Header>
-
-                    <Card.Body>
-                      <h6 className="question-text mb-3">{group.shortText}</h6>
-
-                      <div className="question-meta mb-3">
-                        <div className="meta-item">
-                          <strong>Variáveis:</strong> {group.variables.join(", ")}
+            <>
+              {filteredMultiple.length > 0 && (
+                <section>
+                  <div className="question-group-header">
+                    <Layers />
+                    <h4>Perguntas de Matriz (Múltiplas)</h4>
+                  </div>
+                  {filteredMultiple.map((group) => (
+                    <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
+                      <Card.Body>
+                        <div className="question-card-header">
+                          <div>
+                            <h6 className="question-card-title">{group.questionText}</h6>
+                            <Badge bg="primary" pill>
+                              {group.baseCode}
+                            </Badge>
+                          </div>
                         </div>
-                        <div className="meta-item">
-                          <strong>Rodadas:</strong> {group.rounds.join(", ")}
+                        <p className="question-card-meta">Contém {group.totalSubQuestions || 0} sub-perguntas.</p>
+                        <ul className="sub-questions-list">
+                          {(group.subQuestions || []).slice(0, 3).map((sub) => (
+                            <li key={sub.variable} className="sub-question-item">
+                              <span className="sub-question-variable">{sub.variable}</span>
+                              <span className="sub-question-label">{sub.label}</span>
+                            </li>
+                          ))}
+                          {(group.subQuestions || []).length > 3 && (
+                            <li className="sub-question-item text-muted">
+                              ... e mais {(group.subQuestions || []).length - 3}
+                            </li>
+                          )}
+                        </ul>
+                        <div className="question-card-footer">
+                          <Badge bg="info">{(group.rounds || []).length} Rodadas</Badge>
+                          <Button variant="primary" size="sm" className="analyze-button">
+                            <BarChart3 size={14} className="me-1" />
+                            Analisar Matriz
+                          </Button>
                         </div>
-                      </div>
+                      </Card.Body>
+                    </Card>
+                  ))}
+                </section>
+              )}
 
-                      {group.variations && group.variations.length > 0 && (
-                        <div className="variations-preview mb-3">
-                          <small className="text-muted">
-                            <strong>Exemplo de variação:</strong>
-                            <br />
-                            {group.variations[0].surveyName} - {group.variations[0].date}
-                          </small>
+              {filteredTextGrouped.length > 0 && (
+                <section>
+                  <div className="question-group-header">
+                    <FileText />
+                    <h4>Perguntas Individuais (Agrupadas por Texto)</h4>
+                  </div>
+                  {filteredTextGrouped.map((group) => (
+                    <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
+                      <Card.Body>
+                        <h6 className="question-card-title">{group.shortText || group.questionText}</h6>
+                        <p className="question-card-meta">
+                          {(group.variables || []).length} variável(eis): {(group.variables || []).join(", ")}
+                        </p>
+                        <div className="question-card-footer">
+                          <Badge bg="secondary">{(group.rounds || []).length} Rodadas</Badge>
+                          <Button variant="outline-primary" size="sm" className="analyze-button">
+                            <BarChart3 size={14} className="me-1" />
+                            Ver Histórico
+                          </Button>
                         </div>
-                      )}
-                    </Card.Body>
-
-                    <Card.Footer>
-                      <Button variant="primary" size="sm" onClick={() => handleQuestionClick(group)} className="w-100">
-                        <BarChart3 size={16} className="me-2" />
-                        Visualizar Dashboard
-                      </Button>
-                    </Card.Footer>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
+                      </Card.Body>
+                    </Card>
+                  ))}
+                </section>
+              )}
+            </>
           )}
         </Container>
-      </section>
+      </main>
+
+      <footer className="page-footer">
+        <Container>
+          <p className="mb-0">Dados atualizados em tempo real • Sistema de Monitoramento Secom/PR</p>
+        </Container>
+      </footer>
     </div>
   )
 }

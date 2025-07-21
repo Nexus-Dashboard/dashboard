@@ -20,8 +20,31 @@ import {
 import { DEMOGRAPHIC_LABELS } from "../utils/demographicUtils"
 import "./Dashboard.css"
 
+export const fetchGroupedQuestionData = async ({ queryKey }) => {
+  const [, theme, questionText] = queryKey
+
+  console.log(`🔄 Buscando dados agrupados para tema: ${theme}, questão: ${questionText}`)
+
+  try {
+    const { data: groupedData } = await ApiBase.post(`/api/data/question/grouped/responses`, {
+      theme: theme,
+      questionText: questionText,
+    })
+
+    if (!groupedData.success) {
+      throw new Error("Erro ao buscar dados agrupados")
+    }
+
+    console.log("✅ Dados agrupados recebidos:", groupedData)
+    return groupedData
+  } catch (error) {
+    console.error("💥 Erro ao buscar dados agrupados:", error.message)
+    throw error
+  }
+}
+
 // Função temporária para buscar dados usando a API individual até a API agrupada estar disponível
-const fetchQuestionDataFallback = async ({ queryKey }) => {
+export const fetchQuestionDataFallback = async ({ queryKey }) => {
   const [, theme, questionText] = queryKey
   console.log(`🔄 Usando fallback - buscando dados individuais para tema: ${theme}`)
   console.log(`Question Text: ${questionText}`)
@@ -137,7 +160,7 @@ const fetchQuestionDataFallback = async ({ queryKey }) => {
 }
 
 // Função para buscar TODAS as questões de forma mais robusta
-const fetchAllQuestions = async () => {
+export const fetchAllQuestions = async () => {
   console.log("🔍 Iniciando busca COMPLETA de todas as questões...")
 
   try {
@@ -159,7 +182,6 @@ const fetchAllQuestions = async () => {
       promises.push(
         ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
           .then((response) => {
-            console.log(`✅ Página ${page} carregada: ${response.data?.data?.questions?.length || 0} questões`)
             return response.data?.success ? response.data.data.questions : []
           })
           .catch((error) => {
@@ -255,8 +277,8 @@ export default function Dashboard() {
   }, [location.search])
 
   const { data, error, status } = useQuery({
-    queryKey: ["groupedQuestionDataFallback", theme, questionText],
-    queryFn: fetchQuestionDataFallback,
+    queryKey: ["groupedQuestionData", theme, questionText],
+    queryFn: fetchGroupedQuestionData,
     enabled: !!theme && !!questionText,
     staleTime: 1000 * 60 * 10, // 10 minutes
     cacheTime: 1000 * 60 * 15, // 15 minutes
@@ -296,7 +318,6 @@ export default function Dashboard() {
         const key = q.surveyNumber.toString()
         if (!map.has(key)) {
           map.set(key, q.date)
-          console.log(`✅ Mapeamento ${index + 1}: surveyNumber ${key} → date ${q.date}`)
         }
       }
     })

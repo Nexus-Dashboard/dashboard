@@ -59,7 +59,7 @@ export default function SurveyTypePage() {
                   <Card.Text className="card-description">
                     Pesquisas realizadas por meio de entrevistas telefônicas com a população
                   </Card.Text>
-                  <Button variant="primary" className="select-button">
+                  <Button variant="dark" className="select-button">
                     Selecionar
                   </Button>
                 </Card.Body>
@@ -79,7 +79,7 @@ export default function SurveyTypePage() {
                   <Card.Text className="card-description">
                     Pesquisas realizadas através de entrevistas presenciais face a face
                   </Card.Text>
-                  <Button variant="primary" className="select-button">
+                  <Button variant="dark" className="select-button">
                     Selecionar
                   </Button>
                 </Card.Body>
@@ -98,7 +98,7 @@ export default function SurveyTypePage() {
                     <Card.Text className="card-description">
                       Administrar usuários, permissões e acessos do sistema
                     </Card.Text>
-                    <Button variant="primary" className="select-button">
+                    <Button variant="dark" className="select-button">
                       Acessar
                     </Button>
                   </Card.Body>
