@@ -31,6 +31,8 @@ export const fetchGroupedQuestionData = async ({ queryKey }) => {
       questionText: questionText,
     })
 
+    console.log("📊 Dados recebidos:", groupedData)
+
     if (!groupedData.success) {
       throw new Error("Erro ao buscar dados agrupados")
     }
@@ -257,8 +259,7 @@ export default function Dashboard() {
 
   const [showOffcanvas, setShowOffcanvas] = useState(false)
   const [filters, setFilters] = useState({})
-  const [chartRangeStart, setChartRangeStart] = useState(0)
-  const [chartRangeEnd, setChartRangeEnd] = useState(9)
+  const [numberOfRoundsToShow, setNumberOfRoundsToShow] = useState(10)
   const [selectedMapRoundIndex, setSelectedMapRoundIndex] = useState(0)
 
   const theme = useMemo(() => {
@@ -467,28 +468,18 @@ export default function Dashboard() {
   }, [allHistoricalData, filters])
 
   useEffect(() => {
-    if (allHistoricalData.length > 0) {
-      const maxIndex = Math.max(0, allHistoricalData.length - 1)
-      const newEnd = Math.min(maxIndex, 9) // Set to show last 10 rounds
-      const newStart = Math.max(0, newEnd - 9) // Set start 10 positions before end
-      setChartRangeStart(newStart)
-      setChartRangeEnd(newEnd)
-    }
-  }, [allHistoricalData])
-
-  useEffect(() => {
     if (mapRoundsWithData.length > 0) {
-      const maxIndex = Math.max(0, mapRoundsWithData.length - 1)
-      const newEnd = Math.min(maxIndex, 9) // Set to show last 10 rounds
-      const newStart = Math.max(0, newEnd - 9) // Set start 10 positions before end
-      setSelectedMapRoundIndex(newStart)
+      setSelectedMapRoundIndex(0) // Default to the most recent round with map data
     }
   }, [mapRoundsWithData])
 
   const selectedChartData = useMemo(() => {
     if (!filteredHistoricalData.length) return []
-    return filteredHistoricalData.slice(chartRangeStart, chartRangeEnd + 1).reverse()
-  }, [filteredHistoricalData, chartRangeStart, chartRangeEnd])
+    // Get the N most recent rounds from the data (which is sorted newest to oldest)
+    const recentRounds = filteredHistoricalData.slice(0, numberOfRoundsToShow)
+    // Reverse them to be in chronological order for the chart's X-axis
+    return recentRounds.reverse()
+  }, [filteredHistoricalData, numberOfRoundsToShow])
 
   const mapData = useMemo(() => {
     if (!mapRoundsWithData.length || selectedMapRoundIndex >= mapRoundsWithData.length || !questionInfo) {
@@ -725,83 +716,32 @@ export default function Dashboard() {
                 {questionInfo?.label || questionInfo?.questionText || "Análise Temporal"}
               </Typography>
 
-              {/* Mostrar informações sobre o agrupamento */}
-              {questionInfo?.totalVariations > 1 && (
-                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: "block" }}>
-                  Dados agrupados de {questionInfo.totalVariations} variações: {questionInfo.variables?.join(", ")}
-                </Typography>
-              )}
-
-              {data?.searchMethod && (
-                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: "block" }}>
-                  Método: {data.searchMethod}
-                </Typography>
-              )}
-
               {allHistoricalData.length > 1 && (
                 <Box sx={{ mb: 3, px: 1 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: "block" }}>
-                    Período: {getXAxisLabel(allHistoricalData[chartRangeEnd])} até{" "}
-                    {getXAxisLabel(allHistoricalData[chartRangeStart])}
+                  {selectedChartData.length > 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
+                      Período: {getXAxisLabel(selectedChartData[0])} até{" "}
+                      {getXAxisLabel(selectedChartData[selectedChartData.length - 1])}
+                    </Typography>
+                  )}
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
+                    Exibindo as últimas {numberOfRoundsToShow} de {allHistoricalData.length} rodadas
                   </Typography>
-
-                  <Box sx={{ position: "relative", height: "40px", mb: 1 }}>
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        top: "17px",
-                        left: "0",
-                        right: "0",
-                        height: "6px",
-                        backgroundColor: "#e0e0e0",
-                        borderRadius: "3px",
-                      }}
-                    />
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        top: "17px",
-                        height: "6px",
-                        backgroundColor: "#1976d2",
-                        borderRadius: "3px",
-                        left: `${(chartRangeStart / Math.max(1, allHistoricalData.length - 1)) * 100}%`,
-                        width: `${((chartRangeEnd - chartRangeStart) / Math.max(1, allHistoricalData.length - 1)) * 100}%`,
-                      }}
-                    />
-                    <input
-                      type="range"
-                      min={0}
-                      max={Math.max(0, allHistoricalData.length - 1)}
-                      value={chartRangeStart}
-                      onChange={(e) => {
-                        const newStart = Number.parseInt(e.target.value)
-                        if (newStart <= chartRangeEnd) {
-                          setChartRangeStart(newStart)
-                        }
-                      }}
-                      className="range-slider range-slider-start"
-                    />
-                    <input
-                      type="range"
-                      min={0}
-                      max={Math.max(0, allHistoricalData.length - 1)}
-                      value={chartRangeEnd}
-                      onChange={(e) => {
-                        const newEnd = Number.parseInt(e.target.value)
-                        if (newEnd >= chartRangeStart) {
-                          setChartRangeEnd(newEnd)
-                        }
-                      }}
-                      className="range-slider range-slider-end"
-                    />
-                  </Box>
-
-                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <input
+                    type="range"
+                    min={1}
+                    max={allHistoricalData.length || 1}
+                    value={numberOfRoundsToShow}
+                    onChange={(e) => setNumberOfRoundsToShow(Number(e.target.value))}
+                    className="single-range-slider"
+                    style={{ direction: "rtl" }} // Inverte a direção do slider
+                  />
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
                     <Typography variant="caption" color="text.secondary">
-                      Mais antiga
+                      Mais rodadas
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Mais recente
+                      Menos rodadas
                     </Typography>
                   </Box>
                 </Box>

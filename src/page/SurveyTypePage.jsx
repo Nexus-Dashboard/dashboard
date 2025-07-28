@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Container, Row, Col, Card, Button, Image } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
-import { Phone, Users, Settings } from "lucide-react"
+import { Phone, Users, Settings, Upload } from "lucide-react"
 import { useAuth } from "../contexts/AuthContext"
 import "./SurveyTypePage.css"
 
@@ -81,6 +81,23 @@ export default function SurveyTypePage() {
                   </Card.Text>
                   <Button variant="dark" className="select-button">
                     Selecionar
+                  </Button>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            <Col lg={4} md={6} className="mb-4">
+              <Card className={`survey-type-card upload-card`} onClick={() => navigate("/upload")}>
+                <Card.Body>
+                  <div className="card-icon upload-icon" style={{ background: "rgb(0, 0, 0)", color: "white" }}>
+                    <Upload size={48} />
+                  </div>
+                  <Card.Title className="card-title">Upload de Dados</Card.Title>
+                  <Card.Text className="card-description">
+                    Envie novas pesquisas e dicionários de variáveis para o sistema.
+                  </Card.Text>
+                  <Button variant="dark" className="select-button">
+                    Acessar
                   </Button>
                 </Card.Body>
               </Card>

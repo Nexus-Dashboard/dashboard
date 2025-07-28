@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
-import { Container, Row, Col, Card, Button, Alert, Form, InputGroup, Image, Badge } from "react-bootstrap"
+import { Container, Card, Button, Alert, Form, InputGroup, Image, Badge } from "react-bootstrap"
 import { useNavigate, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, Search, BarChart3, Filter, XCircle, Layers, FileText } from "lucide-react"
+import { ArrowLeft, Search, BarChart3, Filter, Layers, FileText } from "lucide-react"
 import { useAuth } from "../contexts/AuthContext"
 import LoadingState from "../components/LoadingState"
 import ApiBase from "../service/ApiBase"
@@ -31,8 +31,6 @@ export default function ThemeQuestionsPage() {
 
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedRound, setSelectedRound] = useState("")
-  const [availableRounds, setAvailableRounds] = useState([])
-
 
   const {
     data: themeName,
@@ -54,6 +52,13 @@ export default function ThemeQuestionsPage() {
     refetchOnWindowFocus: false,
   })
 
+  const availableRounds = useMemo(() => {
+    if (!data?.questionGroups) return []
+    const allRounds = data.questionGroups.flatMap((g) => g.rounds || [])
+    const uniqueRounds = [...new Set(allRounds)]
+    return uniqueRounds.sort((a, b) => Number(a) - Number(b))
+  }, [data])
+
   const { multipleQuestions, textGroupedQuestions } = useMemo(() => {
     const allGroups = data?.questionGroups || []
     return {
@@ -62,27 +67,65 @@ export default function ThemeQuestionsPage() {
     }
   }, [data])
 
+  const sortLogic = (a, b) => {
+    // 1. Sort by number of rounds (descending)
+    const roundsDiff = (b.rounds?.length || 0) - (a.rounds?.length || 0)
+    if (roundsDiff !== 0) {
+      return roundsDiff
+    }
+
+    // 2. Sort by the first variable (alphanumerically, ascending)
+    const varA = a.variables?.[0]
+    const varB = b.variables?.[0]
+
+    if (varA && varB) {
+      return varA.localeCompare(varB)
+    }
+    if (varA) return -1
+    if (varB) return 1
+
+    return 0
+  }
+
   const filteredMultiple = useMemo(() => {
-    if (!searchTerm.trim()) return multipleQuestions
-    const term = searchTerm.toLowerCase()
-    return multipleQuestions.filter(
-      (g) =>
-        g.questionText?.toLowerCase().includes(term) ||
-        g.baseCode?.toLowerCase().includes(term) ||
-        (g.subQuestions || []).some((sq) => sq.label?.toLowerCase().includes(term)),
-    )
-  }, [multipleQuestions, searchTerm])
+    let results = multipleQuestions
+
+    if (selectedRound) {
+      results = results.filter((g) => (g.rounds || []).includes(selectedRound))
+    }
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase()
+      results = results.filter(
+        (g) =>
+          g.questionText?.toLowerCase().includes(term) ||
+          g.baseCode?.toLowerCase().includes(term) ||
+          (g.subQuestions || []).some((sq) => sq.label?.toLowerCase().includes(term)),
+      )
+    }
+
+    return results.sort(sortLogic)
+  }, [multipleQuestions, searchTerm, selectedRound])
 
   const filteredTextGrouped = useMemo(() => {
-    if (!searchTerm.trim()) return textGroupedQuestions
-    const term = searchTerm.toLowerCase()
-    return textGroupedQuestions.filter(
-      (g) =>
-        g.questionText?.toLowerCase().includes(term) ||
-        (g.shortText && g.shortText.toLowerCase().includes(term)) ||
-        (g.variables || []).some((v) => v.toLowerCase().includes(term)),
-    )
-  }, [textGroupedQuestions, searchTerm])
+    let results = textGroupedQuestions
+
+    if (selectedRound) {
+      results = results.filter((g) => (g.rounds || []).includes(selectedRound))
+    }
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase()
+      results = results.filter(
+        (g) =>
+          g.questionText?.toLowerCase().includes(term) ||
+          (g.shortText && g.shortText.toLowerCase().includes(term)) ||
+          (g.variables || []).some((v) => v.toLowerCase().includes(term)),
+      )
+    }
+
+    return results.sort(sortLogic)
+  }, [textGroupedQuestions, searchTerm, selectedRound])
 
   const handleQuestionClick = useCallback(
     (group) => {
@@ -113,7 +156,10 @@ export default function ThemeQuestionsPage() {
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
   const handleSearchChange = useCallback((e) => setSearchTerm(e.target.value), [])
-  const handleClearFilters = useCallback(() => setSearchTerm(""), [])
+  const handleClearFilters = useCallback(() => {
+    setSearchTerm("")
+    setSelectedRound("")
+  }, [])
   const handleLogout = () => {
     logout()
     navigate("/login")
@@ -161,62 +207,58 @@ export default function ThemeQuestionsPage() {
           </div>
 
           <Card className="filters-card">
-  <Card.Body>
-    <div className="filters-header">
-      <Filter size={20} className="text-primary" />
-      <h6>Filtros de Busca</h6>
-    </div>
+            <Card.Body>
+              <div className="filters-header">
+                <Filter size={20} className="text-primary" />
+                <h6>Filtros de Busca</h6>
+              </div>
 
-    <div className="filters-row">
-      <div className="filter-search">
-        <Form.Group>
-          <Form.Label>Buscar por texto, código ou variável</Form.Label>
-          <InputGroup>
-            <InputGroup.Text>
-              <Search size={16} />
-            </InputGroup.Text>
-            <Form.Control
-              type="text"
-              placeholder="Digite para buscar..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-            />
-          </InputGroup>
-        </Form.Group>
-      </div>
+              <div className="filters-row">
+                <div className="filter-search">
+                  <Form.Group>
+                    <Form.Label>Buscar por texto, código ou variável</Form.Label>
+                    <InputGroup>
+                      <InputGroup.Text>
+                        <Search size={16} />
+                      </InputGroup.Text>
+                      <Form.Control
+                        type="text"
+                        placeholder="Digite para buscar..."
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                      />
+                    </InputGroup>
+                  </Form.Group>
+                </div>
 
-      <div className="filter-round">
-        <Form.Group>
-          <Form.Label>Filtrar por rodada</Form.Label>
-          <Form.Select 
-            value={selectedRound} 
-            onChange={(e) => setSelectedRound(e.target.value)}
-          >
-            <option value="">Todas as rodadas</option>
-            {availableRounds.map((round) => (
-              <option key={round} value={round}>
-                Rodada {round}
-              </option>
-            ))}
-          </Form.Select>
-        </Form.Group>
-      </div>
+                <div className="filter-round">
+                  <Form.Group>
+                    <Form.Label>Filtrar por rodada</Form.Label>
+                    <Form.Select value={selectedRound} onChange={(e) => setSelectedRound(e.target.value)}>
+                      <option value="">Todas as rodadas</option>
+                      {availableRounds.map((round) => (
+                        <option key={round} value={round}>
+                          Rodada {round}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </div>
 
-      <div className="filter-clear">
-        <Form.Label>&nbsp;</Form.Label>
-        <Button
-          variant="outline-secondary"
-          onClick={handleClearFilters}
-          className="clear-filters-btn d-block w-100"
-          disabled={!searchTerm && !selectedRound}
-        >
-          Limpar
-        </Button>
-      </div>
-    </div>
-  </Card.Body>
-</Card>
-
+                <div className="filter-clear">
+                  <Form.Label>&nbsp;</Form.Label>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={handleClearFilters}
+                    className="clear-filters-btn d-block w-100"
+                    disabled={!searchTerm && !selectedRound}
+                  >
+                    Limpar
+                  </Button>
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
 
           {filteredMultiple.length === 0 && filteredTextGrouped.length === 0 ? (
             <div className="empty-state">
@@ -239,40 +281,40 @@ export default function ThemeQuestionsPage() {
                   </div>
                   <div className="questions-grid">
                     {filteredMultiple.map((group) => (
-                    <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
-                      <Card.Body>
-                        <div className="question-card-header">
-                          <div>
-                            <h6 className="question-card-title">{group.questionText}</h6>
-                            <Badge bg="primary" pill>
-                              {group.baseCode}
-                            </Badge>
+                      <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
+                        <Card.Body>
+                          <div className="question-card-header">
+                            <div>
+                              <h6 className="question-card-title">{group.questionText}</h6>
+                              <Badge bg="primary" pill>
+                                {group.baseCode}
+                              </Badge>
+                            </div>
                           </div>
-                        </div>
-                        <p className="question-card-meta">Contém {group.totalSubQuestions || 0} sub-perguntas.</p>
-                        <ul className="sub-questions-list">
-                          {(group.subQuestions || []).slice(0, 3).map((sub) => (
-                            <li key={sub.variable} className="sub-question-item">
-                              <span className="sub-question-variable">{sub.variable}</span>
-                              <span className="sub-question-label">{sub.label}</span>
-                            </li>
-                          ))}
-                          {(group.subQuestions || []).length > 3 && (
-                            <li className="sub-question-item text-muted">
-                              ... e mais {(group.subQuestions || []).length - 3}
-                            </li>
-                          )}
-                        </ul>
-                        <div className="question-card-footer">
-                          <Badge bg="info">{(group.rounds || []).length} Rodadas</Badge>
-                          <Button variant="primary" size="sm" className="analyze-button">
-                            <BarChart3 size={14} className="me-1" />
-                            Analisar Matriz
-                          </Button>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
+                          <p className="question-card-meta">Contém {group.totalSubQuestions || 0} sub-perguntas.</p>
+                          <ul className="sub-questions-list">
+                            {(group.subQuestions || []).slice(0, 3).map((sub) => (
+                              <li key={sub.variable} className="sub-question-item">
+                                <span className="sub-question-variable">{sub.variable}</span>
+                                <span className="sub-question-label">{sub.label}</span>
+                              </li>
+                            ))}
+                            {(group.subQuestions || []).length > 3 && (
+                              <li className="sub-question-item text-muted">
+                                ... e mais {(group.subQuestions || []).length - 3}
+                              </li>
+                            )}
+                          </ul>
+                          <div className="question-card-footer">
+                            <Badge bg="info">{(group.rounds || []).length} Rodadas</Badge>
+                            <Button variant="primary" size="sm" className="analyze-button">
+                              <BarChart3 size={14} className="me-1" />
+                              Analisar Matriz
+                            </Button>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    ))}
                   </div>
                 </section>
               )}
@@ -285,22 +327,22 @@ export default function ThemeQuestionsPage() {
                   </div>
                   <div className="questions-grid">
                     {filteredTextGrouped.map((group) => (
-                    <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
-                      <Card.Body>
-                        <h6 className="question-card-title">{group.shortText || group.questionText}</h6>
-                        <p className="question-card-meta">
-                          {(group.variables || []).length} variável(eis): {(group.variables || []).join(", ")}
-                        </p>
-                        <div className="question-card-footer">
-                          <Badge bg="secondary">{(group.rounds || []).length} Rodadas</Badge>
-                          <Button variant="outline-primary" size="sm" className="analyze-button">
-                            <BarChart3 size={14} className="me-1" />
-                            Ver Histórico
-                          </Button>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
+                      <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
+                        <Card.Body>
+                          <h6 className="question-card-title">{group.shortText || group.questionText}</h6>
+                          <p className="question-card-meta">
+                            {(group.variables || []).length} variável(eis): {(group.variables || []).join(", ")}
+                          </p>
+                          <div className="question-card-footer">
+                            <Badge bg="secondary">{(group.rounds || []).length} Rodadas</Badge>
+                            <Button variant="outline-primary" size="sm" className="analyze-button">
+                              <BarChart3 size={14} className="me-1" />
+                              Ver Histórico
+                            </Button>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    ))}
                   </div>
                 </section>
               )}
