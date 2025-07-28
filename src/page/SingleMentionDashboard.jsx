@@ -16,20 +16,15 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 // Data fetching function
 const fetchSingleMentionData = async ({ queryKey }) => {
-  const [, { questionCode, theme, surveyNumber, questionText }] = queryKey
-  const params = new URLSearchParams({
-    theme,
-    surveyNumber,
-    questionText,
+  const [, { questionCode, theme, surveyNumber, questionText, surveyType }] = queryKey
+  const { data } = await ApiBase.get(`/api/data/question/${encodeURIComponent(questionCode)}/responses`, {
+    params: {
+      theme,
+      surveyNumber,
+      questionText,
+      type: surveyType,
+    },
   })
-  const { data } = await ApiBase.get(
-    `/api/data/question/${encodeURIComponent(questionCode)}/responses`,
-    {
-      questionText: questionText,
-      theme:  theme,
-      surveyNumber: surveyNumber,
-    }
-  )
   if (!data.success || !data.historicalData || data.historicalData.length === 0) {
     throw new Error(data.message || "Não foi possível carregar os dados da pergunta.")
   }
@@ -47,13 +42,14 @@ export default function SingleMentionDashboard() {
   const questionText = searchParams.get("questionText")
   const questionCode = searchParams.get("questionCode")
   const surveyNumber = searchParams.get("surveyNumber")
+  const surveyType = searchParams.get("type")
 
   const {
     data: queryData,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["singleMentionData", { questionCode, theme, surveyNumber, questionText }],
+    queryKey: ["singleMentionData", { questionCode, theme, surveyNumber, questionText, surveyType }],
     queryFn: fetchSingleMentionData,
     enabled: !!questionCode && !!theme && !!surveyNumber && !!questionText,
     staleTime: 1000 * 60 * 10, // 10 minutes

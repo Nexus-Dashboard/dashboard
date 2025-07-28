@@ -10,23 +10,25 @@ import LoadingState from "../components/LoadingState"
 import ApiBase from "../service/ApiBase"
 import "./ThemeQuestionsPage.css"
 
-const fetchThemeNameBySlug = async (themeSlug) => {
-  const { data } = await ApiBase.get("/api/data/themes")
+const fetchThemeNameBySlug = async (themeSlug, surveyType) => {
+  const { data } = await ApiBase.get("/api/data/themes", { params: { type: surveyType } })
   if (!data.success) throw new Error("Erro ao buscar temas")
   const theme = data.themes.find((t) => t.slug === themeSlug)
   if (!theme) throw new Error(`Tema não encontrado para slug: ${themeSlug}`)
   return theme.theme
 }
 
-const fetchGroupedQuestions = async (themeName) => {
-  const { data } = await ApiBase.get(`/api/data/themes/${encodeURIComponent(themeName)}/questions-grouped`)
+const fetchGroupedQuestions = async (themeName, surveyType) => {
+  const { data } = await ApiBase.get(`/api/data/themes/${encodeURIComponent(themeName)}/questions-grouped`, {
+    params: { type: surveyType },
+  })
   if (!data.success) throw new Error("Erro ao buscar perguntas agrupadas")
   return data
 }
 
 export default function ThemeQuestionsPage() {
   const navigate = useNavigate()
-  const { themeSlug } = useParams()
+  const { themeSlug, surveyType } = useParams()
   const { logout } = useAuth()
 
   const [searchTerm, setSearchTerm] = useState("")
@@ -37,16 +39,16 @@ export default function ThemeQuestionsPage() {
     isLoading: isLoadingTheme,
     error: themeError,
   } = useQuery({
-    queryKey: ["themeName", themeSlug],
-    queryFn: () => fetchThemeNameBySlug(themeSlug),
+    queryKey: ["themeName", themeSlug, surveyType],
+    queryFn: () => fetchThemeNameBySlug(themeSlug, surveyType),
     enabled: !!themeSlug,
     staleTime: 1000 * 60 * 60,
     refetchOnWindowFocus: false,
   })
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["groupedQuestions", themeName],
-    queryFn: () => fetchGroupedQuestions(themeName),
+    queryKey: ["groupedQuestions", themeName, surveyType],
+    queryFn: () => fetchGroupedQuestions(themeName, surveyType),
     enabled: !!themeName,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
@@ -129,7 +131,7 @@ export default function ThemeQuestionsPage() {
 
   const handleQuestionClick = useCallback(
     (group) => {
-      const params = new URLSearchParams({ theme: themeName })
+      const params = new URLSearchParams({ theme: themeName, type: surveyType })
       if (group.type === "multiple") {
         params.append("baseCode", group.baseCode)
         params.append("variables", JSON.stringify(group.variables))
@@ -151,7 +153,7 @@ export default function ThemeQuestionsPage() {
         }
       }
     },
-    [navigate, themeName],
+    [navigate, themeName, surveyType],
   )
 
   const handleBack = useCallback(() => navigate(-1), [navigate])

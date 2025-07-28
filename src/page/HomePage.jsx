@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Container, Row, Col, Card, Button, Image, Spinner, Form, InputGroup } from "react-bootstrap"
 import { useNavigate, useParams } from "react-router-dom"
-import { Folder, ChevronRight, Search, ArrowLeft, Filter, X } from "lucide-react"
+import { Folder, Search, ArrowLeft, Filter } from "lucide-react"
 import ApiBase from "../service/ApiBase"
 import { useAuth } from "../contexts/AuthContext"
 import "./HomePage.css"
@@ -27,15 +27,29 @@ export default function HomePage() {
         setLoading(true)
         setError(null)
 
-        const response = await ApiBase.get("/api/data/themes")
+        // Construir parâmetros da requisição baseado no tipo de pesquisa
+        const params = {}
+        if (surveyType === "f2f") {
+          params.type = "f2f"
+        } else if (surveyType === "telefonica") {
+          params.type = "telephonic"
+        }
+
+        const response = await ApiBase.get("/api/data/themes", { params })
 
         if (response.data && response.data.success) {
           const fetchedThemes = response.data.themes
 
           // Processar os temas vindos da API
           const processedThemes = fetchedThemes.map((theme) => {
-            // Renomear "Popularidade tracking" para "Avaliação do Governo"
-            const themeName = theme.theme === "Popularidade tracking" ? "Avaliação do Governo" : theme.theme
+            let themeName = theme.theme
+
+            // Mapear temas de popularidade para "Avaliação do Governo" baseado no tipo de pesquisa
+            if (surveyType === "f2f" && theme.theme === "Popularidade Face a Face") {
+              themeName = "Avaliação do Governo"
+            } else if (surveyType === "telefonica" && theme.theme === "Popularidade tracking") {
+              themeName = "Avaliação do Governo"
+            }
 
             return {
               ...theme,
@@ -59,14 +73,14 @@ export default function HomePage() {
           otherThemes.sort((a, b) => {
             const roundsCountA = a.rounds.length
             const roundsCountB = b.rounds.length
-            
+
             // Primeiro critério: quantidade de rodadas (decrescente)
             if (roundsCountB !== roundsCountA) {
               return roundsCountB - roundsCountA
             }
-            
+
             // Segundo critério: ordem alfabética
-            return a.theme.localeCompare(b.theme, 'pt-BR')
+            return a.theme.localeCompare(b.theme, "pt-BR")
           })
 
           // Recompor a lista final com "Avaliação do Governo" no topo
@@ -94,7 +108,7 @@ export default function HomePage() {
     }
 
     fetchThemes()
-  }, [])
+  }, [surveyType])
 
   useEffect(() => {
     let filtered = themes
@@ -160,15 +174,14 @@ export default function HomePage() {
             </p>
           </div>
 
-          
-          {/* Filters Card - CORRIGIDO */}
+          {/* Filters Card */}
           <Card className="filters-card">
             <Card.Body>
               <div className="filters-header">
                 <Filter size={20} className="text-primary" />
                 <h6>Filtros de Busca</h6>
               </div>
-              
+
               <div className="filters-row">
                 <div className="filter-search">
                   <Form.Group>
@@ -186,14 +199,11 @@ export default function HomePage() {
                     </InputGroup>
                   </Form.Group>
                 </div>
-                
+
                 <div className="filter-round">
                   <Form.Group>
                     <Form.Label>Filtrar por rodada</Form.Label>
-                    <Form.Select 
-                      value={selectedRound} 
-                      onChange={(e) => setSelectedRound(e.target.value)}
-                    >
+                    <Form.Select value={selectedRound} onChange={(e) => setSelectedRound(e.target.value)}>
                       <option value="">Todas as rodadas</option>
                       {availableRounds.map((round) => (
                         <option key={round} value={round}>
@@ -203,7 +213,7 @@ export default function HomePage() {
                     </Form.Select>
                   </Form.Group>
                 </div>
-                
+
                 <div className="filter-clear">
                   <Form.Label>&nbsp;</Form.Label>
                   <Button
@@ -269,7 +279,6 @@ export default function HomePage() {
                           </div>
 
                           <div className="theme-footer">
-                            
                             <Button variant="dark" size="sm" className="view-analysis-btn w-100">
                               Ver Análises
                             </Button>

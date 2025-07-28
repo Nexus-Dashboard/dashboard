@@ -15,8 +15,16 @@ import ApiBase from "../service/ApiBase"
 import { DEMOGRAPHIC_LABELS } from "../utils/demographicUtils"
 import "./MatrixDashboard.css"
 
-const fetchMatrixData = async (searchParams) => {
-  const response = await ApiBase.post("/api/data/question/grouped/responses", searchParams)
+const fetchMatrixData = async ({ queryKey }) => {
+  const [, { theme, variables, surveyType }] = queryKey
+  const response = await ApiBase.post(
+    "/api/data/question/grouped/responses",
+    {
+      theme,
+      variables,
+    },
+    { params: { type: surveyType } },
+  )
   if (!response.data.success) {
     throw new Error(response.data.message || "Erro ao buscar dados da matriz")
   }
@@ -31,6 +39,7 @@ export default function MatrixDashboard() {
   const theme = searchParams.get("theme")
   const baseCode = searchParams.get("baseCode")
   const variablesParam = searchParams.get("variables")
+  const surveyType = searchParams.get("type")
 
   const [demographicFilters, setDemographicFilters] = useState({})
   const [dateRange, setDateRange] = useState({ start: null, end: null })
@@ -48,12 +57,13 @@ export default function MatrixDashboard() {
     return {
       theme,
       variables,
+      surveyType,
     }
-  }, [theme, variables])
+  }, [theme, variables, surveyType])
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["matrixData", requestParams],
-    queryFn: () => fetchMatrixData(requestParams),
+    queryFn: fetchMatrixData,
     enabled: !!requestParams,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,

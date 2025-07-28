@@ -16,6 +16,14 @@ ApiBase.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    // Adicionar o parâmetro 'type' se estiver presente nos parâmetros da requisição
+    if (config.params?.type) {
+      config.url = `${config.url}?type=${config.params.type}`
+      // Remover o 'type' dos params para não ser adicionado duas vezes
+      delete config.params.type
+    }
+
     return config
   },
   (error) => {
@@ -47,13 +55,14 @@ ApiBase.interceptors.response.use(
 // Métodos específicos para as novas rotas da API
 export const ApiMethods = {
   // Buscar todos os temas
-  getThemes: () => ApiBase.get("/api/data/themes"),
+  getThemes: (type) => ApiBase.get("/api/data/themes", { params: { type } }),
 
   // Buscar perguntas de um tema específico
-  getThemeQuestions: (themeSlug) => ApiBase.get(`/api/data/themes/${themeSlug}/questions`),
+  getThemeQuestions: (themeSlug, type) => ApiBase.get(`/api/data/themes/${themeSlug}/questions`, { params: { type } }),
 
   // Buscar dados de uma pergunta específica
-  getQuestionResponses: (questionCode) => ApiBase.get(`/api/data/question/${questionCode}/responses`),
+  getQuestionResponses: (questionCode, params = {}) =>
+    ApiBase.get(`/api/data/question/${questionCode}/responses`, { params }),
 
   // Buscar comparação de uma pergunta
   getQuestionComparison: (questionCode, response) =>
@@ -61,63 +70,64 @@ export const ApiMethods = {
 
   // Buscar todas as perguntas com paginação
   getAllQuestions: (params = {}) => {
-    const queryString = new URLSearchParams(params).toString()
-    return ApiBase.get(`/api/data/questions/all${queryString ? `?${queryString}` : ""}`)
+    return ApiBase.get(`/api/data/questions/all`, { params })
   },
 
   // Nova função para buscar TODAS as páginas de questões
   getAllQuestionsComplete: async () => {
     console.log("Iniciando busca completa de todas as questões...")
     let allQuestions = []
-    let currentPage = 1
+    const currentPage = 1
     let totalPages = 1
 
     try {
       // Primeira requisição para descobrir quantas páginas existem
       const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`)
-      
+
       if (!firstResponse.data?.success) {
         throw new Error("API returned an error")
       }
 
       allQuestions = [...firstResponse.data.data.questions]
       totalPages = firstResponse.data.data.pagination.totalPages
-      
+
       console.log(`Total de páginas: ${totalPages}`)
 
       // Buscar as páginas restantes em paralelo (mas com limite)
       const batchSize = 5 // Processar 5 páginas por vez para não sobrecarregar
-      
+
       for (let startPage = 2; startPage <= totalPages; startPage += batchSize) {
         const endPage = Math.min(startPage + batchSize - 1, totalPages)
         const promises = []
-        
+
         for (let page = startPage; page <= endPage; page++) {
           promises.push(
             ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
-              .then(response => {
+              .then((response) => {
                 if (response.data?.success) {
                   console.log(`Página ${page} carregada com ${response.data.data.questions.length} questões`)
                   return response.data.data.questions
                 }
                 return []
               })
-              .catch(error => {
+              .catch((error) => {
                 console.error(`Erro ao buscar página ${page}:`, error)
                 return []
-              })
+              }),
           )
         }
 
         // Aguardar o lote atual
         const batchResults = await Promise.all(promises)
-        
+
         // Adicionar resultados do lote
-        batchResults.forEach(pageQuestions => {
+        batchResults.forEach((pageQuestions) => {
           allQuestions = [...allQuestions, ...pageQuestions]
         })
-        
-        console.log(`Progresso: ${allQuestions.length} questões carregadas de ${firstResponse.data.data.pagination.totalQuestions}`)
+
+        console.log(
+          `Progresso: ${allQuestions.length} questões carregadas de ${firstResponse.data.data.pagination.totalQuestions}`,
+        )
       }
 
       console.log(`Busca completa finalizada: ${allQuestions.length} questões carregadas`)
@@ -132,8 +142,8 @@ export const ApiMethods = {
             totalPages: 1,
             hasNext: false,
             hasPrev: false,
-          }
-        }
+          },
+        },
       }
     } catch (error) {
       console.error("Erro na busca completa de dados:", error.message)
@@ -142,10 +152,11 @@ export const ApiMethods = {
   },
 
   // Buscar perguntas
-  searchQuestions: (query) => ApiBase.get(`/api/data/search/questions?q=${encodeURIComponent(query)}`),
+  searchQuestions: (query, type) =>
+    ApiBase.get(`/api/data/search/questions?q=${encodeURIComponent(query)}`, { params: { type } }),
 
   // Buscar perguntas de um tema (método POST)
-  getThemeQuestionsPost: (theme) => ApiBase.post("/api/data/themes/questions", { theme }),
+  getThemeQuestionsPost: (theme, type) => ApiBase.post("/api/data/themes/questions", { theme }, { params: { type } }),
 }
 
 export default ApiBase

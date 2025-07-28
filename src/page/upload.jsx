@@ -181,7 +181,6 @@ function Upload() {
     setAlert({ show: false })
     const progressTimer = simulateProgress()
 
-    console.log('teste 1')
 
     try {
       const fileHash = await computeFileHash(dataFile)

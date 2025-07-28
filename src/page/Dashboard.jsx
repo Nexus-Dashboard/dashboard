@@ -21,15 +21,19 @@ import { DEMOGRAPHIC_LABELS } from "../utils/demographicUtils"
 import "./Dashboard.css"
 
 export const fetchGroupedQuestionData = async ({ queryKey }) => {
-  const [, theme, questionText] = queryKey
+  const [, theme, questionText, surveyType] = queryKey
 
-  console.log(`🔄 Buscando dados agrupados para tema: ${theme}, questão: ${questionText}`)
+  console.log(`🔄 Buscando dados agrupados para tema: ${theme}, questão: ${questionText}, tipo: ${surveyType}`)
 
   try {
-    const { data: groupedData } = await ApiBase.post(`/api/data/question/grouped/responses`, {
-      theme: theme,
-      questionText: questionText,
-    })
+    const { data: groupedData } = await ApiBase.post(
+      `/api/data/question/grouped/responses`,
+      {
+        theme: theme,
+        questionText: questionText,
+      },
+      { params: { type: surveyType } },
+    )
 
     console.log("📊 Dados recebidos:", groupedData)
 
@@ -162,11 +166,12 @@ export const fetchQuestionDataFallback = async ({ queryKey }) => {
 }
 
 // Função para buscar TODAS as questões de forma mais robusta
-export const fetchAllQuestions = async () => {
-  console.log("🔍 Iniciando busca COMPLETA de todas as questões...")
+export const fetchAllQuestions = async ({ queryKey }) => {
+  const [, surveyType] = queryKey
+  console.log(`🔍 Iniciando busca COMPLETA de todas as questões para o tipo: ${surveyType}...`)
 
   try {
-    const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`)
+    const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`, { params: { type: surveyType } })
     console.log("📋 Resposta da primeira página:", firstResponse.data)
 
     if (!firstResponse.data?.success) {
@@ -182,7 +187,7 @@ export const fetchAllQuestions = async () => {
     const promises = []
     for (let page = 2; page <= totalPages; page++) {
       promises.push(
-        ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
+        ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`, { params: { type: surveyType } })
           .then((response) => {
             return response.data?.success ? response.data.data.questions : []
           })
@@ -277,8 +282,13 @@ export default function Dashboard() {
     return params.get("groupId")
   }, [location.search])
 
+  const surveyType = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get("type")
+  }, [location.search])
+
   const { data, error, status } = useQuery({
-    queryKey: ["groupedQuestionData", theme, questionText],
+    queryKey: ["groupedQuestionData", theme, questionText, surveyType],
     queryFn: fetchGroupedQuestionData,
     enabled: !!theme && !!questionText,
     staleTime: 1000 * 60 * 10, // 10 minutes
@@ -293,7 +303,7 @@ export default function Dashboard() {
     isLoading: isLoadingAllQuestions,
     error: allQuestionsError,
   } = useQuery({
-    queryKey: ["allQuestions"],
+    queryKey: ["allQuestions", surveyType],
     queryFn: fetchAllQuestions,
     staleTime: 1000 * 60 * 60, // 1 hour
     cacheTime: 1000 * 60 * 60,

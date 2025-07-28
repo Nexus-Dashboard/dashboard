@@ -18,16 +18,44 @@ export const PresentationModeManager = () => {
 
   const fetchTopQuestions = useCallback(async () => {
     try {
-      const themesResponse = await ApiBase.get("/api/data/themes")
-      const popularidadeTheme = themesResponse.data.themes.find((t) => t.theme === "Avaliação do Governo")
+      // Determinar o tipo de pesquisa baseado na URL atual
+      const currentPath = location.pathname
+      let surveyType = "telefonica" // padrão
+
+      if (currentPath.includes("/f2f/")) {
+        surveyType = "f2f"
+      }
+
+      // Buscar temas baseado no tipo de pesquisa
+      const params = {}
+      if (surveyType === "f2f") {
+        params.type = "f2f"
+      } else if (surveyType === "telefonica") {
+        params.type = "telephonic"
+      }
+
+      const themesResponse = await ApiBase.get("/api/data/themes", { params })
+
+      // Encontrar o tema de popularidade baseado no tipo de pesquisa
+      let popularidadeTheme = null
+      if (surveyType === "f2f") {
+        popularidadeTheme = themesResponse.data.themes.find((t) => t.theme === "Popularidade Face a Face")
+      } else {
+        popularidadeTheme = themesResponse.data.themes.find((t) => t.theme === "Popularidade tracking")
+      }
+
       if (!popularidadeTheme) {
-        console.error("Theme 'Avaliação do Governo' not found.")
+        console.error(`Theme de popularidade não encontrado para o tipo ${surveyType}.`)
         return
       }
 
+      // Buscar perguntas agrupadas do tema
+      const questionParams = { ...params }
       const response = await ApiBase.get(
         `/api/data/themes/${encodeURIComponent(popularidadeTheme.theme)}/questions-grouped`,
+        { params: questionParams },
       )
+
       if (response.data.success) {
         const sortedQuestions = response.data.questionGroups
           .filter((g) => g.type === "text-grouped" && g.rounds?.length > 1) // Only individual questions with history
@@ -37,7 +65,7 @@ export const PresentationModeManager = () => {
     } catch (error) {
       console.error("Failed to fetch top questions for presentation mode:", error)
     }
-  }, [])
+  }, [location.pathname])
 
   const startPresentationMode = useCallback(() => {
     // Don't start if already in presentation mode or no questions are loaded

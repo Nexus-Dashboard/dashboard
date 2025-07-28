@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { ApiMethods } from "../service/ApiBase"
 
 // Hook para buscar temas
-export const useThemes = () => {
+export const useThemes = (surveyType = "telefonica") => {
   const [themes, setThemes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -13,7 +13,16 @@ export const useThemes = () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await ApiMethods.getThemes()
+
+      // Construir parâmetros baseado no tipo de pesquisa
+      const params = {}
+      if (surveyType === "f2f") {
+        params.type = "f2f"
+      } else if (surveyType === "telefonica") {
+        params.type = "telephonic"
+      }
+
+      const response = await ApiMethods.getThemes(params)
       if (response.data && response.data.success) {
         setThemes(response.data.themes)
       } else {
@@ -25,7 +34,7 @@ export const useThemes = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [surveyType])
 
   useEffect(() => {
     fetchThemes()
@@ -35,7 +44,7 @@ export const useThemes = () => {
 }
 
 // Hook para buscar perguntas de um tema
-export const useThemeQuestions = (themeSlug) => {
+export const useThemeQuestions = (themeSlug, surveyType = "telefonica") => {
   const [questions, setQuestions] = useState([])
   const [themeName, setThemeName] = useState("")
   const [loading, setLoading] = useState(true)
@@ -49,7 +58,13 @@ export const useThemeQuestions = (themeSlug) => {
         setLoading(true)
         setError(null)
 
-        const response = await ApiMethods.getThemeQuestions(themeSlug)
+        // Construir parâmetros baseado no tipo de pesquisa
+        const params = {}
+        if (surveyType === "f2f") {
+          params.type = "f2f"
+        }
+
+        const response = await ApiMethods.getThemeQuestions(themeSlug, params)
 
         if (response.data && response.data.success) {
           setThemeName(response.data.theme)
@@ -76,13 +91,13 @@ export const useThemeQuestions = (themeSlug) => {
     }
 
     fetchQuestions()
-  }, [themeSlug])
+  }, [themeSlug, surveyType])
 
   return { questions, themeName, loading, error }
 }
 
 // Hook para buscar dados de uma pergunta
-export const useQuestionData = (questionCode, theme) => {
+export const useQuestionData = (questionCode, theme, surveyType = "telefonica") => {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -95,7 +110,13 @@ export const useQuestionData = (questionCode, theme) => {
         setLoading(true)
         setError(null)
 
-        const response = await ApiMethods.getQuestionResponses(questionCode, { theme })
+        // Construir parâmetros baseado no tipo de pesquisa
+        const params = { theme }
+        if (surveyType === "f2f") {
+          params.type = "f2f"
+        }
+
+        const response = await ApiMethods.getQuestionResponses(questionCode, params)
 
         if (response.data && response.data.success) {
           setData(response.data)
@@ -111,13 +132,13 @@ export const useQuestionData = (questionCode, theme) => {
     }
 
     fetchQuestionData()
-  }, [questionCode, theme])
+  }, [questionCode, theme, surveyType])
 
   return { data, loading, error }
 }
 
 // Hook para buscar todas as perguntas com paginação
-export const useAllQuestions = (params = {}) => {
+export const useAllQuestions = (params = {}, surveyType = "telefonica") => {
   const [questions, setQuestions] = useState([])
   const [pagination, setPagination] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -129,7 +150,13 @@ export const useAllQuestions = (params = {}) => {
         setLoading(true)
         setError(null)
 
-        const response = await ApiMethods.getAllQuestions(params)
+        // Adicionar tipo de pesquisa aos parâmetros
+        const finalParams = { ...params }
+        if (surveyType === "f2f") {
+          finalParams.type = "f2f"
+        }
+
+        const response = await ApiMethods.getAllQuestions(finalParams)
 
         if (response.data && response.data.success) {
           setQuestions(response.data.data.questions)
@@ -146,13 +173,13 @@ export const useAllQuestions = (params = {}) => {
     }
 
     fetchAllQuestions()
-  }, [JSON.stringify(params)])
+  }, [JSON.stringify(params), surveyType])
 
   return { questions, pagination, loading, error }
 }
 
 // Hook para busca de perguntas
-export const useSearchQuestions = (query) => {
+export const useSearchQuestions = (query, surveyType = "telefonica") => {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -168,7 +195,13 @@ export const useSearchQuestions = (query) => {
         setLoading(true)
         setError(null)
 
-        const response = await ApiMethods.searchQuestions(query)
+        // Construir parâmetros baseado no tipo de pesquisa
+        const params = { q: query }
+        if (surveyType === "f2f") {
+          params.type = "f2f"
+        }
+
+        const response = await ApiMethods.searchQuestions(params)
 
         if (response.data && response.data.success) {
           setResults(response.data.questions)
@@ -185,7 +218,7 @@ export const useSearchQuestions = (query) => {
 
     const debounceTimer = setTimeout(searchQuestions, 300)
     return () => clearTimeout(debounceTimer)
-  }, [query])
+  }, [query, surveyType])
 
   return { results, loading, error }
 }
