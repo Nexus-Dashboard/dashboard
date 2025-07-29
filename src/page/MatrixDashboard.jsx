@@ -1,27 +1,30 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useRef } from "react"
 import { Container, Row, Col, Card, Button, Alert, Image } from "react-bootstrap"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, Info, BarChart3 } from "lucide-react"
+import { ArrowLeft, Info, BarChart3, Cloud } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 import { useAuth } from "../contexts/AuthContext"
 import LoadingState from "../components/LoadingState"
 import DemographicFilters from "../components/DemographicFilters"
 import DateRangeFilter from "../components/DateRangeFilter"
 import ExportButtons from "../components/ExportButtons"
+import WordCloudChart from "../components/WordCloudChart"
 import ApiBase from "../service/ApiBase"
-import { DEMOGRAPHIC_LABELS } from "../utils/demographicUtils"
+import { filterByDemographics } from "../utils/demographicUtils"
 import "./MatrixDashboard.css"
 
 const fetchMatrixData = async ({ queryKey }) => {
-  const [, { theme, variables, surveyType }] = queryKey
+  const [, { theme, baseCode, surveyType }] = queryKey
   const response = await ApiBase.post(
     "/api/data/question/grouped/responses",
     {
       theme,
-      variables,
+      questionText: baseCode,
     },
     { params: { type: surveyType } },
   )
@@ -35,6 +38,7 @@ export default function MatrixDashboard() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { logout } = useAuth()
+  const matrixContentRef = useRef(null)
 
   const theme = searchParams.get("theme")
   const baseCode = searchParams.get("baseCode")
@@ -44,22 +48,14 @@ export default function MatrixDashboard() {
   const [demographicFilters, setDemographicFilters] = useState({})
   const [dateRange, setDateRange] = useState({ start: null, end: null })
 
-  const variables = useMemo(() => {
-    try {
-      return variablesParam ? JSON.parse(variablesParam) : []
-    } catch {
-      return []
-    }
-  }, [variablesParam])
-
   const requestParams = useMemo(() => {
-    if (!theme || !variables.length) return null
+    if (!theme || !baseCode) return null
     return {
       theme,
-      variables,
+      baseCode,
       surveyType,
     }
-  }, [theme, variables, surveyType])
+  }, [theme, baseCode, surveyType])
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["matrixData", requestParams],
@@ -69,14 +65,22 @@ export default function MatrixDashboard() {
     refetchOnWindowFocus: false,
   })
 
+  const variables = useMemo(() => {
+    try {
+      return variablesParam ? JSON.parse(variablesParam) : []
+    } catch {
+      return []
+    }
+  }, [variablesParam])
+
   const processedData = useMemo(() => {
-    if (!data?.historicalData || data.searchType !== "multiple") return null
+    if (!data?.historicalData) return null
 
     let filteredData = data.historicalData
 
     // Apply demographic filters
     if (Object.keys(demographicFilters).length > 0) {
-      filteredData = DEMOGRAPHIC_LABELS(filteredData, demographicFilters)
+      filteredData = filterByDemographics(filteredData, demographicFilters)
     }
 
     // Apply date range filter
@@ -89,30 +93,22 @@ export default function MatrixDashboard() {
       })
     }
 
-    // Process data for matrix visualization
     const chartData = []
     const labels = data.questionInfo?.labels || {}
 
     filteredData.forEach((item) => {
-      const distribution = item.distribution || {}
-
-      Object.entries(distribution).forEach(([variable, responses]) => {
-        if (Array.isArray(responses)) {
-          responses.forEach((response) => {
-            chartData.push({
-              variable,
-              variableLabel: labels[variable] || variable,
-              response: response.response,
-              count: response.weightedCount || 0,
-              year: item.year,
-              rodada: item.rodada,
-            })
-          })
-        }
+      item.distribution.forEach((dist) => {
+        chartData.push({
+          variable: dist.variable,
+          variableLabel: labels[dist.variable] || dist.variable,
+          response: dist.response,
+          count: dist.weightedCount || 0,
+          year: item.year,
+          rodada: item.rodada,
+        })
       })
     })
 
-    // Group by response type for comparison
     const responseTypes = [...new Set(chartData.map((item) => item.response))]
     const comparisonData = variables.map((variable) => {
       const variableData = {
@@ -156,10 +152,10 @@ export default function MatrixDashboard() {
       }, {}),
     }))
 
-    const csvContent = [Object.keys(csvData[0]).join(","), ...csvData.map((row) => Object.values(row).join(","))].join(
-      "\n",
-    )
+    const headers = Object.keys(csvData[0])
+    const csvRows = [headers.join(","), ...csvData.map((row) => headers.map((header) => `"${row[header]}"`).join(","))]
 
+    const csvContent = csvRows.join("\n")
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
@@ -171,7 +167,28 @@ export default function MatrixDashboard() {
     document.body.removeChild(link)
   }, [processedData, baseCode])
 
-  if (!theme || !variables.length) {
+  const handleExportPDF = useCallback(async () => {
+    const element = matrixContentRef.current
+    if (!element) return
+
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#f0f2f5",
+    })
+
+    const pdf = new jsPDF("l", "mm", "a4") // landscape
+    const imgData = canvas.toDataURL("image/png")
+    const imgProps = pdf.getImageProperties(imgData)
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width
+
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight)
+    pdf.save(`matrix-dashboard-${baseCode}-${Date.now()}.pdf`)
+  }, [baseCode])
+
+  if (!theme || !baseCode) {
     return (
       <Container className="mt-4">
         <Alert variant="warning">
@@ -202,7 +219,7 @@ export default function MatrixDashboard() {
   }
 
   return (
-    <div className="matrix-dashboard-wrapper">
+    <div className="matrix-dashboard-wrapper" ref={matrixContentRef}>
       <header className="matrix-header">
         <Container className="d-flex justify-content-between align-items-center">
           <Image src="/nexus-logo.png" alt="Nexus Logo" className="header-logo" />
@@ -235,8 +252,8 @@ export default function MatrixDashboard() {
                 </Card.Header>
                 <Card.Body>
                   <DemographicFilters
-                    data={data?.historicalData || []}
-                    onFiltersChange={setDemographicFilters}
+                    availableDemographics={data?.demographicFields || []}
+                    onFilterChange={setDemographicFilters}
                     activeFilters={demographicFilters}
                   />
                   <hr />
@@ -251,8 +268,9 @@ export default function MatrixDashboard() {
                 <Card.Body>
                   <ExportButtons
                     onExportCSV={handleExportCSV}
-                    data={processedData?.comparisonData}
-                    disabled={!processedData?.comparisonData}
+                    onExportPDF={handleExportPDF}
+                    csvDisabled={!processedData?.comparisonData}
+                    pdfDisabled={!processedData?.comparisonData}
                   />
                 </Card.Body>
               </Card>
@@ -260,46 +278,64 @@ export default function MatrixDashboard() {
 
             <Col lg={9}>
               {processedData ? (
-                <Card className="matrix-chart-card">
-                  <Card.Header>
-                    <div className="d-flex align-items-center">
-                      <BarChart3 size={20} className="me-2" />
-                      <h5 className="mb-0">Comparação por Variável</h5>
-                    </div>
-                  </Card.Header>
-                  <Card.Body>
-                    <div className="matrix-chart-container">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={processedData.comparisonData}
-                          margin={{
-                            top: 20,
-                            right: 30,
-                            left: 20,
-                            bottom: 100,
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="variableLabel" angle={-45} textAnchor="end" height={100} interval={0} />
-                          <YAxis />
-                          <Tooltip
-                            formatter={(value, name) => [value, name]}
-                            labelFormatter={(label) => `Variável: ${label}`}
-                          />
-                          <Legend />
-                          {processedData.responseTypes.map((responseType, index) => (
-                            <Bar
-                              key={responseType}
-                              dataKey={responseType}
-                              fill={`hsl(${(index * 360) / processedData.responseTypes.length}, 70%, 50%)`}
-                              name={responseType}
-                            />
-                          ))}
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </Card.Body>
-                </Card>
+                <Row className="g-4">
+                  <Col xs={12}>
+                    <Card className="matrix-chart-card">
+                      <Card.Header>
+                        <div className="d-flex align-items-center">
+                          <BarChart3 size={20} className="me-2" />
+                          <h5 className="mb-0">Comparação por Variável</h5>
+                        </div>
+                      </Card.Header>
+                      <Card.Body>
+                        <div className="matrix-chart-container">
+                          <ResponsiveContainer width="100%" height={400}>
+                            <BarChart
+                              data={processedData.comparisonData}
+                              margin={{
+                                top: 20,
+                                right: 30,
+                                left: 20,
+                                bottom: 100,
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="variableLabel" angle={-45} textAnchor="end" height={100} interval={0} />
+                              <YAxis />
+                              <Tooltip
+                                formatter={(value, name) => [value, name]}
+                                labelFormatter={(label) => `Variável: ${label}`}
+                              />
+                              <Legend />
+                              {processedData.responseTypes.map((responseType, index) => (
+                                <Bar
+                                  key={responseType}
+                                  dataKey={responseType}
+                                  fill={`hsl(${(index * 290) / processedData.responseTypes.length}, 60%, 50%)`}
+                                  name={responseType}
+                                  stackId="a"
+                                />
+                              ))}
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                  <Col xs={12}>
+                    <Card className="matrix-chart-card">
+                      <Card.Header>
+                        <div className="d-flex align-items-center">
+                          <Cloud size={20} className="me-2" />
+                          <h5 className="mb-0">Nuvem de Palavras das Respostas</h5>
+                        </div>
+                      </Card.Header>
+                      <Card.Body className="d-flex justify-content-center align-items-center">
+                        <WordCloudChart data={processedData.chartData} />
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                </Row>
               ) : (
                 <div className="matrix-loading-state">
                   <p>Nenhum dado disponível para exibição.</p>

@@ -5,10 +5,11 @@ import { useLocation } from "react-router-dom"
 import ApiBase from "../service/ApiBase"
 import { useQuery } from "@tanstack/react-query"
 import { ResponsiveLine } from "@nivo/line"
-import { Box, Typography, CircularProgress, IconButton, Button, LinearProgress } from "@mui/material"
-import { Download, PictureAsPdf, Menu as MenuIcon } from "@mui/icons-material"
+import { Box, Typography, CircularProgress, Button, LinearProgress } from "@mui/material"
 import OffcanvasNavigation from "../components/OffcanvasNavigation"
 import InteractiveBrazilMap from "../components/InteractiveBrazilMap"
+import DashboardHeader from "../components/DashboardHeader"
+import MapFilters from "../components/mapFilters"
 import {
   groupResponses,
   shouldGroupResponses,
@@ -167,13 +168,13 @@ export const fetchQuestionDataFallback = async ({ queryKey }) => {
 
 // Função para buscar TODAS as questões de forma mais robusta
 export const fetchAllQuestions = async ({ queryKey }) => {
-  const [, surveyType] = queryKey
-  console.log(`🔍 Iniciando busca COMPLETA de todas as questões para o tipo: ${surveyType}...`)
+  const [, surveyType] = queryKey // Manter para compatibilidade
+  console.log(`🔍 Iniciando busca COMPLETA de todas as questões...`)
 
   try {
-    const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`, { params: { type: surveyType } })
-    console.log("📋 Resposta da primeira página:", firstResponse.data)
-
+    // Remover o filtro de tipo para buscar TODAS as questões
+    const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`)
+    
     if (!firstResponse.data?.success) {
       throw new Error("API returned an error")
     }
@@ -182,12 +183,12 @@ export const fetchAllQuestions = async ({ queryKey }) => {
     console.log(`📊 Total de páginas: ${totalPages}, Total de questões: ${totalQuestions}`)
 
     let allQuestions = [...firstResponse.data.data.questions]
-    console.log(`✅ Primeira página carregada: ${allQuestions.length} questões`)
 
     const promises = []
     for (let page = 2; page <= totalPages; page++) {
       promises.push(
-        ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`, { params: { type: surveyType } })
+        // Também remover o filtro aqui
+        ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
           .then((response) => {
             return response.data?.success ? response.data.data.questions : []
           })
@@ -198,23 +199,12 @@ export const fetchAllQuestions = async ({ queryKey }) => {
       )
     }
 
-    console.log(`⏳ Aguardando ${promises.length} requisições...`)
     const additionalPages = await Promise.all(promises)
-
     additionalPages.forEach((pageQuestions) => {
       allQuestions = [...allQuestions, ...pageQuestions]
     })
 
     console.log(`🎉 SUCESSO! Total de questões carregadas: ${allQuestions.length}`)
-
-    console.log(
-      "📋 Primeiros 3 exemplos:",
-      allQuestions.slice(0, 3).map((q) => ({
-        surveyNumber: q.surveyNumber,
-        date: q.date,
-        variable: q.variable,
-      })),
-    )
 
     return {
       success: true,
@@ -259,6 +249,7 @@ const formatChartXAxis = (period, dateLabel) => {
 }
 
 export default function Dashboard() {
+  const pageRef = useRef(null)
   const chartRef = useRef(null)
   const location = useLocation()
 
@@ -344,11 +335,10 @@ export default function Dashboard() {
       return { questionInfo: null, allHistoricalData: [], availableDemographics: [], mapRoundsWithData: [] }
     }
 
-    // Adaptar para a nova estrutura de dados agrupados
     const questionInfo = {
       questionText: questionText,
       label: questionText,
-      variable: data.questionInfo?.variables?.[0] || "GROUPED", // Usar primeira variável ou placeholder
+      variable: data.questionInfo?.variables?.[0] || "GROUPED",
       variables: data.questionInfo?.variables || [],
       rounds: data.questionInfo?.rounds || [],
       totalVariations: data.questionInfo?.totalVariations || 0,
@@ -369,6 +359,17 @@ export default function Dashboard() {
     )
 
     const demographicsMap = new Map()
+    const normalizeRegion = (region) => {
+      const r = String(region || "")
+        .toUpperCase()
+        .trim()
+      if (r.includes("CENTRO-OESTE")) return "Centro-Oeste"
+      if (r.includes("NORDESTE")) return "Nordeste"
+      if (r.includes("NORTE")) return "Norte"
+      if (r.includes("SUDESTE")) return "Sudeste"
+      if (r.includes("SUL")) return "Sul"
+      return region
+    }
     ;(data.demographicFields || []).forEach((key) => {
       if (key !== UF_DEMOGRAPHIC_KEY && key !== "PF10") {
         demographicsMap.set(key, {
@@ -384,17 +385,26 @@ export default function Dashboard() {
         if (dist.demographics) {
           Object.entries(dist.demographics).forEach(([key, values]) => {
             if (demographicsMap.has(key)) {
-              values.forEach((v) => demographicsMap.get(key).values.add(v.response))
+              values.forEach((v) => {
+                const valueToAdd = key === "REGIAO" ? normalizeRegion(v.response) : v.response
+                if (valueToAdd) {
+                  demographicsMap.get(key).values.add(valueToAdd)
+                }
+              })
             }
           })
         }
       })
     })
 
-    const demographics = Array.from(demographicsMap.values()).map((d) => ({
+    let demographics = Array.from(demographicsMap.values()).map((d) => ({
       ...d,
       values: Array.from(d.values).sort((a, b) => a.localeCompare(b)),
     }))
+
+    if (demographicsMap.has("PF2_FAIXAS")) {
+      demographics = demographics.filter((d) => d.key !== "PF2" && d.key !== "Faixa de idade")
+    }
 
     return {
       questionInfo: questionInfo,
@@ -428,6 +438,15 @@ export default function Dashboard() {
       }
 
       return newFilters
+    })
+  }
+
+  const handleQuickFilterToggle = (demographicKey, value) => {
+    setFilters((prevFilters) => {
+      if (prevFilters[demographicKey] && prevFilters[demographicKey][0] === value) {
+        return {}
+      }
+      return { [demographicKey]: [value] }
     })
   }
 
@@ -691,7 +710,7 @@ export default function Dashboard() {
   const chartColorFunc = (d) => (useGroupingForChart ? groupedResponseColorMap[d.id] : getResponseColor(d.id))
 
   return (
-    <Box className="dashboard-page">
+    <Box className="dashboard-page" ref={pageRef}>
       <OffcanvasNavigation
         show={showOffcanvas}
         onHide={() => setShowOffcanvas(false)}
@@ -701,22 +720,12 @@ export default function Dashboard() {
         onClearFilters={handleClearFilters}
       />
 
-      <header className="dashboard-header">
-        <Box className="header-left">
-          <IconButton color="inherit" onClick={() => setShowOffcanvas(true)}>
-            <MenuIcon />
-          </IconButton>
-          <h2>{questionInfo?.questionText || questionInfo?.label || "Dashboard"}</h2>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Button variant="outlined" color="inherit" startIcon={<Download />}>
-            Exportar CSV
-          </Button>
-          <Button variant="contained" className="export-btn-pdf" startIcon={<PictureAsPdf />}>
-            Exportar PDF
-          </Button>
-        </Box>
-      </header>
+      <DashboardHeader
+        questionInfo={questionInfo}
+        allHistoricalData={allHistoricalData}
+        pageRef={pageRef}
+        onMenuClick={() => setShowOffcanvas(true)}
+      />
 
       <div className="dashboard-content">
         <div className="dashboard-grid">
@@ -867,6 +876,11 @@ export default function Dashboard() {
                   </Box>
                 )}
               </div>
+              <MapFilters
+                availableDemographics={availableDemographics}
+                activeFilters={filters}
+                onFilterToggle={handleQuickFilterToggle}
+              />
             </div>
           </div>
         </div>

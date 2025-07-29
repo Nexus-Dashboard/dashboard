@@ -1,22 +1,30 @@
 export const DEMOGRAPHIC_LABELS = {
+  REGIAO: "Região",
+  UF: "UF",
   PF1: "Sexo",
-  PF2: "Idade",
-  "PF2#1": "Faixa Etária",
-  PF2_faixas: "Faixa de idade",
+  PF2: "Faixa Etária",
+  PF2_FAIXAS: "Faixas Etárias",
   PF3: "Escolaridade",
-  PF4: "Trabalho remunerado",
-  PF5: "Classificação do trabalho",
-  PF6: "Vínculo formal de trabalho",
-  PF7: "Possui CNPJ",
-  PF8: "Situação de trabalho",
-  PF9: "Procurou emprego",
-  PF12: "Recebeu Auxílio (últimos 3 anos)",
-  PF13: "Recebe Auxílio (atualmente)",
-  "PF13.1": "Filhos de 0 a 6 anos",
-  "PF13.2": "Filhos de 7 a 17 anos",
-  PF14: "Renda mensal individual",
-  PF15: "Renda familiar mensal",
-  PF16: "Religião",
-  PF17: "Raça/Cor",
-  UF: "Estado",
+  PF4: "Renda Familiar",
+  PF5: "Religião",
+  PF7: "Trabalho Remunerado",
+  PF8: "Classificação do Trabalho",
+  PF9: "Vínculo Formal",
+  PF10: "Possui CNPJ",
+  "Faixa de idade": "Faixa de idade",
+}
+
+export const filterByDemographics = (data, filters) => {
+  if (!data || Object.keys(filters).length === 0) {
+    return data
+  }
+
+  const filterEntries = Object.entries(filters)
+
+  return data.filter((item) => {
+    return filterEntries.every(([key, values]) => {
+      const itemValue = item[key]
+      return values.includes(itemValue)
+    })
+  })
 }

@@ -267,7 +267,7 @@ const OffcanvasNavigation = ({
               }}
             >
               <House className="me-3" size={16} />
-              Dashboard
+              Home
             </Nav.Link>
             <Nav.Link
               style={{
