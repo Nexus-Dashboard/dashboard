@@ -46,7 +46,7 @@ export default function SurveyTypePage() {
           </div>
 
           <Row className="survey-type-cards">
-            <Col lg={4} md={6} className="mb-4">
+            <Col lg={isAdmin() ? 4 : 6} md={6} className="mb-4">
               <Card
                 className={`survey-type-card telefonica ${selectedType === "telefonica" ? "selected" : ""}`}
                 onClick={() => handleTypeSelect("telefonica")}
@@ -66,7 +66,7 @@ export default function SurveyTypePage() {
               </Card>
             </Col>
 
-            <Col lg={4} md={6} className="mb-4">
+            <Col lg={isAdmin() ? 4 : 6} md={6} className="mb-4">
               <Card
                 className={`survey-type-card f2f ${selectedType === "f2f" ? "selected" : ""}`}
                 onClick={() => handleTypeSelect("f2f")}
@@ -86,22 +86,25 @@ export default function SurveyTypePage() {
               </Card>
             </Col>
 
-            <Col lg={4} md={6} className="mb-4">
-              <Card className={`survey-type-card upload-card`} onClick={() => navigate("/upload")}>
-                <Card.Body>
-                  <div className="card-icon upload-icon" style={{ background: "rgb(0, 0, 0)", color: "white" }}>
-                    <Upload size={48} />
-                  </div>
-                  <Card.Title className="card-title">Upload de Dados</Card.Title>
-                  <Card.Text className="card-description">
-                    Envie novas pesquisas e dicionários de variáveis para o sistema.
-                  </Card.Text>
-                  <Button variant="dark" className="select-button">
-                    Acessar
-                  </Button>
-                </Card.Body>
-              </Card>
-            </Col>
+            {/* Card de Upload - Visível apenas para admins */}
+            {isAdmin() && (
+              <Col lg={4} md={6} className="mb-4">
+                <Card className={`survey-type-card upload-card`} onClick={() => navigate("/upload")}>
+                  <Card.Body>
+                    <div className="card-icon upload-icon" style={{ background: "rgb(0, 0, 0)", color: "white" }}>
+                      <Upload size={48} />
+                    </div>
+                    <Card.Title className="card-title">Upload de Dados</Card.Title>
+                    <Card.Text className="card-description">
+                      Envie novas pesquisas e dicionários de variáveis para o sistema.
+                    </Card.Text>
+                    <Button variant="dark" className="select-button">
+                      Acessar
+                    </Button>
+                  </Card.Body>
+                </Card>
+              </Col>
+            )}
 
             {/* Card de Administração - Visível apenas para admins */}
             {isAdmin() && (

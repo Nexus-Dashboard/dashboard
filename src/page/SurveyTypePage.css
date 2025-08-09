@@ -1,3 +1,14 @@
+/* Centralização dos cards quando não há admin */
+.survey-type-cards.justify-content-center {
+  justify-content: center !important;
+}
+
+.survey-type-cards.justify-content-center .col-lg-4 {
+  flex: 0 0 auto;
+  max-width: 350px;
+}
+
+
 .survey-type-page-wrapper {
   min-height: 100vh;
   background: #fff;
@@ -26,7 +37,6 @@
   flex: 1;
   display: flex;
   align-items: center;
-  padding: 2rem 0;
 }
 
 .page-title-section {
@@ -217,3 +227,4 @@
     padding: 1.5rem 1rem;
   }
 }
+
