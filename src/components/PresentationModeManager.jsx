@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
-import { useInactivityTimer } from "../hooks/useInactivityTimer"
 import ApiBase from "../service/ApiBase"
 
 const PRESENTATION_INTERVAL = 300000 // 5 minutes
-const INACTIVITY_TIMEOUT = 300000 // 5 minutes
 
 export const PresentationModeManager = () => {
   const [isPresentationMode, setIsPresentationMode] = useState(false)
@@ -73,6 +71,15 @@ export const PresentationModeManager = () => {
 
     console.log("Starting presentation mode...")
     setIsPresentationMode(true)
+    window.isPresentationModeActive = true
+    
+    // Entrar em tela cheia
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.log("Erro ao entrar em tela cheia:", err)
+      })
+    }
+    
     currentQuestionIndexRef.current = 0
     const firstQuestion = topQuestions[0]
     navigate(
@@ -95,6 +102,15 @@ export const PresentationModeManager = () => {
     if (isPresentationMode) {
       console.log("Stopping presentation mode due to activity.")
       setIsPresentationMode(false)
+      window.isPresentationModeActive = false
+      
+      // Sair da tela cheia
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(err => {
+          console.log("Erro ao sair da tela cheia:", err)
+        })
+      }
+      
       if (presentationIntervalRef.current) {
         clearInterval(presentationIntervalRef.current)
         presentationIntervalRef.current = null
@@ -108,13 +124,43 @@ export const PresentationModeManager = () => {
 
   useEffect(() => {
     fetchTopQuestions()
-  }, [fetchTopQuestions])
+    
+    // Listener para quando sair da tela cheia manualmente
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && isPresentationMode) {
+        console.log("Saiu da tela cheia, finalizando apresentação")
+        stopPresentationMode()
+      }
+    }
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }
+  }, [fetchTopQuestions, isPresentationMode, stopPresentationMode])
 
-  useInactivityTimer({
-    onTimeout: startPresentationMode,
-    onActivity: stopPresentationMode,
-    timeout: INACTIVITY_TIMEOUT,
-  })
+  // Listener para evento manual de iniciar apresentação
+  useEffect(() => {
+    const handleManualStart = () => {
+      console.log("Manual presentation mode triggered")
+      startPresentationMode()
+    }
+
+    window.addEventListener('startPresentationMode', handleManualStart)
+    
+    return () => {
+      window.removeEventListener('startPresentationMode', handleManualStart)
+    }
+  }, [startPresentationMode])
+
+  // Expor estado do modo apresentação globalmente
+  useEffect(() => {
+    window.isPresentationMode = isPresentationMode
+    if (isPresentationMode) {
+      window.isPresentationModeActive = true
+    }
+  }, [isPresentationMode])
 
   return null // This is a manager component, it doesn't render anything
 }

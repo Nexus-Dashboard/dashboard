@@ -6,6 +6,8 @@ import { useNavigate } from "react-router-dom"
 import { Phone, Users, Settings, Upload } from "lucide-react"
 import { useAuth } from "../contexts/AuthContext"
 import "./SurveyTypePage.css"
+import { PlayFill } from "react-bootstrap-icons"
+
 
 export default function SurveyTypePage() {
   const navigate = useNavigate()
@@ -26,14 +28,32 @@ export default function SurveyTypePage() {
     navigate("/admin/users")
   }
 
+  const handleStartPresentation = () => {
+    // Simular inatividade para iniciar o modo apresentação
+    // Dispara um evento de timeout no PresentationModeManager
+    window.dispatchEvent(new Event('startPresentationMode'))
+  }
+
   return (
     <div className="survey-type-page-wrapper">
       <header className="main-header">
         <Container className="d-flex justify-content-between align-items-center">
           <Image src="/nexus-logo.png" alt="Nexus Logo" className="header-logo-nexus" />
-          <Button variant="outline-light" size="sm" onClick={handleLogout}>
-            Sair
-          </Button>
+          <div className="d-flex align-items-center gap-2">
+            {/* Botão de Modo Apresentação */}
+            <Button
+              variant="outline-light"
+              size="sm"
+              onClick={handleStartPresentation}
+              title="Iniciar modo apresentação"
+            >
+              <PlayFill className="me-1" />
+              Apresentação
+            </Button>
+            <Button variant="outline-light" size="sm" onClick={handleLogout}>
+              Sair
+            </Button>
+          </div>       
         </Container>
       </header>
 
