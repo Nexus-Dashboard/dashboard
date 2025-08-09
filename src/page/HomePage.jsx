@@ -1,17 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Container, Row, Col, Card, Button, Image, Spinner, Form, InputGroup } from "react-bootstrap"
+import { useState, useEffect, useCallback } from "react"
+import { Container, Row, Col, Card, Button, Form, InputGroup, Spinner } from "react-bootstrap"
 import { useNavigate, useParams } from "react-router-dom"
 import { Folder, Search, ArrowLeft, Filter } from "lucide-react"
 import ApiBase from "../service/ApiBase"
-import { useAuth } from "../contexts/AuthContext"
+import CommonHeader from "../components/CommonHeader"
 import "./HomePage.css"
 
 export default function HomePage() {
   const navigate = useNavigate()
   const { surveyType } = useParams()
-  const { logout } = useAuth()
 
   const [themes, setThemes] = useState([])
   const [filteredThemes, setFilteredThemes] = useState([])
@@ -134,11 +133,6 @@ export default function HomePage() {
     navigate("/")
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate("/login")
-  }
-
   const handleClearFilters = () => {
     setSearchTerm("")
     setSelectedRound("")
@@ -147,41 +141,37 @@ export default function HomePage() {
   const getSurveyTypeTitle = () => {
     return surveyType === "telefonica" ? "Pesquisas Telefônicas" : "Pesquisas Face-to-Face"
   }
+  
+  const handleBack = useCallback(() => navigate(-1), [navigate])
 
   return (
     <div className="home-page-wrapper">
-      <header className="main-header">
-        <Container className="d-flex justify-content-between align-items-center">
-          <Image src="/nexus-logo.png" alt="Nexus Logo" className="header-logo-nexus" />
-          <Button variant="outline-light" size="sm" onClick={handleLogout}>
-            Sair
-          </Button>
-        </Container>
-      </header>
+      <CommonHeader />
 
       <main className="content-area">
         <Container>
           <div className="page-header">
-            <Button variant="outline-secondary" size="sm" onClick={handleBackClick} className="back-button">
-              <ArrowLeft size={16} className="me-2" />
-              Voltar para Tipos de Pesquisa
-            </Button>
-            <h1 className="page-title">{getSurveyTypeTitle()}</h1>
-            <p className="page-description">
-              {loading
-                ? "Carregando temas disponíveis..."
-                : `Explore ${filteredThemes.length} temas de pesquisa disponíveis`}
-            </p>
+            <div className="d-flex align-items-center justify-content-between">
+              <div>
+                <h1 className="page-title">{getSurveyTypeTitle()}</h1>
+                <p className="page-description">
+                  {loading
+                    ? "Carregando temas disponíveis..."
+                    : `Explore ${filteredThemes.length} temas de pesquisa disponíveis`}
+                </p>
+              </div>
+              <Button variant="outline-secondary" onClick={handleBack} className="back-button">
+                  <ArrowLeft size={16} className="me-2" />
+                  Voltar
+              </Button>
+            </div>
+            
           </div>
 
           {/* Filters Card */}
           <Card className="filters-card">
             <Card.Body>
-              <div className="filters-header">
-                <Filter size={20} className="text-primary" />
-                <h6>Filtros de Busca</h6>
-              </div>
-
+              
               <div className="filters-row">
                 <div className="filter-search">
                   <Form.Group>
@@ -247,13 +237,7 @@ export default function HomePage() {
 
           {!loading && !error && (
             <div className="themes-grid">
-              <div className="themes-header mb-3">
-                <h5 className="mb-0">
-                  {filteredThemes.length} tema{filteredThemes.length !== 1 ? "s" : ""} encontrado
-                  {filteredThemes.length !== 1 ? "s" : ""}
-                  {selectedRound && ` na rodada ${selectedRound}`}
-                </h5>
-              </div>
+              
 
               {filteredThemes.length === 0 ? (
                 <div className="empty-state">
@@ -266,10 +250,7 @@ export default function HomePage() {
                   {filteredThemes.map((theme) => (
                     <Col key={theme.id} lg={4} md={6}>
                       <Card className="theme-card" onClick={() => handleThemeClick(theme)}>
-                        <Card.Body>
-                          <div className="theme-icon-wrapper">
-                            <Folder size={24} color="white" />
-                          </div>
+                        <Card.Body>                          
 
                           <div className="flex-grow-1">
                             <h5 className="theme-card-title">{theme.theme}</h5>

@@ -11,9 +11,10 @@
 
 .survey-type-page-wrapper {
   min-height: 100vh;
-  background: #fff;
+  background-color: #f4f7f9; /* Mesmo fundo da HomePage */
   display: flex;
   flex-direction: column;
+  color: #212529;
 }
 
 .main-header {
@@ -35,8 +36,7 @@
 
 .content-area {
   flex: 1;
-  display: flex;
-  align-items: center;
+  padding: 1.5rem 0;
 }
 
 .page-title-section {

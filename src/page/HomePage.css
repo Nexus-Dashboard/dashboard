@@ -7,6 +7,12 @@
   color: #212529;
 }
 
+.back-button {
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
 /* Header */
 .main-header {
   background-color: #212529 !important; /* Usando a cor do Dashboard */
@@ -223,16 +229,27 @@
   font-weight: 600;
 }
 
+.questions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+  gap: 16px;
+  margin-top: 1rem;
+}
+
 /* Theme Cards */
 .theme-card {
   border: none;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
-  cursor: pointer;
   background: #ffffff;
-  height: 100%;
+  width: 100%;
+  max-width: unset;
+  margin: 0;
+  cursor: pointer;
+  min-height: 250px; /* ajuste o valor conforme necessário */
 }
+
 
 .theme-card:hover {
   transform: translateY(-4px);

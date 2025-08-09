@@ -1,4 +1,16 @@
-/* SUBSTITUIR TODO O CSS por este: */
+/* Loading State - idêntico à HomePage */
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  padding: 3rem 2rem;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  gap: 1rem;
+  margin: 2rem 0;
+}
 
 .questions-page-wrapper {
   min-height: 100vh;

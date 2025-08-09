@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
-import { Container, Card, Button, Alert, Form, InputGroup, Image, Badge } from "react-bootstrap"
+import { Container, Card, Button, Alert, Form, InputGroup, Badge, Spinner } from "react-bootstrap"
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
 import { useNavigate, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft, Search, BarChart3, Filter, Layers, FileText } from "lucide-react"
-import { useAuth } from "../contexts/AuthContext"
-import LoadingState from "../components/LoadingState"
+import CommonHeader from "../components/CommonHeader"
 import ApiBase from "../service/ApiBase"
 import "./ThemeQuestionsPage.css"
 
@@ -29,7 +30,6 @@ const fetchGroupedQuestions = async (themeName, surveyType) => {
 export default function ThemeQuestionsPage() {
   const navigate = useNavigate()
   const { themeSlug, surveyType } = useParams()
-  const { logout } = useAuth()
 
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedRound, setSelectedRound] = useState("")
@@ -162,44 +162,26 @@ export default function ThemeQuestionsPage() {
     setSearchTerm("")
     setSelectedRound("")
   }, [])
-  const handleLogout = () => {
-    logout()
-    navigate("/login")
-  }
 
-  if (isLoadingTheme || isLoading) return <LoadingState message="Carregando dados do tema e perguntas..." />
-  if (themeError || error) {
-    return (
-      <Container className="mt-4">
-        <Alert variant="danger">
-          <Alert.Heading>Erro ao carregar dados</Alert.Heading>
-          <p>{themeError?.message || error?.message}</p>
-          <Button variant="secondary" onClick={handleBack}>
-            Voltar
-          </Button>
-        </Alert>
-      </Container>
-    )
-  }
+  const loading = isLoadingTheme || isLoading
+  const hasError = themeError || error
 
   return (
     <div className="questions-page-wrapper">
-      <header className="main-header">
-        <Container className="d-flex justify-content-between align-items-center">
-          <Image src="/nexus-logo.png" alt="Nexus Logo" className="header-logo-nexus" />
-          <Button variant="outline-light" size="sm" onClick={handleLogout}>
-            Sair
-          </Button>
-        </Container>
-      </header>
+      <CommonHeader />
 
       <main className="content-area">
         <Container>
           <div className="page-title-section">
             <div className="d-flex align-items-center justify-content-between">
               <div>
-                <h1 className="main-title">{themeName}</h1>
-                <p className="main-description">Explore as perguntas disponíveis para análise.</p>
+                <h1 className="main-title">{loading ? "Carregando tema..." : themeName}</h1>
+                <p className="main-description">
+                  {loading 
+                    ? "Carregando perguntas disponíveis..." 
+                    : "Explore as perguntas disponíveis para análise."
+                  }
+                </p>
               </div>
               <Button variant="outline-secondary" onClick={handleBack} className="back-button">
                 <ArrowLeft size={16} className="me-2" />
@@ -209,13 +191,10 @@ export default function ThemeQuestionsPage() {
           </div>
 
           <Card className="filters-card">
-            <Card.Body>
-              <div className="filters-header">
-                <Filter size={20} className="text-primary" />
-                <h6>Filtros de Busca</h6>
-              </div>
+            <Card.Body>            
 
               <div className="filters-row">
+                
                 <div className="filter-search">
                   <Form.Group>
                     <Form.Label>Buscar por texto, código ou variável</Form.Label>
@@ -262,91 +241,126 @@ export default function ThemeQuestionsPage() {
             </Card.Body>
           </Card>
 
-          {filteredMultiple.length === 0 && filteredTextGrouped.length === 0 ? (
-            <div className="empty-state">
-              <h4>Nenhuma pergunta encontrada</h4>
-              <p>
-                Não foram encontradas perguntas que correspondam à sua busca. Tente um termo diferente ou limpe o
-                filtro.
-              </p>
-              <Button variant="primary" onClick={handleClearFilters}>
-                Limpar busca
+          {/* Mostrar erro se houver */}
+          {hasError && (
+            <Alert variant="danger">
+              <Alert.Heading>Erro ao carregar dados</Alert.Heading>
+              <p>{hasError?.message}</p>
+              <Button variant="outline-danger" onClick={() => refetch()}>
+                Tentar Novamente
               </Button>
-            </div>
-          ) : (
-            <>
-              {filteredMultiple.length > 0 && (
-                <section>
-                  <div className="question-group-header">
-                    <Layers />
-                    <h4>Perguntas de Matriz (Múltiplas)</h4>
-                  </div>
-                  <div className="questions-grid">
-                    {filteredMultiple.map((group) => (
-                      <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
-                        <Card.Body>
-                          <div className="question-card-header">
-                            <div>
-                              <h6 className="question-card-title">{group.questionText}</h6>
-                              <Badge bg="primary" pill>
-                                {group.baseCode}
-                              </Badge>
-                            </div>
-                          </div>
-                          <p className="question-card-meta">Contém {group.totalSubQuestions || 0} sub-perguntas.</p>
-                          <ul className="sub-questions-list">
-                            {(group.subQuestions || []).slice(0, 3).map((sub) => (
-                              <li key={sub.variable} className="sub-question-item">
-                                <span className="sub-question-variable">{sub.variable}</span>
-                                <span className="sub-question-label">{sub.label}</span>
-                              </li>
-                            ))}
-                            {(group.subQuestions || []).length > 3 && (
-                              <li className="sub-question-item text-muted">
-                                ... e mais {(group.subQuestions || []).length - 3}
-                              </li>
-                            )}
-                          </ul>
-                          <div className="question-card-footer">
-                            <Badge bg="info">{(group.rounds || []).length} Rodadas</Badge>
-                            <Button variant="primary" size="sm" className="analyze-button">
-                              <BarChart3 size={14} className="me-1" />
-                              Analisar Matriz
-                            </Button>
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    ))}
-                  </div>
-                </section>
-              )}
+            </Alert>
+          )}
 
-              {filteredTextGrouped.length > 0 && (
-                <section>
-                  <div className="question-group-header">
-                    <FileText />
-                    <h4>Perguntas Individuais (Agrupadas por Texto)</h4>
-                  </div>
-                  <div className="questions-grid">
-                    {filteredTextGrouped.map((group) => (
-                      <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
-                        <Card.Body>
-                          <h6 className="question-card-title">{group.shortText || group.questionText}</h6>
-                          <p className="question-card-meta">
-                            {(group.variables || []).length} variável(eis): {(group.variables || []).join(", ")}
-                          </p>
-                          <div className="question-card-footer">
-                            <Badge bg="secondary">{(group.rounds || []).length} Rodadas</Badge>
-                            <Button variant="outline-primary" size="sm" className="analyze-button">
-                              <BarChart3 size={14} className="me-1" />
-                              Ver Histórico
-                            </Button>
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    ))}
-                  </div>
-                </section>
+          {/* Mostrar loading ou conteúdo */}
+          {loading && !hasError && (
+            <div className="loading-state">
+              <Spinner animation="border" variant="primary" />
+              <p className="mt-3 text-muted">Carregando perguntas do tema...</p>
+            </div>
+          )}
+
+          {!loading && !hasError && (
+            <>
+              {filteredMultiple.length === 0 && filteredTextGrouped.length === 0 ? (
+                <div className="empty-state">
+                  <h4>Nenhuma pergunta encontrada</h4>
+                  <p>
+                    Não foram encontradas perguntas que correspondam à sua busca. Tente um termo diferente ou limpe o
+                    filtro.
+                  </p>
+                  <Button variant="primary" onClick={handleClearFilters}>
+                    Limpar busca
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {filteredMultiple.length > 0 && (
+                    <section>
+                      <div className="question-group-header">
+                        <Layers />
+                        <h4>Perguntas de Matriz (Múltiplas)</h4>
+                      </div>
+                      <div className="questions-grid">
+                        {filteredMultiple.map((group) => (
+                          <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
+                            <Card.Body>
+                              <div className="question-card-header">
+                                <div>
+                                  <h6 className="question-card-title">{group.questionText}</h6>
+                                  <Badge bg="primary" pill>
+                                    {group.baseCode}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <p className="question-card-meta">Contém {group.totalSubQuestions || 0} sub-perguntas.</p>
+                              <ul className="sub-questions-list">
+                                {(group.subQuestions || []).slice(0, 3).map((sub) => (
+                                  <li key={sub.variable} className="sub-question-item">
+                                    <span className="sub-question-variable">{sub.variable}</span>
+                                    <span className="sub-question-label">{sub.label}</span>
+                                  </li>
+                                ))}
+                                {(group.subQuestions || []).length > 3 && (
+                                  <li className="sub-question-item text-muted">
+                                    ... e mais {(group.subQuestions || []).length - 3}
+                                  </li>
+                                )}
+                              </ul>
+                              <div className="question-card-footer">
+                                <Badge bg="info">{(group.rounds || []).length} Rodadas</Badge>
+                                <Button variant="primary" size="sm" className="analyze-button">
+                                  <BarChart3 size={14} className="me-1" />
+                                  Analisar Matriz
+                                </Button>
+                              </div>
+                            </Card.Body>
+                          </Card>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {filteredTextGrouped.length > 0 && (
+                    <section>
+                      <div className="question-group-header">
+                        <FileText />
+                        <h4>Perguntas Individuais (Agrupadas por Texto)</h4>
+                      </div>
+                      <div className="questions-grid">
+                        {filteredTextGrouped.map((group) => (
+                          <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
+                            <Card.Body>
+                              <h6 className="question-card-title">
+                                {group.shortText || group.questionText}
+                              </h6>
+
+                              <div className="question-card-footer">
+                                <OverlayTrigger
+                                  placement="top"
+                                  overlay={
+                                    <Tooltip id={`tooltip-${group.id}`}>
+                                      {(group.variables || []).length} variável(eis): {(group.variables || []).join(", ")}
+                                    </Tooltip>
+                                  }
+                                >
+                                  <Badge bg="secondary" style={{ cursor: 'pointer' }}>
+                                    {(group.rounds || []).length} Rodadas
+                                  </Badge>
+                                </OverlayTrigger>
+
+                                <Button variant="outline-primary" size="sm" className="analyze-button">
+                                  <BarChart3 size={14} className="me-1" />
+                                  Ver Histórico
+                                </Button>
+                              </div>
+                            </Card.Body>
+                          </Card>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </>
               )}
             </>
           )}
