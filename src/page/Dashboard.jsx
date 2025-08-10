@@ -4,12 +4,9 @@ import { useState, useMemo, useRef, useEffect } from "react"
 import { useLocation } from "react-router-dom"
 import ApiBase from "../service/ApiBase"
 import { useQuery } from "@tanstack/react-query"
-import { ResponsiveLine } from "@nivo/line"
-import { Box, Typography, CircularProgress, Button, LinearProgress } from "@mui/material"
+import { Box } from "@mui/material"
 import OffcanvasNavigation from "../components/OffcanvasNavigation"
-import InteractiveBrazilMap from "../components/InteractiveBrazilMap"
 import DashboardHeader from "../components/DashboardHeader"
-import MapFilters from "../components/mapFilters"
 import {
   groupResponses,
   shouldGroupResponses,
@@ -19,6 +16,10 @@ import {
   RESPONSE_ORDER,
 } from "../utils/chartUtils"
 import { DEMOGRAPHIC_LABELS } from "../utils/demographicUtils"
+import LoadingWithProgress from "./dashboard/loading-with-progress"
+import ErrorState from "./dashboard/error-state"
+import ChartCard from "./dashboard/chart-card"
+import MapCard from "./dashboard/map-card"
 import "./Dashboard.css"
 
 export const fetchGroupedQuestionData = async ({ queryKey }) => {
@@ -57,14 +58,12 @@ export const fetchQuestionDataFallback = async ({ queryKey }) => {
   console.log(`Question Text: ${questionText}`)
 
   try {
-    // Primeiro, buscar todas as perguntas do tema para encontrar as variáveis relacionadas
     const { data: themeData } = await ApiBase.get(`/api/data/themes/${encodeURIComponent(theme)}/questions-grouped`)
 
     if (!themeData.success) {
       throw new Error("Erro ao buscar dados do tema")
     }
 
-    // Encontrar o grupo de perguntas correspondente
     const questionGroup = themeData.questionGroups.find((group) => group.questionText === questionText)
 
     if (!questionGroup) {
@@ -73,7 +72,6 @@ export const fetchQuestionDataFallback = async ({ queryKey }) => {
 
     console.log("📊 Grupo encontrado:", questionGroup)
 
-    // Buscar dados para cada variável do grupo
     const allHistoricalData = []
     const demographicFieldsSet = new Set()
 
@@ -86,20 +84,16 @@ export const fetchQuestionDataFallback = async ({ queryKey }) => {
         })
 
         if (variableData.success && variableData.historicalData) {
-          // Adicionar dados históricos
           variableData.historicalData.forEach((round) => {
-            // Verificar se já existe uma rodada com o mesmo período
             const existingRound = allHistoricalData.find((r) => r.period === round.period)
 
             if (existingRound) {
-              // Combinar distribuições
               round.distribution.forEach((dist) => {
                 const existingDist = existingRound.distribution.find((d) => d.response === dist.response)
                 if (existingDist) {
                   existingDist.weightedCount += dist.weightedCount
                   existingDist.count += dist.count
 
-                  // Combinar demographics
                   if (dist.demographics) {
                     Object.entries(dist.demographics).forEach(([key, values]) => {
                       if (!existingDist.demographics[key]) {
@@ -118,12 +112,11 @@ export const fetchQuestionDataFallback = async ({ queryKey }) => {
             } else {
               allHistoricalData.push({
                 ...round,
-                variable: variable, // Adicionar referência da variável
+                variable: variable,
               })
             }
           })
 
-          // Adicionar campos demográficos
           if (variableData.demographicFields) {
             variableData.demographicFields.forEach((field) => demographicFieldsSet.add(field))
           }
@@ -133,7 +126,6 @@ export const fetchQuestionDataFallback = async ({ queryKey }) => {
       }
     }
 
-    // Ordenar dados históricos por período
     allHistoricalData.sort((a, b) => {
       const [yearA, roundA] = a.period.split("-R").map(Number)
       const [yearB, roundB] = b.period.split("-R").map(Number)
@@ -168,13 +160,12 @@ export const fetchQuestionDataFallback = async ({ queryKey }) => {
 
 // Função para buscar TODAS as questões de forma mais robusta
 export const fetchAllQuestions = async ({ queryKey }) => {
-  const [, surveyType] = queryKey // Manter para compatibilidade
+  const [, surveyType] = queryKey
   console.log(`🔍 Iniciando busca COMPLETA de todas as questões...`)
 
   try {
-    // Remover o filtro de tipo para buscar TODAS as questões
     const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`)
-    
+
     if (!firstResponse.data?.success) {
       throw new Error("API returned an error")
     }
@@ -187,7 +178,6 @@ export const fetchAllQuestions = async ({ queryKey }) => {
     const promises = []
     for (let page = 2; page <= totalPages; page++) {
       promises.push(
-        // Também remover o filtro aqui
         ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
           .then((response) => {
             return response.data?.success ? response.data.data.questions : []
@@ -288,11 +278,10 @@ export default function Dashboard() {
       setStartTime(Date.now())
       setLoadingProgress(5)
       setLoadingStage("Iniciando busca de dados...")
-      
+
       try {
-        // Simular progresso durante a requisição
         const progressInterval = setInterval(() => {
-          setLoadingProgress(prev => {
+          setLoadingProgress((prev) => {
             if (prev < 90) {
               return prev + Math.random() * 15
             }
@@ -302,18 +291,17 @@ export default function Dashboard() {
 
         setLoadingStage("Conectando com a API...")
         setLoadingProgress(15)
-        
+
         const result = await fetchGroupedQuestionData(queryKey)
-        
+
         clearInterval(progressInterval)
         setLoadingStage("Processando dados históricos...")
         setLoadingProgress(95)
-        
-        // Pequeno delay para mostrar o progresso final
-        await new Promise(resolve => setTimeout(resolve, 300))
+
+        await new Promise((resolve) => setTimeout(resolve, 300))
         setLoadingProgress(100)
         setLoadingStage("Dados carregados com sucesso!")
-        
+
         return result
       } catch (error) {
         setLoadingStage("Erro no carregamento")
@@ -321,8 +309,8 @@ export default function Dashboard() {
       }
     },
     enabled: !!theme && !!questionText,
-    staleTime: 1000 * 60 * 10, // 10 minutes
-    cacheTime: 1000 * 60 * 15, // 15 minutes
+    staleTime: 1000 * 60 * 10,
+    cacheTime: 1000 * 60 * 15,
     refetchOnWindowFocus: false,
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
@@ -335,7 +323,7 @@ export default function Dashboard() {
   } = useQuery({
     queryKey: ["allQuestions", surveyType],
     queryFn: fetchAllQuestions,
-    staleTime: 1000 * 60 * 60, // 1 hour
+    staleTime: 1000 * 60 * 60,
     cacheTime: 1000 * 60 * 60,
     refetchOnWindowFocus: false,
     retry: 1,
@@ -354,7 +342,7 @@ export default function Dashboard() {
 
     console.log(`📊 Processando ${questions.length} questões...`)
 
-    questions.forEach((q, index) => {
+    questions.forEach((q) => {
       if (q.surveyNumber && q.date) {
         const key = q.surveyNumber.toString()
         if (!map.has(key)) {
@@ -537,15 +525,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (mapRoundsWithData.length > 0) {
-      setSelectedMapRoundIndex(0) // Default to the most recent round with map data
+      setSelectedMapRoundIndex(0)
     }
   }, [mapRoundsWithData])
 
   const selectedChartData = useMemo(() => {
     if (!filteredHistoricalData.length) return []
-    // Get the N most recent rounds from the data (which is sorted newest to oldest)
     const recentRounds = filteredHistoricalData.slice(0, numberOfRoundsToShow)
-    // Reverse them to be in chronological order for the chart's X-axis
     return recentRounds.reverse()
   }, [filteredHistoricalData, numberOfRoundsToShow])
 
@@ -559,7 +545,6 @@ export default function Dashboard() {
 
     selectedRound.distribution.forEach((dist) => {
       const responseValue = dist.response
-      // Primeiro tenta UF, se não existir, usa PF10
       const ufDemographics = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
 
       if (ufDemographics) {
@@ -630,9 +615,6 @@ export default function Dashboard() {
 
         const roundNumber = period.split("-R")[1]
         const dateLabel = surveyDateMap.get(roundNumber)
-
-        console.log(`🔍 Buscando data para rodada ${roundNumber}:`, dateLabel)
-
         const xLabel = formatChartXAxis(period, dateLabel)
 
         return {
@@ -663,7 +645,6 @@ export default function Dashboard() {
     return formatChartXAxis(rodada.period, dateLabel)
   }
 
-  // Debug dos erros
   useEffect(() => {
     if (allQuestionsError) {
       console.error("💥 Erro ao carregar todas as questões:", allQuestionsError)
@@ -671,140 +652,30 @@ export default function Dashboard() {
   }, [allQuestionsError])
 
   if (status === "loading" || !data) {
-    const elapsedTime = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0
-    const estimatedTotal = 15 // segundos estimados
-    const timeRemaining = Math.max(0, estimatedTotal - elapsedTime)
-    
-    return (
-      <Box className="loading-container">
-        <CircularProgress size={80} sx={{ mb: 3, color: '#1976d2' }} />
-        <Typography variant="h5" color="text.primary" sx={{ mb: 2, fontWeight: 600 }}>
-          Carregando Dados da Pergunta
-        </Typography>
-        
-        {/* Barra de Progresso Principal */}
-        <Box sx={{ width: "100%", maxWidth: "500px", mb: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-              {loadingStage}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-              {Math.round(loadingProgress)}%
-            </Typography>
-          </Box>
-          <LinearProgress 
-            variant="determinate" 
-            value={loadingProgress} 
-            sx={{ 
-              height: 8, 
-              borderRadius: 4,
-              backgroundColor: '#e3f2fd',
-              '& .MuiLinearProgress-bar': {
-                borderRadius: 4,
-                background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)'
-              }
-            }} 
-          />
-        </Box>
-        
-        {/* Etapas do Processo */}
-        <Box sx={{ width: "100%", maxWidth: "500px" }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-            Progresso das Etapas:
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {[
-              { step: "Conectando com a API", threshold: 15 },
-              { step: "Buscando dados agrupados", threshold: 40 },
-              { step: "Carregando informações de datas", threshold: 70 },
-              { step: "Processando dados históricos", threshold: 95 },
-              { step: "Finalizando carregamento", threshold: 100 }
-            ].map((item, index) => (
-              <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ 
-                  width: 16, 
-                  height: 16, 
-                  borderRadius: '50%',
-                  backgroundColor: loadingProgress >= item.threshold ? '#4caf50' : '#e0e0e0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {loadingProgress >= item.threshold && (
-                    <Typography sx={{ color: 'white', fontSize: '10px' }}>✓</Typography>
-                  )}
-                </Box>
-                <Typography 
-                  variant="caption" 
-                  sx={{ 
-                    color: loadingProgress >= item.threshold ? 'success.main' : 'text.secondary',
-                    fontWeight: loadingProgress >= item.threshold ? 600 : 400
-                  }}
-                >
-                  {item.step}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-        </Box>
-
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-          Processando dados históricos e demográficos agrupados...
-        </Typography>
-      </Box>
-    )
+    return <LoadingWithProgress loadingProgress={loadingProgress} loadingStage={loadingStage} />
   }
 
   if (isLoadingAllQuestions) {
-    return (
-      <Box className="loading-container">
-        <CircularProgress size={60} />
-        <Typography variant="h6" color="text.secondary" sx={{ mt: 2, mb: 2 }}>
-          🔄 Carregando informações de datas...
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Buscando dados de todas as {allQuestionsData?.data?.pagination?.totalQuestions || "1883"} questões para
-          formatação correta dos rótulos
-        </Typography>
-        <Box sx={{ width: "300px", mt: 2 }}>
-          <LinearProgress />
-        </Box>
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-          Isso pode levar alguns segundos...
-        </Typography>
-      </Box>
-    )
+    return <LoadingWithProgress loadingProgress={30} loadingStage="Carregando informações de datas..." />
   }
 
   if (status === "error") {
     return (
-      <Box className="error-container">
-        <Typography variant="h5" color="error" sx={{ mb: 2 }}>
-          Erro ao carregar dados agrupados
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-          {`Erro: ${error.message}`}
-        </Typography>
-        <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
-          Tentar Novamente
-        </Button>
-      </Box>
+      <ErrorState
+        title="Erro ao carregar dados agrupados"
+        message={`Erro: ${error.message}`}
+        onRetry={() => window.location.reload()}
+      />
     )
   }
 
   if (allQuestionsError) {
     return (
-      <Box className="error-container">
-        <Typography variant="h5" color="error" sx={{ mb: 2 }}>
-          Erro ao carregar informações de datas
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-          {`Erro: ${allQuestionsError.message}`}
-        </Typography>
-        <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
-          Tentar Novamente
-        </Button>
-      </Box>
+      <ErrorState
+        title="Erro ao carregar informações de datas"
+        message={`Erro: ${allQuestionsError.message}`}
+        onRetry={() => window.location.reload()}
+      />
     )
   }
 
@@ -833,160 +704,29 @@ export default function Dashboard() {
 
       <div className="dashboard-content">
         <div className="dashboard-grid">
-          <div className="chart-card">
-            <div className="chart-card-content">
-              <Typography className="card-title-custom">
-                {questionInfo?.label || questionInfo?.questionText || "Análise Temporal"}
-              </Typography>
+          <ChartCard
+            title={questionInfo?.label || questionInfo?.questionText}
+            allHistoricalData={allHistoricalData}
+            selectedChartData={selectedChartData}
+            numberOfRoundsToShow={numberOfRoundsToShow}
+            onRoundsChange={setNumberOfRoundsToShow}
+            chartData={chartData}
+            chartRef={chartRef}
+            chartColorFunc={chartColorFunc}
+            getXAxisLabel={getXAxisLabel}
+          />
 
-              {allHistoricalData.length > 1 && (
-                <Box sx={{ mb: 3, px: 1 }}>
-                  {selectedChartData.length > 0 && (
-                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-                      Período: {getXAxisLabel(selectedChartData[0])} até{" "}
-                      {getXAxisLabel(selectedChartData[selectedChartData.length - 1])}
-                    </Typography>
-                  )}
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-                    Exibindo as últimas {numberOfRoundsToShow} de {allHistoricalData.length} rodadas
-                  </Typography>
-                  <input
-                    type="range"
-                    min={1}
-                    max={allHistoricalData.length || 1}
-                    value={numberOfRoundsToShow}
-                    onChange={(e) => setNumberOfRoundsToShow(Number(e.target.value))}
-                    className="single-range-slider"
-                    style={{ direction: "rtl" }} // Inverte a direção do slider
-                  />
-                  <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Mais rodadas
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Menos rodadas
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
-
-              <div ref={chartRef} className="chart-container">
-                {chartData.length > 0 ? (
-                  <ResponsiveLine
-                    data={chartData}
-                    margin={{ top: 20, right: 110, bottom: 60, left: 60 }}
-                    xScale={{ type: "point" }}
-                    yScale={{ type: "linear", min: 0, max: "auto" }}
-                    yFormat=" >-.1f"
-                    curve="monotoneX"
-                    axisTop={null}
-                    axisRight={null}
-                    axisBottom={{
-                      tickSize: 5,
-                      tickPadding: 5,
-                      tickRotation: -15,
-                      legend: "Período",
-                      legendOffset: 50,
-                      legendPosition: "middle",
-                    }}
-                    axisLeft={{
-                      tickSize: 5,
-                      tickPadding: 5,
-                      tickRotation: 0,
-                      legend: "Porcentagem (%)",
-                      legendOffset: -50,
-                      legendPosition: "middle",
-                    }}
-                    pointSize={8}
-                    pointColor={{ theme: "background" }}
-                    pointBorderWidth={2}
-                    pointBorderColor={{ from: "serieColor" }}
-                    pointLabelYOffset={-12}
-                    useMesh={true}
-                    colors={chartColorFunc}
-                    legends={[
-                      {
-                        anchor: "right",
-                        direction: "column",
-                        justify: false,
-                        translateX: 100,
-                        translateY: 0,
-                        itemsSpacing: 2,
-                        itemDirection: "left-to-right",
-                        itemWidth: 80,
-                        itemHeight: 20,
-                        itemOpacity: 0.85,
-                        symbolSize: 12,
-                        symbolShape: "circle",
-                      },
-                    ]}
-                  />
-                ) : (
-                  <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
-                    <Typography variant="body1" color="text.secondary">
-                      Nenhum dado disponível para o período ou filtros selecionados
-                    </Typography>
-                  </Box>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="map-card">
-            <div className="map-card-content">
-              <Typography className="card-title-custom">Mapa Interativo do Brasil</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Visualização geográfica das respostas por estado
-              </Typography>
-
-              {mapRoundsWithData.length > 1 && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-                    Rodada: {getXAxisLabel(mapRoundsWithData[selectedMapRoundIndex]) || "N/A"}
-                  </Typography>
-                  <input
-                    type="range"
-                    min={0}
-                    max={Math.max(0, mapRoundsWithData.length - 1)}
-                    value={selectedMapRoundIndex}
-                    onChange={(e) => setSelectedMapRoundIndex(Number.parseInt(e.target.value))}
-                    className="single-range-slider"
-                  />
-                  <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Mais recente
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Mais antiga
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
-
-              <div className="map-container">
-                {mapData.length > 0 ? (
-                  <InteractiveBrazilMap responses={mapData} selectedQuestion={questionInfo} onStateClick={() => {}} />
-                ) : (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      height: "100%",
-                      color: "text.secondary",
-                    }}
-                  >
-                    <Typography>Nenhum dado geográfico para a rodada selecionada.</Typography>
-                  </Box>
-                )}
-              </div>
-              <MapFilters
-                availableDemographics={availableDemographics}
-                activeFilters={filters}
-                onFilterToggle={handleQuickFilterToggle}
-              />
-            </div>
-          </div>
+          <MapCard
+            mapRoundsWithData={mapRoundsWithData}
+            selectedMapRoundIndex={selectedMapRoundIndex}
+            onRoundIndexChange={setSelectedMapRoundIndex}
+            mapData={mapData}
+            questionInfo={questionInfo}
+            availableDemographics={availableDemographics}
+            activeFilters={filters}
+            onFilterToggle={handleQuickFilterToggle}
+            getXAxisLabel={getXAxisLabel}
+          />
         </div>
       </div>
     </Box>
