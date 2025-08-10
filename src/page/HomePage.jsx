@@ -1,12 +1,16 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Container, Row, Col, Card, Button, Form, InputGroup, Spinner } from "react-bootstrap"
 import { useNavigate, useParams } from "react-router-dom"
 import { Folder, Search, ArrowLeft, Filter } from "lucide-react"
 import ApiBase from "../service/ApiBase"
 import CommonHeader from "../components/CommonHeader"
 import "./HomePage.css"
+import { formatApiDateForDisplay } from "../hooks/dateUtils"
+import { useQuery } from "@tanstack/react-query"
+import { ApiMethods } from "../service/ApiBase"
+
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -85,16 +89,17 @@ export default function HomePage() {
           // Recompor a lista final com "Avaliação do Governo" no topo
           const finalThemes = avaliacaoTheme ? [avaliacaoTheme, ...otherThemes] : otherThemes
 
-          // Extrair todas as rodadas disponíveis
+          // Extrair todas as rodadas disponíveis (SEM DUPLICAÇÃO)
           const allRounds = new Set()
           finalThemes.forEach((theme) => {
             theme.rounds.forEach((round) => allRounds.add(round))
           })
-          const sortedRounds = Array.from(allRounds).sort((a, b) => b - a)
+          const sortedRounds = Array.from(allRounds).sort((a, b) => a - b) // MUDANÇA: crescente em vez de decrescente
+
 
           setThemes(finalThemes)
           setFilteredThemes(finalThemes)
-          setAvailableRounds(sortedRounds)
+          setAvailableRounds(sortedRounds) // VOLTAR AO FORMATO ORIGINAL
         } else {
           setError("Não foi possível carregar os temas.")
         }
@@ -124,6 +129,46 @@ export default function HomePage() {
 
     setFilteredThemes(filtered)
   }, [themes, searchTerm, selectedRound])
+
+  // HomePage.jsx - SUBSTITUIR o useQuery por uma busca mais robusta
+  const { data: questionsData } = useQuery({
+    queryKey: ["allQuestions", surveyType],
+    queryFn: async () => {
+      try {
+        // Usar o método que busca TODAS as páginas
+        const response = await ApiMethods.getAllQuestionsComplete()
+        return response?.success ? response.data.questions : []
+      } catch (error) {
+        console.warn("Erro ao buscar dados de questões:", error)
+        // Fallback para busca simples com mais registros
+        try {
+          const fallbackResponse = await ApiBase.get("/api/data/questions/all?page=1&limit=1000")
+          return fallbackResponse.data?.success ? fallbackResponse.data.data.questions : []
+        } catch (fallbackError) {
+          return []
+        }
+      }
+    },
+    enabled: availableRounds.length > 0,
+    staleTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
+  })
+
+  // Mapear rodadas com datas
+  const roundsWithDates = useMemo(() => {
+    if (!availableRounds.length || !questionsData) return availableRounds
+
+    return availableRounds.map(round => {
+      const questionWithDate = questionsData.find(q => q.surveyNumber?.toString() === round.toString())
+      const dateStr = questionWithDate?.date ? formatApiDateForDisplay(questionWithDate.date) : ""
+      
+      return {
+        number: round,
+        label: dateStr ? `Rodada ${round} - ${dateStr}` : `Rodada ${round}`,
+        value: round
+      }
+    })
+  }, [availableRounds, questionsData])
 
   const handleThemeClick = (theme) => {
     navigate(`/theme/${surveyType}/${theme.slug}`)
@@ -195,9 +240,9 @@ export default function HomePage() {
                     <Form.Label>Filtrar por rodada</Form.Label>
                     <Form.Select value={selectedRound} onChange={(e) => setSelectedRound(e.target.value)}>
                       <option value="">Todas as rodadas</option>
-                      {availableRounds.map((round) => (
-                        <option key={round} value={round}>
-                          Rodada {round}
+                      {roundsWithDates.map((round) => (
+                        <option key={round.value || round} value={round.value || round}>
+                          {round.label || `Rodada ${round}`}
                         </option>
                       ))}
                     </Form.Select>

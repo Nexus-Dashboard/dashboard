@@ -36,6 +36,33 @@ const FULL_MONTH_TO_SHORT = {
   "Dezembro": "Dez"
 }
 
+
+
+/**
+ * Formata data da API para exibição
+ * @param {string} apiDate - Data da API (ex: "Mai./25")
+ * @returns {string} - Data formatada (ex: "Maio/25")
+ */
+export const formatApiDateForDisplay = (apiDate) => {
+  if (!apiDate) return ""
+  
+  // Remove pontos e normaliza
+  let cleaned = apiDate.replace(/\./g, "").trim()
+  
+  // Se já está no formato desejado (Mai/25), converte para Maio/25
+  const shortMatch = cleaned.match(/^(\w{3})\/(\d{2})$/)
+  if (shortMatch) {
+    const [, shortMonth, year] = shortMatch
+    // Encontrar o mês completo baseado na abreviação
+    const fullMonth = Object.keys(FULL_MONTH_TO_SHORT).find(
+      full => FULL_MONTH_TO_SHORT[full] === shortMonth
+    )
+    return fullMonth ? `${fullMonth}/${year}` : apiDate
+  }
+  
+  return apiDate
+}
+
 /**
  * Busca a data de uma rodada específica baseado no número da rodada
  * @param {number|string} roundNumber - Número da rodada

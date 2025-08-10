@@ -10,6 +10,9 @@ import { ArrowLeft, Search, BarChart3, Filter, Layers, FileText } from "lucide-r
 import CommonHeader from "../components/CommonHeader"
 import ApiBase from "../service/ApiBase"
 import "./ThemeQuestionsPage.css"
+import { formatApiDateForDisplay } from "../hooks/dateUtils"
+import { ApiMethods } from "../service/ApiBase"
+
 
 const fetchThemeNameBySlug = async (themeSlug, surveyType) => {
   const { data } = await ApiBase.get("/api/data/themes", { params: { type: surveyType } })
@@ -54,12 +57,49 @@ export default function ThemeQuestionsPage() {
     refetchOnWindowFocus: false,
   })
 
+  // NOVO: Query para buscar dados de datas
+  const { data: questionsData } = useQuery({
+    queryKey: ["allQuestions", surveyType],
+    queryFn: async () => {
+      try {
+        // Usar o método que busca TODAS as páginas
+        const response = await ApiMethods.getAllQuestionsComplete()
+        return response?.success ? response.data.questions : []
+      } catch (error) {
+        console.warn("Erro ao buscar dados de questões:", error)
+        // Fallback para busca simples com mais registros
+        try {
+          const fallbackResponse = await ApiBase.get("/api/data/questions/all?page=1&limit=1000")
+          return fallbackResponse.data?.success ? fallbackResponse.data.data.questions : []
+        } catch (fallbackError) {
+          return []
+        }
+      }
+    },
+    enabled: !!themeName,
+    staleTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
+  })
+
   const availableRounds = useMemo(() => {
     if (!data?.questionGroups) return []
     const allRounds = data.questionGroups.flatMap((g) => g.rounds || [])
     const uniqueRounds = [...new Set(allRounds)]
-    return uniqueRounds.sort((a, b) => Number(a) - Number(b))
-  }, [data])
+    
+    // Mapear rodadas com datas
+    const roundsWithDates = uniqueRounds.map(round => {
+      const questionWithDate = questionsData?.find(q => q.surveyNumber?.toString() === round.toString())
+      const dateStr = questionWithDate?.date ? formatApiDateForDisplay(questionWithDate.date) : ""
+      
+      return {
+        number: round,
+        label: dateStr ? `Rodada ${round} - ${dateStr}` : `Rodada ${round}`,
+        value: round
+      }
+    })
+    
+    return roundsWithDates.sort((a, b) => Number(a.value) - Number(b.value))
+  }, [data, questionsData])
 
   const { multipleQuestions, textGroupedQuestions } = useMemo(() => {
     const allGroups = data?.questionGroups || []
@@ -218,8 +258,8 @@ export default function ThemeQuestionsPage() {
                     <Form.Select value={selectedRound} onChange={(e) => setSelectedRound(e.target.value)}>
                       <option value="">Todas as rodadas</option>
                       {availableRounds.map((round) => (
-                        <option key={round} value={round}>
-                          Rodada {round}
+                        <option key={round.value} value={round.value}>
+                          {round.label}
                         </option>
                       ))}
                     </Form.Select>
