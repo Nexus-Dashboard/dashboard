@@ -258,6 +258,10 @@ export default function Dashboard() {
   const [numberOfRoundsToShow, setNumberOfRoundsToShow] = useState(10)
   const [selectedMapRoundIndex, setSelectedMapRoundIndex] = useState(0)
 
+  const [loadingProgress, setLoadingProgress] = useState(0)
+  const [loadingStage, setLoadingStage] = useState("")
+  const [startTime, setStartTime] = useState(null)
+
   const theme = useMemo(() => {
     const params = new URLSearchParams(location.search)
     return params.get("theme")
@@ -280,7 +284,42 @@ export default function Dashboard() {
 
   const { data, error, status } = useQuery({
     queryKey: ["groupedQuestionData", theme, questionText, surveyType],
-    queryFn: fetchGroupedQuestionData,
+    queryFn: async (queryKey) => {
+      setStartTime(Date.now())
+      setLoadingProgress(5)
+      setLoadingStage("Iniciando busca de dados...")
+      
+      try {
+        // Simular progresso durante a requisição
+        const progressInterval = setInterval(() => {
+          setLoadingProgress(prev => {
+            if (prev < 90) {
+              return prev + Math.random() * 15
+            }
+            return prev
+          })
+        }, 200)
+
+        setLoadingStage("Conectando com a API...")
+        setLoadingProgress(15)
+        
+        const result = await fetchGroupedQuestionData(queryKey)
+        
+        clearInterval(progressInterval)
+        setLoadingStage("Processando dados históricos...")
+        setLoadingProgress(95)
+        
+        // Pequeno delay para mostrar o progresso final
+        await new Promise(resolve => setTimeout(resolve, 300))
+        setLoadingProgress(100)
+        setLoadingStage("Dados carregados com sucesso!")
+        
+        return result
+      } catch (error) {
+        setLoadingStage("Erro no carregamento")
+        throw error
+      }
+    },
     enabled: !!theme && !!questionText,
     staleTime: 1000 * 60 * 10, // 10 minutes
     cacheTime: 1000 * 60 * 15, // 15 minutes
@@ -632,19 +671,84 @@ export default function Dashboard() {
   }, [allQuestionsError])
 
   if (status === "loading" || !data) {
+    const elapsedTime = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0
+    const estimatedTotal = 15 // segundos estimados
+    const timeRemaining = Math.max(0, estimatedTotal - elapsedTime)
+    
     return (
       <Box className="loading-container">
-        <CircularProgress size={60} />
-        <Typography variant="h6" color="text.secondary" sx={{ mt: 2, mb: 2 }}>
-          Carregando dados agrupados da pergunta...
+        <CircularProgress size={80} sx={{ mb: 3, color: '#1976d2' }} />
+        <Typography variant="h5" color="text.primary" sx={{ mb: 2, fontWeight: 600 }}>
+          Carregando Dados da Pergunta
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Usando método de fallback para combinar dados de múltiplas variáveis
-        </Typography>
-        <Box sx={{ width: "300px", mt: 2 }}>
-          <LinearProgress />
+        
+        {/* Barra de Progresso Principal */}
+        <Box sx={{ width: "100%", maxWidth: "500px", mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+              {loadingStage}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+              {Math.round(loadingProgress)}%
+            </Typography>
+          </Box>
+          <LinearProgress 
+            variant="determinate" 
+            value={loadingProgress} 
+            sx={{ 
+              height: 8, 
+              borderRadius: 4,
+              backgroundColor: '#e3f2fd',
+              '& .MuiLinearProgress-bar': {
+                borderRadius: 4,
+                background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)'
+              }
+            }} 
+          />
         </Box>
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+        
+        {/* Etapas do Processo */}
+        <Box sx={{ width: "100%", maxWidth: "500px" }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
+            Progresso das Etapas:
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {[
+              { step: "Conectando com a API", threshold: 15 },
+              { step: "Buscando dados agrupados", threshold: 40 },
+              { step: "Carregando informações de datas", threshold: 70 },
+              { step: "Processando dados históricos", threshold: 95 },
+              { step: "Finalizando carregamento", threshold: 100 }
+            ].map((item, index) => (
+              <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ 
+                  width: 16, 
+                  height: 16, 
+                  borderRadius: '50%',
+                  backgroundColor: loadingProgress >= item.threshold ? '#4caf50' : '#e0e0e0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {loadingProgress >= item.threshold && (
+                    <Typography sx={{ color: 'white', fontSize: '10px' }}>✓</Typography>
+                  )}
+                </Box>
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    color: loadingProgress >= item.threshold ? 'success.main' : 'text.secondary',
+                    fontWeight: loadingProgress >= item.threshold ? 600 : 400
+                  }}
+                >
+                  {item.step}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
           Processando dados históricos e demográficos agrupados...
         </Typography>
       </Box>

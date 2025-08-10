@@ -16,54 +16,47 @@ export const PresentationModeManager = () => {
 
   const fetchTopQuestions = useCallback(async () => {
     try {
-      // Determinar o tipo de pesquisa baseado na URL atual
-      const currentPath = location.pathname
-      let surveyType = "telefonica" // padrão
+      // Perguntas fixas para o modo apresentação - Tema: Popularidade tracking
+      const fixedQuestions = [
+        "Como você avalia o desempenho do Governo Federal? Você diria que ele está sendo ótimo, bom, regular, ruim ou péssimo? (ESTIMULADA E ÚNICA)",
+        "E você aprova ou desaprova o desempenho do Governo Federal? (ESTIMULADA E ÚNICA)",
+        "E na sua avaliação, o desempenho do Governo Federal é regular mais para positivo ou regular mais para negativo? (ESTIMULADA E ÚNICA)",
+        "E você aprova ou desaprova o trabalho do Presidente da República? (ESTIMULADA E ÚNICA)"
+      ]
 
-      if (currentPath.includes("/f2f/")) {
-        surveyType = "f2f"
-      }
-
-      // Buscar temas baseado no tipo de pesquisa
-      const params = {}
-      if (surveyType === "f2f") {
-        params.type = "f2f"
-      } else if (surveyType === "telefonica") {
-        params.type = "telephonic"
-      }
-
-      const themesResponse = await ApiBase.get("/api/data/themes", { params })
-
-      // Encontrar o tema de popularidade baseado no tipo de pesquisa
-      let popularidadeTheme = null
-      if (surveyType === "f2f") {
-        popularidadeTheme = themesResponse.data.themes.find((t) => t.theme === "Popularidade Face a Face")
-      } else {
-        popularidadeTheme = themesResponse.data.themes.find((t) => t.theme === "Popularidade tracking")
-      }
+      // Buscar o tema Popularidade tracking
+      const themesResponse = await ApiBase.get("/api/data/themes", { params: { type: "telephonic" } })
+      const popularidadeTheme = themesResponse.data.themes.find((t) => t.theme === "Popularidade tracking")
 
       if (!popularidadeTheme) {
-        console.error(`Theme de popularidade não encontrado para o tipo ${surveyType}.`)
+        console.error("Theme 'Popularidade tracking' não encontrado.")
         return
       }
 
       // Buscar perguntas agrupadas do tema
-      const questionParams = { ...params }
       const response = await ApiBase.get(
         `/api/data/themes/${encodeURIComponent(popularidadeTheme.theme)}/questions-grouped`,
-        { params: questionParams },
+        { params: { type: "telephonic" } },
       )
 
       if (response.data.success) {
-        const sortedQuestions = response.data.questionGroups
-          .filter((g) => g.type === "text-grouped" && g.rounds?.length > 1) // Only individual questions with history
-          .sort((a, b) => (b.rounds?.length || 0) - (a.rounds?.length || 0))
-        setTopQuestions(sortedQuestions.slice(0, 5))
+        // Filtrar apenas as perguntas fixas definidas
+        const selectedQuestions = response.data.questionGroups
+          .filter((g) => g.type === "text-grouped" && fixedQuestions.includes(g.questionText))
+          .sort((a, b) => {
+            // Ordenar na ordem das perguntas fixas
+            const indexA = fixedQuestions.indexOf(a.questionText)
+            const indexB = fixedQuestions.indexOf(b.questionText)
+            return indexA - indexB
+          })
+
+        console.log(`✅ Perguntas fixas carregadas para apresentação: ${selectedQuestions.length}`)
+        setTopQuestions(selectedQuestions)
       }
     } catch (error) {
-      console.error("Failed to fetch top questions for presentation mode:", error)
+      console.error("Failed to fetch fixed questions for presentation mode:", error)
     }
-  }, [location.pathname])
+  }, [])
 
   const startPresentationMode = useCallback(() => {
     // Don't start if already in presentation mode or no questions are loaded
@@ -83,7 +76,7 @@ export const PresentationModeManager = () => {
     currentQuestionIndexRef.current = 0
     const firstQuestion = topQuestions[0]
     navigate(
-      `/dashboard?theme=${encodeURIComponent(firstQuestion.theme)}&questionText=${encodeURIComponent(firstQuestion.questionText)}`,
+      `/dashboard?theme=${encodeURIComponent(firstQuestion.theme)}&questionText=${encodeURIComponent(firstQuestion.questionText)}&type=telephonic`,
     )
 
     if (presentationIntervalRef.current) clearInterval(presentationIntervalRef.current)
@@ -93,7 +86,7 @@ export const PresentationModeManager = () => {
       const nextQuestion = topQuestions[currentQuestionIndexRef.current]
       console.log(`Switching to question ${currentQuestionIndexRef.current + 1}: ${nextQuestion.questionText}`)
       navigate(
-        `/dashboard?theme=${encodeURIComponent(nextQuestion.theme)}&questionText=${encodeURIComponent(nextQuestion.questionText)}`,
+        `/dashboard?theme=${encodeURIComponent(nextQuestion.theme)}&questionText=${encodeURIComponent(nextQuestion.questionText)}&type=telephonic`,
       )
     }, PRESENTATION_INTERVAL)
   }, [navigate, topQuestions, isPresentationMode])
