@@ -119,100 +119,78 @@ const PeriodDropdown = ({
     });
   }, [allHistoricalData, surveyDateMap, formatChartXAxis]);
 
-  const relativePeriods = React.useMemo(() => {
-    if (!availablePeriods.length) return [];
-    
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    
-    const periods = [];
-    
-    // Último mês
-    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-    const lastMonthPeriods = availablePeriods.filter(p => 
-      p.year === lastMonthYear && p.round === lastMonth
-    );
-    if (lastMonthPeriods.length > 0) {
-      periods.push({
-        type: 'relative',
-        key: 'last_month',
-        label: 'Último Mês',
-        periods: lastMonthPeriods.map(p => p.period)
-      });
-    }
-    
-    // Últimos 3 meses
-    const last3Months = [];
-    for (let i = 0; i < 3; i++) {
-      let month = currentMonth - i;
-      let year = currentYear;
-      if (month <= 0) {
-        month += 12;
-        year -= 1;
-      }
-      last3Months.push({ year, month });
-    }
-    const last3MonthsPeriods = availablePeriods.filter(p => 
-      last3Months.some(m => p.year === m.year && p.round === m.month)
-    );
-    if (last3MonthsPeriods.length > 0) {
-      periods.push({
-        type: 'relative',
-        key: 'last_3_months',
-        label: 'Últimos 3 Meses',
-        periods: last3MonthsPeriods.map(p => p.period)
-      });
-    }
-    
-    // Últimos 6 meses
-    const last6Months = [];
-    for (let i = 0; i < 6; i++) {
-      let month = currentMonth - i;
-      let year = currentYear;
-      if (month <= 0) {
-        month += 12;
-        year -= 1;
-      }
-      last6Months.push({ year, month });
-    }
-    const last6MonthsPeriods = availablePeriods.filter(p => 
-      last6Months.some(m => p.year === m.year && p.round === m.month)
-    );
-    if (last6MonthsPeriods.length > 0) {
-      periods.push({
-        type: 'relative',
-        key: 'last_6_months',
-        label: 'Últimos 6 Meses',
-        periods: last6MonthsPeriods.map(p => p.period)
-      });
-    }
-    
-    // Último ano
-    const lastYearPeriods = availablePeriods.filter(p => p.year === currentYear - 1);
-    if (lastYearPeriods.length > 0) {
-      periods.push({
-        type: 'relative',
-        key: 'last_year',
-        label: 'Ano Passado',
-        periods: lastYearPeriods.map(p => p.period)
-      });
-    }
-    
-    // Ano atual
-    const currentYearPeriods = availablePeriods.filter(p => p.year === currentYear);
-    if (currentYearPeriods.length > 0) {
-      periods.push({
-        type: 'relative',
-        key: 'current_year',
-        label: 'Ano Atual',
-        periods: currentYearPeriods.map(p => p.period)
-      });
-    }
-    
-    return periods;
-  }, [availablePeriods]);
+    const relativePeriods = React.useMemo(() => {
+        if (!availablePeriods.length) return [];
+        
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1;
+        
+        const periods = [];
+        
+        // Ordenar períodos do mais recente para o mais antigo
+        const sortedPeriods = [...availablePeriods].sort((a, b) => {
+        if (b.year !== a.year) return b.year - a.year;
+        return b.round - a.round;
+        });
+        
+        // Último mês (rodada mais recente)
+        if (sortedPeriods.length > 0) {
+        const mostRecent = sortedPeriods[0];
+        periods.push({
+            type: 'relative',
+            key: 'last_month',
+            label: 'Último Mês',
+            periods: [mostRecent.period]
+        });
+        }
+        
+        // Últimos 3 meses (últimas 3 rodadas)
+        if (sortedPeriods.length >= 3) {
+        const last3 = sortedPeriods.slice(0, 3);
+        periods.push({
+            type: 'relative',
+            key: 'last_3_months',
+            label: 'Últimos 3 Meses',
+            periods: last3.map(p => p.period)
+        });
+        }
+        
+        // Últimos 6 meses (últimas 6 rodadas)
+        if (sortedPeriods.length >= 6) {
+        const last6 = sortedPeriods.slice(0, 6);
+        periods.push({
+            type: 'relative',
+            key: 'last_6_months',
+            label: 'Últimos 6 Meses',
+            periods: last6.map(p => p.period)
+        });
+        }
+        
+        // Ano atual
+        const currentYearPeriods = availablePeriods.filter(p => p.year === currentYear);
+        if (currentYearPeriods.length > 0) {
+        periods.push({
+            type: 'relative',
+            key: 'current_year',
+            label: 'Ano Atual',
+            periods: currentYearPeriods.map(p => p.period)
+        });
+        }
+        
+        // Ano passado
+        const lastYearPeriods = availablePeriods.filter(p => p.year === currentYear - 1);
+        if (lastYearPeriods.length > 0) {
+        periods.push({
+            type: 'relative',
+            key: 'last_year',
+            label: 'Ano Passado',
+            periods: lastYearPeriods.map(p => p.period)
+        });
+        }
+        
+        return periods;
+    }, [availablePeriods]);
 
   const handlePeriodSelect = (selectedValue) => {
     if (selectedValue === 'all') {

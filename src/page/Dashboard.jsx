@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useEffect } from "react"
+import { useState, useMemo, useRef, useEffect, useCallback } from "react" // 1. Importar useCallback
 import { useLocation } from "react-router-dom"
 import ApiBase from "../service/ApiBase"
 import { useQuery } from "@tanstack/react-query"
@@ -106,32 +106,7 @@ export const fetchAllQuestions = async ({ queryKey }) => {
   }
 }
 
-// Função para formatar eixo X do gráfico
-const formatChartXAxis = (period, dateLabel) => {
-  console.log(`🔧 Formatando eixo X - period: ${period}, dateLabel: ${dateLabel}`)
-
-  const roundNumber = period ? period.split("-R")[1] : ""
-
-  if (dateLabel && roundNumber) {
-    const formatted = `R${roundNumber.padStart(2, "0")} - ${dateLabel}`
-    console.log(`✅ Formato com data: ${formatted}`)
-    return formatted
-  }
-
-  if (period) {
-    const parts = period.split("-R")
-    if (parts.length === 2) {
-      const year = parts[0].slice(-2)
-      const round = parts[1].padStart(2, "0")
-      const formatted = `R${round}/${year}`
-      console.log(`⚠️ Formato sem data: ${formatted}`)
-      return formatted
-    }
-  }
-
-  console.log(`❌ Formato padrão: ${period}`)
-  return period || ""
-}
+// 2. A função formatChartXAxis foi removida daqui
 
 // UF demographic key
 const UF_DEMOGRAPHIC_KEY = "UF"
@@ -258,6 +233,42 @@ export default function Dashboard() {
     return map
   }, [allQuestionsData])
 
+  // 3. Mover a função para dentro do componente e envolvê-la com useCallback
+  const formatChartXAxis = useCallback(
+    (period, dateLabel) => {
+      const roundNumber = period ? period.split("-R")[1] : ""
+
+      // Se temos uma label de data, usá-la com o formato correto
+      if (dateLabel && roundNumber) {
+        const formatted = `R${roundNumber.padStart(2, "0")} - ${dateLabel}`
+        return formatted
+      }
+
+      // Fallback se não houver data
+      if (period) {
+        const parts = period.split("-R")
+        if (parts.length === 2) {
+          const year = parts[0]
+          const round = parts[1]
+
+          // Tentar buscar a data do surveyDateMap se disponível
+          const dateFromMap = surveyDateMap.get(round) // Agora surveyDateMap está acessível
+          if (dateFromMap) {
+            const formatted = `R${round.padStart(2, "0")} - ${dateFromMap}`
+            return formatted
+          }
+
+          // Último fallback
+          const formatted = `R${round.padStart(2, "0")}/${year.slice(-2)}`
+          return formatted
+        }
+      }
+
+      return period || ""
+    },
+    [surveyDateMap],
+  ) // A função depende de surveyDateMap
+
   const { questionInfo, allHistoricalData, availableDemographics, mapRoundsWithData } = useMemo(() => {
     if (!data) {
       return { questionInfo: null, allHistoricalData: [], availableDemographics: [], mapRoundsWithData: [] }
@@ -346,8 +357,8 @@ export default function Dashboard() {
     if (!allHistoricalData || allHistoricalData.length === 0) return []
 
     // SEMPRE aplicar normalização NS/NR primeiro
-    const allNormalizedAnswers = allHistoricalData.flatMap((r) => 
-      r.distribution.map((d) => normalizeAndGroupNSNR(d.response))
+    const allNormalizedAnswers = allHistoricalData.flatMap((r) =>
+      r.distribution.map((d) => normalizeAndGroupNSNR(d.response)),
     )
     const useGrouping = shouldGroupResponses(allNormalizedAnswers)
 
@@ -425,10 +436,10 @@ export default function Dashboard() {
 
     // 1. Aplicar filtro de período específico PRIMEIRO
     if (selectedPeriod) {
-      if (selectedPeriod.type === 'relative') {
+      if (selectedPeriod.type === "relative") {
         // Para períodos relativos, filtrar por array de períodos
         filtered = filtered.filter((round) => selectedPeriod.periods.includes(round.period))
-      } else if (selectedPeriod.type === 'specific') {
+      } else if (selectedPeriod.type === "specific") {
         // Para período específico, filtrar por período único
         filtered = filtered.filter((round) => round.period === selectedPeriod.period)
       }
@@ -515,26 +526,19 @@ export default function Dashboard() {
   }, [mapRoundsWithData, selectedMapRoundIndex, questionInfo])
 
   const chartData = useMemo(() => {
-    console.log("🎨 Criando dados do gráfico...")
-
     if (!selectedChartData || selectedChartData.length === 0) {
-      console.log("❌ Sem dados selecionados para o gráfico")
       return []
     }
-
-    console.log(`📊 Processando ${selectedChartData.length} rodadas para o gráfico`)
 
     const dataByPeriod = new Map(selectedChartData.map((d) => [d.period, d]))
     const allPeriods = Array.from(dataByPeriod.keys())
 
-    console.log("🕐 Períodos encontrados:", allPeriods)
-
     // SEMPRE aplicar normalização NS/NR primeiro
-    const allNormalizedResponses = selectedChartData.flatMap((r) => 
-      r.distribution.map((d) => normalizeAndGroupNSNR(d.response))
+    const allNormalizedResponses = selectedChartData.flatMap((r) =>
+      r.distribution.map((d) => normalizeAndGroupNSNR(d.response)),
     )
     const uniqueNormalizedResponses = new Set(allNormalizedResponses)
-    
+
     // Verificar se deve usar agrupamento completo
     const useGrouping = shouldGroupResponses(allNormalizedResponses)
     const responseOrder = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
@@ -552,8 +556,6 @@ export default function Dashboard() {
 
     if (allSeriesIds.size === 0) return []
 
-    console.log("🏷️ Séries identificadas:", Array.from(allSeriesIds))
-
     const series = Array.from(allSeriesIds).map((seriesId) => ({
       id: seriesId,
       data: allPeriods.map((period) => {
@@ -562,18 +564,18 @@ export default function Dashboard() {
 
         if (rodada && rodada.totalWeightedResponses > 0) {
           let weightedCount = 0
-          
+
           rodada.distribution.forEach((dist) => {
             // SEMPRE aplicar normalização NS/NR primeiro
             const normalizedResponse = normalizeAndGroupNSNR(dist.response)
             // Depois aplicar agrupamento se necessário
             const finalResponse = useGrouping ? groupResponses(normalizedResponse) : normalizedResponse
-            
+
             if (finalResponse === seriesId) {
               weightedCount += dist.weightedCount
             }
           })
-          
+
           yValue = (weightedCount / rodada.totalWeightedResponses) * 100
         }
 
@@ -588,11 +590,9 @@ export default function Dashboard() {
       }),
     }))
 
-    console.log("📈 Dados finais do gráfico:", series)
-
     // Filtrar séries duplicadas e ordenar
     const uniqueSeries = new Map()
-    series.forEach(serie => {
+    series.forEach((serie) => {
       if (!uniqueSeries.has(serie.id)) {
         uniqueSeries.set(serie.id, serie)
       }
@@ -608,7 +608,7 @@ export default function Dashboard() {
         return a.id.localeCompare(b.id)
       })
       .filter((serie) => serie.data && serie.data.length > 0)
-  }, [selectedChartData, surveyDateMap])
+  }, [selectedChartData, surveyDateMap, formatChartXAxis])
 
   const getXAxisLabel = (rodada) => {
     if (!rodada || !surveyDateMap) return "N/A"
