@@ -15,6 +15,7 @@ import {
   GROUPED_RESPONSE_ORDER,
   RESPONSE_ORDER,
 } from "../utils/chartUtils"
+import { sortMapResponses } from "../utils/questionGrouping"
 import { DEMOGRAPHIC_LABELS } from "../utils/demographicUtils"
 import LoadingWithProgress from "./dashboard/loading-with-progress"
 import ErrorState from "./dashboard/error-state"
@@ -144,6 +145,7 @@ export default function Dashboard() {
   const [numberOfRoundsToShow, setNumberOfRoundsToShow] = useState(10)
   const [selectedMapRoundIndex, setSelectedMapRoundIndex] = useState(0)
   const [selectedPeriod, setSelectedPeriod] = useState(null) // NOVO: Estado para período específico
+  const [selectedMapResponse, setSelectedMapResponse] = useState(null)
 
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [loadingStage, setLoadingStage] = useState("")
@@ -339,6 +341,31 @@ export default function Dashboard() {
     }
   }, [data, questionText])
 
+  const availableMapResponses = useMemo(() => {
+    if (!allHistoricalData || allHistoricalData.length === 0) return []
+
+    const allAnswers = new Set()
+    const useGrouping = shouldGroupResponses(allHistoricalData.flatMap((r) => r.distribution.map((d) => d.response)))
+
+    allHistoricalData.forEach((round) => {
+      round.distribution.forEach((dist) => {
+        const answer = dist.response
+        if (answer) {
+          const finalAnswer = useGrouping ? groupResponses(answer) : answer
+          allAnswers.add(finalAnswer)
+        }
+      })
+    })
+
+    return sortMapResponses(Array.from(allAnswers))
+  }, [allHistoricalData])
+
+  useEffect(() => {
+    if (availableMapResponses.length > 0 && !selectedMapResponse) {
+      setSelectedMapResponse(availableMapResponses[0])
+    }
+  }, [availableMapResponses, selectedMapResponse])
+
   const handleFilterChange = (demographicKey, value, checked) => {
     setFilters((prevFilters) => {
       const newFilters = {}
@@ -390,7 +417,7 @@ export default function Dashboard() {
 
     // 1. Aplicar filtro de período específico PRIMEIRO
     if (selectedPeriod) {
-      filtered = filtered.filter(round => round.period === selectedPeriod.period)
+      filtered = filtered.filter((round) => round.period === selectedPeriod.period)
     }
 
     // 2. Aplicar filtros demográficos
@@ -643,6 +670,9 @@ export default function Dashboard() {
             activeFilters={filters}
             onFilterToggle={handleQuickFilterToggle}
             getXAxisLabel={getXAxisLabel}
+            availableMapResponses={availableMapResponses}
+            selectedMapResponse={selectedMapResponse}
+            onMapResponseChange={setSelectedMapResponse}
           />
         </div>
       </div>

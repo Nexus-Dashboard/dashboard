@@ -3,16 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as d3 from "d3"
 import { Box, Typography, Grid } from "@mui/material"
-import { OverlayTrigger, Tooltip } from "react-bootstrap"
-import {
-  normalizeAnswer,
-  getResponseColor,
-  groupResponses,
-  shouldGroupResponses,
-  groupedResponseColorMap,
-  GROUPED_RESPONSE_ORDER,
-  RESPONSE_ORDER,
-} from "../utils/chartUtils"
+import { normalizeAnswer, groupResponses, shouldGroupResponses } from "../utils/chartUtils"
+import { MAP_RESPONSE_BASE_COLORS } from "../utils/questionGrouping"
 
 const ABBR_TO_STATE_NAMES = {
   AC: "Acre",
@@ -44,14 +36,17 @@ const ABBR_TO_STATE_NAMES = {
   TO: "Tocantins",
 }
 
-// Reverse mapping: full state name to abbreviation
 const STATE_NAME_TO_ABBR = Object.fromEntries(Object.entries(ABBR_TO_STATE_NAMES).map(([abbr, name]) => [name, abbr]))
 
-const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => {
+const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selectedMapResponse }) => {
   const svgRef = useRef(null)
   const [geoData, setGeoData] = useState(null)
   const [hoveredState, setHoveredState] = useState(null)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  // Linha corrigida
+  const [colorScale, setColorScale] = useState(() =>
+    d3.scaleLinear().domain([0, 100]).range(["#e9ecef", "#e9ecef"])
+  );
 
   useEffect(() => {
     fetch("/brazil-states.json")
@@ -61,16 +56,18 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
   }, [])
 
   const mapData = useMemo(() => {
-    if (!responses || responses.length === 0 || !selectedQuestion?.variable)
-      return { stateResults: new Map(), useGrouping: false }
+    if (!responses || responses.length === 0 || !selectedQuestion?.variable) {
+      return { stateResults: new Map(), useGrouping: false, availableResponses: [] }
+    }
 
     const questionKey = selectedQuestion.variable
     const stateResults = new Map()
     const allAnswersInMap = new Set(responses.map((r) => normalizeAnswer(r[questionKey])).filter(Boolean))
     const useGrouping = shouldGroupResponses(Array.from(allAnswersInMap))
+    const availableResponses = new Set()
 
     responses.forEach((response) => {
-      const stateName = response.UF // This comes as full state name from API
+      const stateName = response.UF
       if (!stateName || !STATE_NAME_TO_ABBR[stateName]) return
 
       const stateAbbr = STATE_NAME_TO_ABBR[stateName]
@@ -78,6 +75,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
       if (!answer) return
 
       const finalAnswer = useGrouping ? groupResponses(answer) : answer
+      availableResponses.add(finalAnswer)
 
       if (!stateResults.has(stateAbbr)) {
         stateResults.set(stateAbbr, {
@@ -85,6 +83,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
           name: stateName,
           counts: {},
           total: 0,
+          percentages: {},
         })
       }
 
@@ -95,50 +94,73 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
 
     stateResults.forEach((stateData) => {
       if (stateData.total > 0) {
-        stateData.dominantResponse = Object.keys(stateData.counts).reduce((a, b) =>
-          stateData.counts[a] > stateData.counts[b] ? a : b,
-        )
-
-        // Calculate percentage for the dominant response
-        stateData.dominantPercentage = ((stateData.counts[stateData.dominantResponse] / stateData.total) * 100).toFixed(1)
-        
-        // Calculate margin of error: √(1/N) * 100 (em pontos percentuais)
+        Object.keys(stateData.counts).forEach((response) => {
+          stateData.percentages[response] = (stateData.counts[response] / stateData.total) * 100
+        })
         stateData.marginOfError = Math.sqrt(1 / stateData.total) * 100
       }
     })
 
-    return { stateResults, useGrouping }
+    return { stateResults, useGrouping, availableResponses: Array.from(availableResponses) }
   }, [responses, selectedQuestion])
 
-  // Função para calcular a margem de erro
+  useEffect(() => {
+    if (!selectedMapResponse || !mapData.stateResults.size) {
+      const defaultScale = d3.scaleLinear().domain([0, 100]).range(["#e9ecef", "#e9ecef"]).clamp(true);
+      // CORREÇÃO AQUI
+      setColorScale(() => defaultScale);
+      return;
+    }
+
+    const baseColor = MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#9e9e9e";
+    const lightColor = d3.color(baseColor).brighter(2.5).formatHex();
+
+    const percentages = Array.from(mapData.stateResults.values())
+      .map((state) => state.percentages[selectedMapResponse] || 0)
+      .filter((p) => p > 0);
+
+    const maxPercentage = percentages.length > 0 ? Math.max(...percentages) : 100;
+
+    const scale = d3.scaleLinear().domain([0, maxPercentage]).range([lightColor, baseColor]).clamp(true);
+
+    // CORREÇÃO AQUI
+    setColorScale(() => scale);
+}, [selectedMapResponse, mapData]);
+
   const calculateMarginOfError = (n) => {
     if (!n || n === 0) return 0
-    return Math.sqrt(1 / n) * 100 // Em pontos percentuais
+    return Math.sqrt(1 / n) * 100
   }
 
-  // Criar tooltip content
   const renderTooltipContent = (stateData, stateAbbr) => {
     if (!stateData) {
       return (
         <div>
-          <strong>{ABBR_TO_STATE_NAMES[stateAbbr] || stateAbbr}</strong><br/>
+          <strong>{ABBR_TO_STATE_NAMES[stateAbbr] || stateAbbr}</strong>
+          <br />
           <span className="text-muted">Sem dados disponíveis</span>
         </div>
       )
     }
 
+    const percentage = stateData.percentages?.[selectedMapResponse]
     const marginOfError = calculateMarginOfError(stateData.total)
 
     return (
       <div>
-        <strong>{stateData.name}</strong><br/>
-        <span style={{ color: '#28a745', fontWeight: 'bold' }}>
-          {stateData.dominantResponse}: {stateData.dominantPercentage}%
-        </span><br/>
-        <span className="text-white">
-          Total: {stateData.total} respostas
-        </span><br/>
-        <span className="text-white" style={{ fontSize: '0.85em' }}>
+        <strong>{stateData.name}</strong>
+        <br />
+        {typeof percentage !== "undefined" ? (
+          <span style={{ color: colorScale(percentage), fontWeight: "bold" }}>
+            {selectedMapResponse}: {percentage.toFixed(1)}%
+          </span>
+        ) : (
+          <span style={{ color: "#ccc" }}>{selectedMapResponse}: N/A</span>
+        )}
+        <br />
+        <span className="text-white">Total: {stateData.total} respostas</span>
+        <br />
+        <span className="text-white" style={{ fontSize: "0.85em" }}>
           Margem de erro: ±{marginOfError.toFixed(1)}pp
         </span>
       </div>
@@ -148,18 +170,15 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
   useEffect(() => {
     if (!geoData || !svgRef.current) return
 
-    const { stateResults, useGrouping } = mapData
-    const colorFn = useGrouping ? (d) => groupedResponseColorMap[d] : getResponseColor
+    const { stateResults } = mapData
 
     const svg = d3.select(svgRef.current)
     svg.selectAll("*").remove()
 
-    // Get container dimensions
     const container = svgRef.current.parentElement
     const containerWidth = container.clientWidth
     const containerHeight = container.clientHeight
 
-    // Use container dimensions with some padding
     const width = Math.max(containerWidth - 20, 400)
     const height = Math.max(containerHeight - 20, 300)
 
@@ -176,7 +195,10 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
       .attr("d", path)
       .attr("fill", (d) => {
         const stateData = stateResults.get(d.properties.sigla)
-        return stateData?.dominantResponse ? colorFn(stateData.dominantResponse) : "#e9ecef"
+        if (stateData && selectedMapResponse && typeof stateData.percentages[selectedMapResponse] !== "undefined") {
+          return colorScale(stateData.percentages[selectedMapResponse])
+        }
+        return "#e9ecef"
       })
       .attr("stroke", "#fff")
       .attr("stroke-width", 0.5)
@@ -184,24 +206,19 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
       .on("mouseover", function (event, d) {
         d3.select(this).attr("stroke", "#343a40").attr("stroke-width", 2)
         const stateData = stateResults.get(d.properties.sigla)
-        
-        // Atualizar estado do hover
         setHoveredState({
           abbr: d.properties.sigla,
-          data: stateData
+          data: stateData,
         })
-        
-        // Atualizar posição do mouse
         setMousePosition({
           x: event.pageX,
-          y: event.pageY
+          y: event.pageY,
         })
       })
       .on("mousemove", (event) => {
-        // Atualizar posição do mouse durante o movimento
         setMousePosition({
           x: event.pageX,
-          y: event.pageY
+          y: event.pageY,
         })
       })
       .on("mouseout", function () {
@@ -213,37 +230,49 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
           onStateClick(d.properties.sigla)
         }
       })
-  }, [geoData, mapData, onStateClick])
+  }, [geoData, mapData, onStateClick, colorScale, selectedMapResponse])
 
-  const legendData = useMemo(() => {
-    const { stateResults, useGrouping } = mapData
-    if (stateResults.size === 0) return []
+  const ColorScaleLegend = ({ scale }) => {
+    // ADICIONE ESTA VERIFICAÇÃO
+    if (!scale || typeof scale.domain !== 'function') {
+      return null;
+    }
+  
+    const legendHeight = 20;
+    const legendWidth = 150;
+    const domain = scale.domain();
+    const range = scale.range();
 
-    const legendMap = new Map()
-    const orderToUse = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
+    if (!domain || domain.length < 2 || !range) return null;
 
-    stateResults.forEach((data) => {
-      if (data.dominantResponse) {
-        if (!legendMap.has(data.dominantResponse)) {
-          legendMap.set(data.dominantResponse, {
-            response: data.dominantResponse,
-            count: 0,
-            order: orderToUse.indexOf(data.dominantResponse),
-          })
-        }
-        legendMap.get(data.dominantResponse).count++
-      }
-    })
+    const gradientId = `legend-gradient-${selectedMapResponse?.replace(/\s/g, "-")}`
 
-    return Array.from(legendMap.values()).sort((a, b) => {
-      if (a.order !== -1 && b.order !== -1) return a.order - b.order
-      return a.response.localeCompare(b.response)
-    })
-  }, [mapData])
+    return (
+      <Box sx={{ mt: 1 }}>
+        <Typography variant="caption" sx={{ fontWeight: "bold", display: "block", mb: 0.5 }}>
+          Intensidade (%)
+        </Typography>
+        <svg width={legendWidth} height={legendHeight + 15}>
+          <defs>
+            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor={range[0]} />
+              <stop offset="100%" stopColor={range[1]} />
+            </linearGradient>
+          </defs>
+          <rect x="0" y="0" width={legendWidth} height={legendHeight} fill={`url(#${gradientId})`} />
+          <text x="0" y={legendHeight + 12} fill="#6c757d" fontSize="12">
+            {domain[0].toFixed(0)}%
+          </text>
+          <text x={legendWidth} y={legendHeight + 12} fill="#6c757d" fontSize="12" textAnchor="end">
+            {domain[1].toFixed(0)}%
+          </text>
+        </svg>
+      </Box>
+    )
+  }
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column", position: "relative" }}>
-      {/* Tooltip personalizado */}
       {hoveredState && (
         <div
           style={{
@@ -260,7 +289,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
             pointerEvents: "none",
             maxWidth: "250px",
             boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
-            border: "1px solid rgba(255, 255, 255, 0.2)"
+            border: "1px solid rgba(255, 255, 255, 0.2)",
           }}
         >
           {renderTooltipContent(hoveredState.data, hoveredState.abbr)}
@@ -268,7 +297,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
       )}
 
       <Grid container spacing={2} sx={{ height: "100%" }}>
-        <Grid item xs={8} sx={{ height: "100%" }}>
+        <Grid item xs={12} md={8} sx={{ height: "100%" }}>
           <Box sx={{ width: "100%", height: "100%", minHeight: "300px" }}>
             <svg
               ref={svgRef}
@@ -280,38 +309,15 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
             />
           </Box>
         </Grid>
-        <Grid item xs={4} sx={{ height: "100%", overflow: "auto" }}>
+        <Grid item xs={12} md={4} sx={{ height: "100%", overflow: "auto" }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold" }}>
             Legenda
           </Typography>
-          {legendData.length > 0 ? (
-            legendData.map(({ response, count }) => (
-              <Box key={response} sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                <Box
-                  sx={{
-                    width: 18,
-                    height: 18,
-                    backgroundColor: mapData.useGrouping
-                      ? groupedResponseColorMap[response]
-                      : getResponseColor(response),
-                    mr: 1.5,
-                    borderRadius: "4px",
-                    flexShrink: 0,
-                  }}
-                />
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 500, fontSize: "0.8rem" }}>
-                    {response}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {count} {count > 1 ? "estados" : "estado"}
-                  </Typography>
-                </Box>
-              </Box>
-            ))
+          {selectedMapResponse ? (
+            <ColorScaleLegend scale={colorScale} />
           ) : (
             <Typography variant="body2" color="text.secondary">
-              Sem dados para exibir
+              Selecione uma resposta para ver a legenda.
             </Typography>
           )}
         </Grid>

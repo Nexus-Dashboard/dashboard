@@ -3,40 +3,40 @@
 // Função para criar uma chave única baseada nas possíveis respostas
 export const createAnswerTypeKey = (possibleAnswers) => {
   if (!possibleAnswers || possibleAnswers.length === 0) {
-    return "no-answers";
+    return "no-answers"
   }
 
   // Ordenar e criar hash das respostas para agrupar perguntas similares
   const sortedLabels = possibleAnswers
     .map((answer) => answer.label)
     .sort()
-    .join("|");
+    .join("|")
 
-  return btoa(sortedLabels).substring(0, 10); // Base64 truncado para chave única
-};
+  return btoa(sortedLabels).substring(0, 10) // Base64 truncado para chave única
+}
 
 // Função para obter título do grupo baseado no tipo de resposta
 export const getAnswerTypeTitle = (possibleAnswers) => {
   if (!possibleAnswers || possibleAnswers.length === 0) {
-    return "Perguntas Abertas";
+    return "Perguntas Abertas"
   }
 
-  const labels = possibleAnswers.map((a) => a.label.toLowerCase());
+  const labels = possibleAnswers.map((a) => a.label.toLowerCase())
 
   // Detectar tipos comuns de resposta
   if (labels.some((l) => l.includes("ótimo") && l.includes("péssimo"))) {
-    return "Avaliação (Ótimo a Péssimo)";
+    return "Avaliação (Ótimo a Péssimo)"
   }
   if (labels.some((l) => l.includes("aprova") && l.includes("desaprova"))) {
-    return "Aprovação/Desaprovação";
+    return "Aprovação/Desaprovação"
   }
   if (labels.some((l) => l.includes("sim") && l.includes("não"))) {
-    return "Sim/Não";
+    return "Sim/Não"
   }
   // ... (outras lógicas existentes)
 
-  return `Múltipla Escolha (${possibleAnswers.length} opções)`;
-};
+  return `Múltipla Escolha (${possibleAnswers.length} opções)`
+}
 
 // =============================================================================
 // NOVA CONFIGURAÇÃO PARA O MAPA INTERATIVO
@@ -60,7 +60,7 @@ export const MAP_RESPONSE_BASE_COLORS = {
   Não: "#db4437",
   "Não sabe": "#9e9e9e",
   "Não respondeu": "#9e9e9e",
-};
+}
 
 /**
  * Ordem de exibição das respostas na caixa de seleção do mapa.
@@ -77,14 +77,14 @@ export const MAP_RESPONSE_ORDER = [
   "NS/NR",
   "Não sabe",
   "Não respondeu",
-];
+]
 
 // Função para obter descrição do grupo
 export const getAnswerTypeDescription = (possibleAnswers) => {
   if (!possibleAnswers || possibleAnswers.length === 0) {
     return "Perguntas com respostas em texto livre"
   }
-  
+
   return `${possibleAnswers.length} opções de resposta disponíveis`
 }
 
@@ -94,46 +94,46 @@ export const getAnswerTypeColor = (possibleAnswers) => {
     return "secondary"
   }
 
-  const labels = possibleAnswers.map(a => a.label.toLowerCase())
-  
-  if (labels.some(l => l.includes("ótimo") && l.includes("péssimo"))) {
+  const labels = possibleAnswers.map((a) => a.label.toLowerCase())
+
+  if (labels.some((l) => l.includes("ótimo") && l.includes("péssimo"))) {
     return "success"
   }
-  if (labels.some(l => l.includes("aprova") && l.includes("desaprova"))) {
+  if (labels.some((l) => l.includes("aprova") && l.includes("desaprova"))) {
     return "warning"
   }
-  if (labels.some(l => l.includes("sim") && l.includes("não"))) {
+  if (labels.some((l) => l.includes("sim") && l.includes("não"))) {
     return "info"
   }
-  if (labels.some(l => l.includes("muito") && l.includes("pouco"))) {
+  if (labels.some((l) => l.includes("muito") && l.includes("pouco"))) {
     return "primary"
   }
-  
+
   return "primary"
 }
 
 // Função principal para agrupar perguntas por tipo de resposta
 export const groupQuestionsByAnswerType = (questions) => {
   // ... lógica original
-  const groups = {};
+  const groups = {}
 
   questions.forEach((question) => {
-    const answerKey = createAnswerTypeKey(question.possibleAnswers || []);
+    const answerKey = createAnswerTypeKey(question.possibleAnswers || [])
     if (!groups[answerKey]) {
       groups[answerKey] = {
         key: answerKey,
         title: getAnswerTypeTitle(question.possibleAnswers || []),
         // ...outras propriedades
         questions: [],
-      };
+      }
     }
-    groups[answerKey].questions.push(question);
-  });
+    groups[answerKey].questions.push(question)
+  })
   return Object.values(groups).reduce((acc, group) => {
-    acc[group.key] = group;
-    return acc;
-  }, {});
-};
+    acc[group.key] = group
+    return acc
+  }, {})
+}
 
 // Função para verificar se duas perguntas têm o mesmo tipo de resposta
 export const haveSameAnswerType = (question1, question2) => {
@@ -146,20 +146,19 @@ export const haveSameAnswerType = (question1, question2) => {
 export const getGroupingStats = (questions) => {
   const grouped = groupQuestionsByAnswerType(questions)
   const groups = Object.values(grouped)
-  
+
   return {
     totalQuestions: questions.length,
     totalGroups: groups.length,
-    largestGroup: groups.reduce((max, group) => 
-      group.questions.length > max.questions.length ? group : max, 
-      { questions: [] }
-    ),
+    largestGroup: groups.reduce((max, group) => (group.questions.length > max.questions.length ? group : max), {
+      questions: [],
+    }),
     averageQuestionsPerGroup: Math.round(questions.length / groups.length),
-    groupDistribution: groups.map(group => ({
+    groupDistribution: groups.map((group) => ({
       title: group.title,
       count: group.questions.length,
-      percentage: Math.round((group.questions.length / questions.length) * 100)
-    }))
+      percentage: Math.round((group.questions.length / questions.length) * 100),
+    })),
   }
 }
 
@@ -167,27 +166,50 @@ export const getGroupingStats = (questions) => {
 // NOVAS FUNÇÕES PARA ORDENAÇÃO DE LEGENDAS EM GRÁFICOS
 // =============================================================================
 
+/**
+ * Ordena um array de respostas com base na ordem definida em MAP_RESPONSE_ORDER.
+ * @param {string[]} responses - Array de respostas a serem ordenadas.
+ * @returns {string[]} - Array de respostas ordenado.
+ */
+export const sortMapResponses = (responses) => {
+  return [...responses].sort((a, b) => {
+    const indexA = MAP_RESPONSE_ORDER.indexOf(a)
+    const indexB = MAP_RESPONSE_ORDER.indexOf(b)
+
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB // Ambos estão na lista, ordenar por índice
+    }
+    if (indexA !== -1) {
+      return -1 // A está na lista, B não -> A vem primeiro
+    }
+    if (indexB !== -1) {
+      return 1 // B está na lista, A não -> B vem primeiro
+    }
+    return a.localeCompare(b) // Nenhum está na lista, ordenar alfabeticamente
+  })
+}
+
 // Ordem de prioridade para legendas de gráficos (do melhor para o pior)
 export const CHART_LEGEND_ORDER = [
   // Respostas agrupadas (ordem preferencial)
   "Ótimo/Bom",
-  "Regular", 
+  "Regular",
   "Ruim/Péssimo",
   "NS/NR",
-  
+
   // Respostas individuais (fallback)
   "Ótimo",
-  "Bom", 
+  "Bom",
   "Regular mais para positivo",
   "Regular",
   "Regular mais para negativo",
   "Ruim",
   "Péssimo",
-  
+
   // Aprovação
   "Aprova",
   "Desaprova",
-  
+
   // Outros
   "Sim",
   "Não",
@@ -195,10 +217,10 @@ export const CHART_LEGEND_ORDER = [
   "Pouco",
   "Melhor",
   "Pior",
-  
+
   // Neutros/Não sei (sempre por último)
   "Não sabe",
-  "Não respondeu"
+  "Não respondeu",
 ]
 
 /**
@@ -209,36 +231,34 @@ export const CHART_LEGEND_ORDER = [
  */
 export const createOrderedChartLegend = (chartData, colorFunction) => {
   if (!chartData || chartData.length === 0) return []
-  
-  const availableSeries = chartData.map(serie => serie.id)
+
+  const availableSeries = chartData.map((serie) => serie.id)
   const orderedLegend = []
-  
+
   // Primeiro: adicionar itens na ordem de prioridade
-  CHART_LEGEND_ORDER.forEach(item => {
+  CHART_LEGEND_ORDER.forEach((item) => {
     if (availableSeries.includes(item)) {
-      const serie = chartData.find(s => s.id === item)
+      const serie = chartData.find((s) => s.id === item)
       orderedLegend.push({
         id: item,
         label: item,
-        color: colorFunction ? colorFunction({ id: item }) : serie.color || "#000"
+        color: colorFunction ? colorFunction({ id: item }) : serie.color || "#000",
       })
     }
   })
-  
+
   // Segundo: adicionar séries que não estão na ordem predefinida (alfabeticamente)
-  const remainingSeries = availableSeries.filter(serieId => 
-    !CHART_LEGEND_ORDER.includes(serieId)
-  ).sort()
-  
-  remainingSeries.forEach(serieId => {
-    const serie = chartData.find(s => s.id === serieId)
+  const remainingSeries = availableSeries.filter((serieId) => !CHART_LEGEND_ORDER.includes(serieId)).sort()
+
+  remainingSeries.forEach((serieId) => {
+    const serie = chartData.find((s) => s.id === serieId)
     orderedLegend.push({
       id: serieId,
       label: serieId,
-      color: colorFunction ? colorFunction({ id: serieId }) : serie.color || "#000"
+      color: colorFunction ? colorFunction({ id: serieId }) : serie.color || "#000",
     })
   })
-  
+
   return orderedLegend
 }
 
@@ -261,11 +281,11 @@ export const sortResponsesByPriority = (responses) => {
   return [...responses].sort((a, b) => {
     const priorityA = getResponsePriority(a)
     const priorityB = getResponsePriority(b)
-    
+
     if (priorityA !== priorityB) {
       return priorityA - priorityB
     }
-    
+
     // Se mesma prioridade, ordenar alfabeticamente
     return a.localeCompare(b)
   })
