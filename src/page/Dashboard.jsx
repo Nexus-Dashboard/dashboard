@@ -23,7 +23,7 @@ import MapCard from "./dashboard/map-card"
 import "./Dashboard.css"
 import { formatApiDateForDisplay } from "../hooks/dateUtils"
 
-
+// Função para buscar dados agrupados
 export const fetchGroupedQuestionData = async ({ queryKey }) => {
   const [, theme, questionText, surveyType] = queryKey
 
@@ -53,114 +53,7 @@ export const fetchGroupedQuestionData = async ({ queryKey }) => {
   }
 }
 
-// Função temporária para buscar dados usando a API individual até a API agrupada estar disponível
-export const fetchQuestionDataFallback = async ({ queryKey }) => {
-  const [, theme, questionText] = queryKey
-  console.log(`🔄 Usando fallback - buscando dados individuais para tema: ${theme}`)
-  console.log(`Question Text: ${questionText}`)
-
-  try {
-    const { data: themeData } = await ApiBase.get(`/api/data/themes/${encodeURIComponent(theme)}/questions-grouped`)
-
-    if (!themeData.success) {
-      throw new Error("Erro ao buscar dados do tema")
-    }
-
-    const questionGroup = themeData.questionGroups.find((group) => group.questionText === questionText)
-
-    if (!questionGroup) {
-      throw new Error("Grupo de perguntas não encontrado")
-    }
-
-    console.log("📊 Grupo encontrado:", questionGroup)
-
-    const allHistoricalData = []
-    const demographicFieldsSet = new Set()
-
-    for (const variable of questionGroup.variables) {
-      try {
-        console.log(`🔍 Buscando dados para variável: ${variable}`)
-        const { data: variableData } = await ApiBase.post(`/api/data/question/${variable}/responses`, {
-          theme: theme,
-          questionText: questionText,
-        })
-
-        if (variableData.success && variableData.historicalData) {
-          variableData.historicalData.forEach((round) => {
-            const existingRound = allHistoricalData.find((r) => r.period === round.period)
-
-            if (existingRound) {
-              round.distribution.forEach((dist) => {
-                const existingDist = existingRound.distribution.find((d) => d.response === dist.response)
-                if (existingDist) {
-                  existingDist.weightedCount += dist.weightedCount
-                  existingDist.count += dist.count
-
-                  if (dist.demographics) {
-                    Object.entries(dist.demographics).forEach(([key, values]) => {
-                      if (!existingDist.demographics[key]) {
-                        existingDist.demographics[key] = []
-                      }
-                      existingDist.demographics[key] = [...existingDist.demographics[key], ...values]
-                    })
-                  }
-                } else {
-                  existingRound.distribution.push({ ...dist })
-                }
-              })
-
-              existingRound.totalWeightedResponses += round.totalWeightedResponses
-              existingRound.totalResponses += round.totalResponses
-            } else {
-              allHistoricalData.push({
-                ...round,
-                variable: variable,
-              })
-            }
-          })
-
-          if (variableData.demographicFields) {
-            variableData.demographicFields.forEach((field) => demographicFieldsSet.add(field))
-          }
-        }
-      } catch (variableError) {
-        console.warn(`⚠️ Erro ao buscar dados para variável ${variable}:`, variableError.message)
-      }
-    }
-
-    allHistoricalData.sort((a, b) => {
-      const [yearA, roundA] = a.period.split("-R").map(Number)
-      const [yearB, roundB] = b.period.split("-R").map(Number)
-      if (yearA !== yearB) return yearA - yearB
-      return roundA - roundB
-    })
-
-    console.log(`✅ Dados combinados: ${allHistoricalData.length} rodadas`)
-
-    return {
-      success: true,
-      searchMethod: "Dados agrupados via fallback",
-      theme: theme,
-      questionInfo: {
-        variables: questionGroup.variables,
-        rounds: questionGroup.rounds,
-        totalVariations: questionGroup.totalVariations,
-        variablesByRound:
-          questionGroup.variations?.reduce((acc, variation) => {
-            acc[variation.surveyNumber] = variation.variable
-            return acc
-          }, {}) || {},
-      },
-      historicalData: allHistoricalData,
-      demographicFields: Array.from(demographicFieldsSet),
-    }
-  } catch (error) {
-    console.error("💥 Erro no fallback:", error.message)
-    throw error
-  }
-}
-
-// Função para buscar TODAS as questões de forma mais robusta
+// Função para buscar todas as questões
 export const fetchAllQuestions = async ({ queryKey }) => {
   const [, surveyType] = queryKey
   console.log(`🔍 Iniciando busca COMPLETA de todas as questões...`)
@@ -211,16 +104,13 @@ export const fetchAllQuestions = async ({ queryKey }) => {
   }
 }
 
-// UF demographic key - adjust this if your API uses a different key for states
-const UF_DEMOGRAPHIC_KEY = "UF"
-
+// Função para formatar eixo X do gráfico
 const formatChartXAxis = (period, dateLabel) => {
   console.log(`🔧 Formatando eixo X - period: ${period}, dateLabel: ${dateLabel}`)
 
   const roundNumber = period ? period.split("-R")[1] : ""
 
   if (dateLabel && roundNumber) {
-    // FORMATO CORRETO: R43 - Jul/25
     const formatted = `R${roundNumber.padStart(2, "0")} - ${dateLabel}`
     console.log(`✅ Formato com data: ${formatted}`)
     return formatted
@@ -241,6 +131,9 @@ const formatChartXAxis = (period, dateLabel) => {
   return period || ""
 }
 
+// UF demographic key
+const UF_DEMOGRAPHIC_KEY = "UF"
+
 export default function Dashboard() {
   const pageRef = useRef(null)
   const chartRef = useRef(null)
@@ -250,6 +143,7 @@ export default function Dashboard() {
   const [filters, setFilters] = useState({})
   const [numberOfRoundsToShow, setNumberOfRoundsToShow] = useState(10)
   const [selectedMapRoundIndex, setSelectedMapRoundIndex] = useState(0)
+  const [selectedPeriod, setSelectedPeriod] = useState(null) // NOVO: Estado para período específico
 
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [loadingStage, setLoadingStage] = useState("")
@@ -349,7 +243,6 @@ export default function Dashboard() {
       if (q.surveyNumber && q.date) {
         const key = q.surveyNumber.toString()
         if (!map.has(key)) {
-          // APLICAR formatApiDateForDisplay aqui
           const formattedDate = formatApiDateForDisplay(q.date)
           map.set(key, formattedDate)
         }
@@ -486,19 +379,33 @@ export default function Dashboard() {
     setFilters({})
   }
 
+  // NOVA FUNÇÃO: Handle mudança de período específico
+  const handlePeriodChange = (periodData) => {
+    setSelectedPeriod(periodData)
+  }
+
+  // NOVA LÓGICA: Filtrar dados históricos por período específico
   const filteredHistoricalData = useMemo(() => {
-    if (!allHistoricalData || Object.keys(filters).length === 0) {
-      return allHistoricalData
+    let filtered = allHistoricalData
+
+    // 1. Aplicar filtro de período específico PRIMEIRO
+    if (selectedPeriod) {
+      filtered = filtered.filter(round => round.period === selectedPeriod.period)
+    }
+
+    // 2. Aplicar filtros demográficos
+    if (Object.keys(filters).length === 0) {
+      return filtered
     }
 
     const filterKey = Object.keys(filters)[0]
     const filterValues = filters[filterKey]
 
     if (!filterKey || !filterValues || filterValues.length === 0) {
-      return allHistoricalData
+      return filtered
     }
 
-    return allHistoricalData.map((round) => {
+    return filtered.map((round) => {
       let totalForFilter = 0
       const distributionForFilter = {}
 
@@ -526,7 +433,7 @@ export default function Dashboard() {
         totalWeightedResponses: totalForFilter,
       }
     })
-  }, [allHistoricalData, filters])
+  }, [allHistoricalData, filters, selectedPeriod])
 
   useEffect(() => {
     if (mapRoundsWithData.length > 0) {
@@ -719,6 +626,11 @@ export default function Dashboard() {
             chartRef={chartRef}
             chartColorFunc={chartColorFunc}
             getXAxisLabel={getXAxisLabel}
+            // NOVAS PROPS para o dropdown de período
+            surveyDateMap={surveyDateMap}
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={handlePeriodChange}
+            formatChartXAxis={formatChartXAxis}
           />
 
           <MapCard

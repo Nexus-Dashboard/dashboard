@@ -2,6 +2,7 @@
 import { Box, Typography } from "@mui/material"
 import { ResponsiveLine } from "@nivo/line"
 import { createOrderedChartLegend } from "../../utils/questionGrouping"
+import PeriodDropdown from "./PeriodFilter"
 
 export default function ChartCard({
   title,
@@ -13,6 +14,11 @@ export default function ChartCard({
   chartRef,
   chartColorFunc,
   getXAxisLabel,
+  // Novas props para o dropdown de período
+  surveyDateMap = new Map(),
+  selectedPeriod = null,
+  onPeriodChange,
+  formatChartXAxis
 }) {
   // Componente de tooltip customizado que usa o sistema nativo do Nivo
   const CustomTooltip = ({ point }) => {
@@ -78,6 +84,22 @@ export default function ChartCard({
       <div className="chart-card-content">
         <Typography className="card-title-custom">{title || "Análise Temporal"}</Typography>
 
+        {/* Linha com período e dropdown lado a lado */}
+        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '13px', fontWeight: '500' }}>
+              Filtrar por período:
+            </Typography>
+            <PeriodDropdown
+              allHistoricalData={allHistoricalData}
+              surveyDateMap={surveyDateMap}
+              selectedPeriods={selectedPeriod}
+              onPeriodChange={onPeriodChange}
+              formatChartXAxis={formatChartXAxis}
+            />
+          </Box>
+        </Box>
+
         {allHistoricalData.length > 1 && (
           <Box sx={{ mb: 3, px: 1 }}>
             {selectedChartData.length > 0 && (
@@ -87,26 +109,36 @@ export default function ChartCard({
               </Typography>
             )}
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-              Exibindo as últimas {numberOfRoundsToShow} de {allHistoricalData.length} rodadas
+              {selectedPeriod ? (
+                selectedPeriod.type === 'relative' ? 
+                  `Exibindo ${selectedChartData.length} rodadas do período: ${selectedPeriod.label}` :
+                  `Exibindo rodada específica: ${selectedPeriod.label}`
+              ) : (
+                `Exibindo as últimas ${numberOfRoundsToShow} de ${allHistoricalData.length} rodadas`
+              )}
             </Typography>
-            <input
-              type="range"
-              min={1}
-              max={allHistoricalData.length || 1}
-              value={numberOfRoundsToShow}
-              onChange={(e) => onRoundsChange?.(Number(e.target.value))}
-              className="single-range-slider"
-              style={{ direction: "rtl" }}
-              aria-label="Selecionar número de rodadas"
-            />
-            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
-              <Typography variant="caption" color="text.secondary">
-                Mais rodadas
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Menos rodadas
-              </Typography>
-            </Box>
+            {!selectedPeriod && (
+              <>
+                <input
+                  type="range"
+                  min={1}
+                  max={allHistoricalData.length || 1}
+                  value={numberOfRoundsToShow}
+                  onChange={(e) => onRoundsChange?.(Number(e.target.value))}
+                  className="single-range-slider"
+                  style={{ direction: "rtl" }}
+                  aria-label="Selecionar número de rodadas"
+                />
+                <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Mais rodadas
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Menos rodadas
+                  </Typography>
+                </Box>
+              </>
+            )}
           </Box>
         )}
 
@@ -169,7 +201,10 @@ export default function ChartCard({
           ) : (
             <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
               <Typography variant="body1" color="text.secondary">
-                Nenhum dado disponível para o período ou filtros selecionados
+                {selectedPeriod 
+                  ? `Nenhum dado disponível para o período selecionado: ${selectedPeriod.label}`
+                  : "Nenhum dado disponível para o período ou filtros selecionados"
+                }
               </Typography>
             </Box>
           )}
