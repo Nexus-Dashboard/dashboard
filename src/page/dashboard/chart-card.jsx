@@ -42,14 +42,14 @@ export default function ChartCard({
           backdropFilter: "blur(10px)"
         }}
       >
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           marginBottom: '8px',
           paddingBottom: '8px',
           borderBottom: '1px solid rgba(255,255,255,0.2)'
         }}>
-          <div 
+          <div
             style={{
               width: '12px',
               height: '12px',
@@ -61,17 +61,17 @@ export default function ChartCard({
           ></div>
           <strong style={{ fontSize: '14px' }}>{period}</strong>
         </div>
-        <div style={{ 
-          color: point.serieColor, 
+        <div style={{
+          color: point.serieColor,
           fontWeight: 'bold',
           marginBottom: '4px',
           fontSize: '14px'
         }}>
           {point.serieId}: {percentage.toFixed(1)}%
         </div>
-        <div style={{ 
-          color: 'rgba(255,255,255,0.8)', 
-          fontSize: '12px' 
+        <div style={{
+          color: 'rgba(255,255,255,0.8)',
+          fontSize: '12px'
         }}>
           Dados da pesquisa
         </div>
@@ -84,61 +84,69 @@ export default function ChartCard({
       <div className="chart-card-content">
         <Typography className="card-title-custom">{title || "Análise Temporal"}</Typography>
 
-        {/* Linha com período e dropdown lado a lado */}
-        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '13px', fontWeight: '500' }}>
-              Filtrar por período:
-            </Typography>
-            <PeriodDropdown
-              allHistoricalData={allHistoricalData}
-              surveyDateMap={surveyDateMap}
-              selectedPeriods={selectedPeriod}
-              onPeriodChange={onPeriodChange}
-              formatChartXAxis={formatChartXAxis}
-            />
-          </Box>
-        </Box>
-
         {allHistoricalData.length > 1 && (
-          <Box sx={{ mb: 3, px: 1 }}>
-            {selectedChartData.length > 0 && (
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-                Período: {getXAxisLabel(selectedChartData[0])} até{" "}
-                {getXAxisLabel(selectedChartData[selectedChartData.length - 1])}
-              </Typography>
-            )}
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
+          <Box sx={{ px: 1 }}>
+            {/* INÍCIO DA SEÇÃO MODIFICADA */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 1 }}>
+              {/* Coluna 1: Dropdown */}
+              <Box sx={{ flex: '1 1 33.33%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                
+                <PeriodDropdown
+                  allHistoricalData={allHistoricalData}
+                  surveyDateMap={surveyDateMap}
+                  selectedPeriods={selectedPeriod}
+                  onPeriodChange={onPeriodChange}
+                  formatChartXAxis={formatChartXAxis}
+                />
+              </Box>
+
+              {/* Coluna 2: Informação de Período */}
+              <Box sx={{ flex: '1 1 33.33%', textAlign: 'center' }}>
+                {selectedChartData.length > 0 && !selectedPeriod && (
+                  <Typography variant="caption" color="text.secondary">
+                    Período: {getXAxisLabel(selectedChartData[0])} até{" "}
+                    {getXAxisLabel(selectedChartData[selectedChartData.length - 1])}
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Coluna 3: Alça de Seleção */}
+              <Box sx={{ flex: '1 1 33.33%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {!selectedPeriod && (
+                  <>
+                    <input
+                      type="range"
+                      min={1}
+                      max={allHistoricalData.length || 1}
+                      value={numberOfRoundsToShow}
+                      onChange={(e) => onRoundsChange?.(Number(e.target.value))}
+                      className="single-range-slider"
+                      style={{ direction: "rtl", width: '100%' }}
+                      aria-label="Selecionar número de rodadas"
+                    />
+                    <Box sx={{ display: "flex", justifyContent: "space-between", width: '100%', mt: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Mais rodadas
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Menos rodadas
+                      </Typography>
+                    </Box>
+                  </>
+                )}
+              </Box>
+            </Box>
+            {/* FIM DA SEÇÃO MODIFICADA */}
+            
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", textAlign: 'left', width: '100%' }}>
               {selectedPeriod ? (
-                selectedPeriod.type === 'relative' ? 
+                selectedPeriod.type === 'relative' ?
                   `Exibindo ${selectedChartData.length} rodadas do período: ${selectedPeriod.label}` :
                   `Exibindo rodada específica: ${selectedPeriod.label}`
               ) : (
                 `Exibindo as últimas ${numberOfRoundsToShow} de ${allHistoricalData.length} rodadas`
               )}
             </Typography>
-            {!selectedPeriod && (
-              <>
-                <input
-                  type="range"
-                  min={1}
-                  max={allHistoricalData.length || 1}
-                  value={numberOfRoundsToShow}
-                  onChange={(e) => onRoundsChange?.(Number(e.target.value))}
-                  className="single-range-slider"
-                  style={{ direction: "rtl" }}
-                  aria-label="Selecionar número de rodadas"
-                />
-                <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Mais rodadas
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Menos rodadas
-                  </Typography>
-                </Box>
-              </>
-            )}
           </Box>
         )}
 
@@ -176,10 +184,10 @@ export default function ChartCard({
               pointLabelYOffset={-12}
               useMesh={true}
               colors={chartColorFunc}
-              
+
               // Usar tooltip customizado do Nivo
               tooltip={CustomTooltip}
-              
+
               legends={[
                 {
                   data: createOrderedChartLegend(chartData, chartColorFunc),
@@ -201,7 +209,7 @@ export default function ChartCard({
           ) : (
             <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
               <Typography variant="body1" color="text.secondary">
-                {selectedPeriod 
+                {selectedPeriod
                   ? `Nenhum dado disponível para o período selecionado: ${selectedPeriod.label}`
                   : "Nenhum dado disponível para o período ou filtros selecionados"
                 }

@@ -23,7 +23,7 @@ const CustomToggle = React.forwardRef(({ children, onClick }, ref) => (
       fontWeight: '500',
       color: '#495057',
       transition: 'all 0.2s ease',
-      minWidth: '200px',
+      width: '100%', // <-- ALTERAÇÃO 1: Garante que o botão ocupe todo o espaço
       justifyContent: 'space-between'
     }}
     onMouseEnter={(e) => {
@@ -43,7 +43,7 @@ const CustomToggle = React.forwardRef(({ children, onClick }, ref) => (
   </div>
 ));
 
-// Custom Menu
+// Custom Menu (sem alterações aqui)
 const CustomMenu = React.forwardRef(
   ({ children, style, className, 'aria-labelledby': labeledBy }, ref) => {
     const [value, setValue] = useState('');
@@ -96,7 +96,7 @@ const PeriodDropdown = ({
   onPeriodChange,
   formatChartXAxis 
 }) => {
-  // Gerar lista de períodos disponíveis usando a mesma lógica do gráfico
+  // ... (lógica interna sem alterações)
   const availablePeriods = React.useMemo(() => {
     if (!allHistoricalData.length) return [];
     
@@ -119,17 +119,16 @@ const PeriodDropdown = ({
     });
   }, [allHistoricalData, surveyDateMap, formatChartXAxis]);
 
-  // Calcular períodos relativos baseados nas datas disponíveis
   const relativePeriods = React.useMemo(() => {
     if (!availablePeriods.length) return [];
     
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // getMonth() retorna 0-11
+    const currentMonth = now.getMonth() + 1;
     
     const periods = [];
     
-    // Último mês (rodadas do mês passado)
+    // Último mês
     const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
     const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
     const lastMonthPeriods = availablePeriods.filter(p => 
@@ -252,10 +251,12 @@ const PeriodDropdown = ({
     return selectedPeriods.label;
   };
 
+
   if (!availablePeriods.length) return null;
 
   return (
-    <Dropdown onSelect={handlePeriodSelect} style={{ minWidth: '200px' }}>
+    // ALTERAÇÃO 2: Container principal do dropdown também ocupará 100% da largura
+    <Dropdown onSelect={handlePeriodSelect} style={{ width: '100%' }}>
       <Dropdown.Toggle as={CustomToggle} id="period-dropdown">
         {getToggleText()}
       </Dropdown.Toggle>
