@@ -28,9 +28,11 @@ export default function MapCard({
 
         {mapRoundsWithData.length > 1 && (
           <Box sx={{ mb: 2 }}>
+            
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-              Rodada: {getXAxisLabel?.(mapRoundsWithData[selectedMapRoundIndex]) || "N/A"}
+              <h5>Rodada: {getXAxisLabel?.(mapRoundsWithData[selectedMapRoundIndex]) || "N/A"}</h5>
             </Typography>
+            
             <input
               type="range"
               min={0}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as d3 from "d3"
 import { Box, Typography, Grid } from "@mui/material"
+import { OverlayTrigger, Tooltip } from "react-bootstrap"
 import {
   normalizeAnswer,
   getResponseColor,
@@ -48,8 +49,9 @@ const STATE_NAME_TO_ABBR = Object.fromEntries(Object.entries(ABBR_TO_STATE_NAMES
 
 const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => {
   const svgRef = useRef(null)
-  const tooltipRef = useRef(null)
   const [geoData, setGeoData] = useState(null)
+  const [hoveredState, setHoveredState] = useState(null)
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
   useEffect(() => {
     fetch("/brazil-states.json")
@@ -98,14 +100,50 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
         )
 
         // Calculate percentage for the dominant response
-        stateData.dominantPercentage = ((stateData.counts[stateData.dominantResponse] / stateData.total) * 100).toFixed(
-          1,
-        )
+        stateData.dominantPercentage = ((stateData.counts[stateData.dominantResponse] / stateData.total) * 100).toFixed(1)
+        
+        // Calculate margin of error: √(1/N) * 100 (em pontos percentuais)
+        stateData.marginOfError = Math.sqrt(1 / stateData.total) * 100
       }
     })
 
     return { stateResults, useGrouping }
   }, [responses, selectedQuestion])
+
+  // Função para calcular a margem de erro
+  const calculateMarginOfError = (n) => {
+    if (!n || n === 0) return 0
+    return Math.sqrt(1 / n) * 100 // Em pontos percentuais
+  }
+
+  // Criar tooltip content
+  const renderTooltipContent = (stateData, stateAbbr) => {
+    if (!stateData) {
+      return (
+        <div>
+          <strong>{ABBR_TO_STATE_NAMES[stateAbbr] || stateAbbr}</strong><br/>
+          <span className="text-muted">Sem dados disponíveis</span>
+        </div>
+      )
+    }
+
+    const marginOfError = calculateMarginOfError(stateData.total)
+
+    return (
+      <div>
+        <strong>{stateData.name}</strong><br/>
+        <span style={{ color: '#28a745', fontWeight: 'bold' }}>
+          {stateData.dominantResponse}: {stateData.dominantPercentage}%
+        </span><br/>
+        <span className="text-white">
+          Total: {stateData.total} respostas
+        </span><br/>
+        <span className="text-white" style={{ fontSize: '0.85em' }}>
+          Margem de erro: ±{marginOfError.toFixed(1)}pp
+        </span>
+      </div>
+    )
+  }
 
   useEffect(() => {
     if (!geoData || !svgRef.current) return
@@ -115,8 +153,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
 
     const svg = d3.select(svgRef.current)
     svg.selectAll("*").remove()
-
-    const tooltip = d3.select(tooltipRef.current)
 
     // Get container dimensions
     const container = svgRef.current.parentElement
@@ -148,24 +184,29 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
       .on("mouseover", function (event, d) {
         d3.select(this).attr("stroke", "#343a40").attr("stroke-width", 2)
         const stateData = stateResults.get(d.properties.sigla)
-        if (stateData) {
-          tooltip.style("opacity", 1).html(`
-              <strong>${stateData.name}</strong><br/>
-              ${stateData.dominantResponse}: ${stateData.dominantPercentage}%<br/>
-              Total: ${stateData.total} respostas
-            `)
-        } else {
-          tooltip
-            .style("opacity", 1)
-            .html(`<strong>${ABBR_TO_STATE_NAMES[d.properties.sigla] || d.properties.sigla}</strong><br/>Sem dados`)
-        }
+        
+        // Atualizar estado do hover
+        setHoveredState({
+          abbr: d.properties.sigla,
+          data: stateData
+        })
+        
+        // Atualizar posição do mouse
+        setMousePosition({
+          x: event.pageX,
+          y: event.pageY
+        })
       })
       .on("mousemove", (event) => {
-        tooltip.style("left", event.pageX + 10 + "px").style("top", event.pageY - 28 + "px")
+        // Atualizar posição do mouse durante o movimento
+        setMousePosition({
+          x: event.pageX,
+          y: event.pageY
+        })
       })
       .on("mouseout", function () {
         d3.select(this).attr("stroke", "#fff").attr("stroke-width", 0.5)
-        tooltip.style("opacity", 0)
+        setHoveredState(null)
       })
       .on("click", (event, d) => {
         if (onStateClick) {
@@ -201,7 +242,31 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
   }, [mapData])
 
   return (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", position: "relative" }}>
+      {/* Tooltip personalizado */}
+      {hoveredState && (
+        <div
+          style={{
+            position: "fixed",
+            left: mousePosition.x + 15,
+            top: mousePosition.y - 10,
+            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            color: "white",
+            padding: "12px",
+            borderRadius: "8px",
+            fontSize: "14px",
+            lineHeight: "1.4",
+            zIndex: 9999,
+            pointerEvents: "none",
+            maxWidth: "250px",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+            border: "1px solid rgba(255, 255, 255, 0.2)"
+          }}
+        >
+          {renderTooltipContent(hoveredState.data, hoveredState.abbr)}
+        </div>
+      )}
+
       <Grid container spacing={2} sx={{ height: "100%" }}>
         <Grid item xs={8} sx={{ height: "100%" }}>
           <Box sx={{ width: "100%", height: "100%", minHeight: "300px" }}>
@@ -251,24 +316,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick }) => 
           )}
         </Grid>
       </Grid>
-      <div
-        ref={tooltipRef}
-        style={{
-          position: "absolute",
-          textAlign: "left",
-          padding: "8px 12px",
-          background: "rgba(0, 0, 0, 0.8)",
-          color: "white",
-          borderRadius: "4px",
-          pointerEvents: "none",
-          opacity: 0,
-          transition: "opacity 0.2s",
-          fontSize: "12px",
-          lineHeight: "1.4",
-          maxWidth: "200px",
-          zIndex: 1000,
-        }}
-      ></div>
     </Box>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 import { Box, Typography } from "@mui/material"
 import { ResponsiveLine } from "@nivo/line"
+import { createOrderedChartLegend } from "../../utils/questionGrouping"
 
 export default function ChartCard({
   title,
@@ -13,6 +14,65 @@ export default function ChartCard({
   chartColorFunc,
   getXAxisLabel,
 }) {
+  // Componente de tooltip customizado que usa o sistema nativo do Nivo
+  const CustomTooltip = ({ point }) => {
+    if (!point) return null
+
+    const percentage = point.data.exactValue || point.data.y
+    const period = point.data.x
+
+    return (
+      <div
+        style={{
+          backgroundColor: "rgba(0, 0, 0, 0.92)",
+          color: "white",
+          padding: "12px 16px",
+          borderRadius: "8px",
+          fontSize: "13px",
+          lineHeight: "1.4",
+          maxWidth: "280px",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+          border: "1px solid rgba(255, 255, 255, 0.15)",
+          backdropFilter: "blur(10px)"
+        }}
+      >
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          marginBottom: '8px',
+          paddingBottom: '8px',
+          borderBottom: '1px solid rgba(255,255,255,0.2)'
+        }}>
+          <div 
+            style={{
+              width: '12px',
+              height: '12px',
+              backgroundColor: point.serieColor,
+              borderRadius: '50%',
+              marginRight: '8px',
+              flexShrink: 0
+            }}
+          ></div>
+          <strong style={{ fontSize: '14px' }}>{period}</strong>
+        </div>
+        <div style={{ 
+          color: point.serieColor, 
+          fontWeight: 'bold',
+          marginBottom: '4px',
+          fontSize: '14px'
+        }}>
+          {point.serieId}: {percentage.toFixed(1)}%
+        </div>
+        <div style={{ 
+          color: 'rgba(255,255,255,0.8)', 
+          fontSize: '12px' 
+        }}>
+          Dados da pesquisa
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="chart-card">
       <div className="chart-card-content">
@@ -73,7 +133,7 @@ export default function ChartCard({
                 tickSize: 5,
                 tickPadding: 5,
                 tickRotation: 0,
-                legend: "Porcentagem (%)",
+                legend: "% (Porcentagem)",
                 legendOffset: -50,
                 legendPosition: "middle",
               }}
@@ -84,8 +144,13 @@ export default function ChartCard({
               pointLabelYOffset={-12}
               useMesh={true}
               colors={chartColorFunc}
+              
+              // Usar tooltip customizado do Nivo
+              tooltip={CustomTooltip}
+              
               legends={[
                 {
+                  data: createOrderedChartLegend(chartData, chartColorFunc),
                   anchor: "right",
                   direction: "column",
                   justify: false,

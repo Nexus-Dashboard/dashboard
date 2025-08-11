@@ -21,6 +21,8 @@ import ErrorState from "./dashboard/error-state"
 import ChartCard from "./dashboard/chart-card"
 import MapCard from "./dashboard/map-card"
 import "./Dashboard.css"
+import { formatApiDateForDisplay } from "../hooks/dateUtils"
+
 
 export const fetchGroupedQuestionData = async ({ queryKey }) => {
   const [, theme, questionText, surveyType] = queryKey
@@ -218,7 +220,8 @@ const formatChartXAxis = (period, dateLabel) => {
   const roundNumber = period ? period.split("-R")[1] : ""
 
   if (dateLabel && roundNumber) {
-    const formatted = `${dateLabel} - R${roundNumber.padStart(2, "0")}`
+    // FORMATO CORRETO: R43 - Jul/25
+    const formatted = `R${roundNumber.padStart(2, "0")} - ${dateLabel}`
     console.log(`✅ Formato com data: ${formatted}`)
     return formatted
   }
@@ -346,7 +349,9 @@ export default function Dashboard() {
       if (q.surveyNumber && q.date) {
         const key = q.surveyNumber.toString()
         if (!map.has(key)) {
-          map.set(key, q.date)
+          // APLICAR formatApiDateForDisplay aqui
+          const formattedDate = formatApiDateForDisplay(q.date)
+          map.set(key, formattedDate)
         }
       }
     })

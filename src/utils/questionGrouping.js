@@ -161,3 +161,111 @@ export const getGroupingStats = (questions) => {
     }))
   }
 }
+
+// =============================================================================
+// NOVAS FUNÇÕES PARA ORDENAÇÃO DE LEGENDAS EM GRÁFICOS
+// =============================================================================
+
+// Ordem de prioridade para legendas de gráficos (do melhor para o pior)
+export const CHART_LEGEND_ORDER = [
+  // Respostas agrupadas (ordem preferencial)
+  "Ótimo/Bom",
+  "Regular", 
+  "Ruim/Péssimo",
+  "NS/NR",
+  
+  // Respostas individuais (fallback)
+  "Ótimo",
+  "Bom", 
+  "Regular mais para positivo",
+  "Regular",
+  "Regular mais para negativo",
+  "Ruim",
+  "Péssimo",
+  
+  // Aprovação
+  "Aprova",
+  "Desaprova",
+  
+  // Outros
+  "Sim",
+  "Não",
+  "Muito",
+  "Pouco",
+  "Melhor",
+  "Pior",
+  
+  // Neutros/Não sei (sempre por último)
+  "Não sabe",
+  "Não respondeu"
+]
+
+/**
+ * Cria uma legenda ordenada para gráficos baseada nas séries disponíveis
+ * @param {Array} chartData - Array de séries do gráfico (formato Nivo)
+ * @param {Function} colorFunction - Função para obter cores das séries
+ * @returns {Array} Array de objetos de legenda ordenados
+ */
+export const createOrderedChartLegend = (chartData, colorFunction) => {
+  if (!chartData || chartData.length === 0) return []
+  
+  const availableSeries = chartData.map(serie => serie.id)
+  const orderedLegend = []
+  
+  // Primeiro: adicionar itens na ordem de prioridade
+  CHART_LEGEND_ORDER.forEach(item => {
+    if (availableSeries.includes(item)) {
+      const serie = chartData.find(s => s.id === item)
+      orderedLegend.push({
+        id: item,
+        label: item,
+        color: colorFunction ? colorFunction({ id: item }) : serie.color || "#000"
+      })
+    }
+  })
+  
+  // Segundo: adicionar séries que não estão na ordem predefinida (alfabeticamente)
+  const remainingSeries = availableSeries.filter(serieId => 
+    !CHART_LEGEND_ORDER.includes(serieId)
+  ).sort()
+  
+  remainingSeries.forEach(serieId => {
+    const serie = chartData.find(s => s.id === serieId)
+    orderedLegend.push({
+      id: serieId,
+      label: serieId,
+      color: colorFunction ? colorFunction({ id: serieId }) : serie.color || "#000"
+    })
+  })
+  
+  return orderedLegend
+}
+
+/**
+ * Obtém a ordem de prioridade de uma resposta específica
+ * @param {string} response - Nome da resposta
+ * @returns {number} Índice de prioridade (menor = maior prioridade)
+ */
+export const getResponsePriority = (response) => {
+  const index = CHART_LEGEND_ORDER.indexOf(response)
+  return index === -1 ? 999 : index // Itens não encontrados vão para o final
+}
+
+/**
+ * Ordena um array de respostas pela ordem de prioridade
+ * @param {Array} responses - Array de strings com nomes das respostas
+ * @returns {Array} Array ordenado pela prioridade
+ */
+export const sortResponsesByPriority = (responses) => {
+  return [...responses].sort((a, b) => {
+    const priorityA = getResponsePriority(a)
+    const priorityB = getResponsePriority(b)
+    
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB
+    }
+    
+    // Se mesma prioridade, ordenar alfabeticamente
+    return a.localeCompare(b)
+  })
+}
