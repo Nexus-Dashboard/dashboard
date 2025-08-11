@@ -13,6 +13,7 @@ import {
   shouldGroupResponses,
   groupedResponseColorMap,
   GROUPED_RESPONSE_ORDER,
+  normalizeAndGroupNSNR,
 } from "../utils/chartUtils"
 import LoadingState from "../components/LoadingState"
 import InteractiveBrazilMap from "../components/InteractiveBrazilMap"
@@ -311,211 +312,213 @@ const TimelinePage = () => {
 
   // Calculate timeline data with grouping logic
   const timelineData = useMemo(() => {
-    if (!selectedQuestion.key || !selectedQuestion.label) return []
+  if (!selectedQuestion.key || !selectedQuestion.label) return []
 
-    // Find relevant surveys that contain this question
-    const relevantSurveys = surveys.filter((survey) =>
-      (survey.variables || []).some((v) => v.key === selectedQuestion.key),
-    )
+  // Find relevant surveys that contain this question
+  const relevantSurveys = surveys.filter((survey) =>
+    (survey.variables || []).some((v) => v.key === selectedQuestion.key),
+  )
 
-    if (relevantSurveys.length === 0) return []
+  if (relevantSurveys.length === 0) return []
 
-    // Apply date range filter to surveys
-    let filteredSurveys = relevantSurveys
-    if (dateRange) {
-      filteredSurveys = relevantSurveys.filter((survey) => {
-        const month = survey.month || ""
-        const year = survey.year || ""
-        if (month && year) {
-          const monthMap = {
-            Janeiro: "01",
-            Fevereiro: "02",
-            Março: "03",
-            Abril: "04",
-            Maio: "05",
-            Junho: "06",
-            Julho: "07",
-            Agosto: "08",
-            Setembro: "09",
-            Outubro: "10",
-            Novembro: "11",
-            Dezembro: "12",
-          }
-          const monthNum = monthMap[month] || "01"
-          const surveyDate = `${year}-${monthNum}-01`
-          return surveyDate >= dateRange.start && surveyDate <= dateRange.end
+  // Apply date range filter to surveys
+  let filteredSurveys = relevantSurveys
+  if (dateRange) {
+    filteredSurveys = relevantSurveys.filter((survey) => {
+      const month = survey.month || ""
+      const year = survey.year || ""
+      if (month && year) {
+        const monthMap = {
+          Janeiro: "01",
+          Fevereiro: "02",
+          Março: "03",
+          Abril: "04",
+          Maio: "05",
+          Junho: "06",
+          Julho: "07",
+          Agosto: "08",
+          Setembro: "09",
+          Outubro: "10",
+          Novembro: "11",
+          Dezembro: "12",
         }
-        return true
-      })
+        const monthNum = monthMap[month] || "01"
+        const surveyDate = `${year}-${monthNum}-01`
+        return surveyDate >= dateRange.start && surveyDate <= dateRange.end
+      }
+      return true
+    })
+  }
+
+  // Sort surveys by date
+  const sortedSurveys = [...filteredSurveys].sort((a, b) => {
+    // First by year
+    if (a.year !== b.year) return a.year - b.year
+
+    // Then by month (convert month names to numbers)
+    const monthOrder = {
+      Janeiro: 1,
+      Fevereiro: 2,
+      Março: 3,
+      Abril: 4,
+      Maio: 5,
+      Junho: 6,
+      Julho: 7,
+      Agosto: 8,
+      Setembro: 9,
+      Outubro: 10,
+      Novembro: 11,
+      Dezembro: 12,
     }
 
-    // Sort surveys by date
-    const sortedSurveys = [...filteredSurveys].sort((a, b) => {
-      // First by year
-      if (a.year !== b.year) return a.year - b.year
+    const aMonth = monthOrder[a.month] || 0
+    const bMonth = monthOrder[b.month] || 0
 
-      // Then by month (convert month names to numbers)
-      const monthOrder = {
-        Janeiro: 1,
-        Fevereiro: 2,
-        Março: 3,
-        Abril: 4,
-        Maio: 5,
-        Junho: 6,
-        Julho: 7,
-        Agosto: 8,
-        Setembro: 9,
-        Outubro: 10,
-        Novembro: 11,
-        Dezembro: 12,
+    return aMonth - bMonth
+  })
+
+  // SEMPRE aplicar normalização NS/NR primeiro
+  const allNormalizedResponses = new Set()
+  sortedSurveys.forEach((survey) => {
+    const responses = filteredResponses[survey._id] || []
+    responses.forEach((resp) => {
+      const normalizedAnswer = normalizeAndGroupNSNR(resp[selectedQuestion.key])
+      if (normalizedAnswer) {
+        allNormalizedResponses.add(normalizedAnswer)
       }
+    })
+  })
 
-      const aMonth = monthOrder[a.month] || 0
-      const bMonth = monthOrder[b.month] || 0
+  const useGrouping = shouldGroupResponses(Array.from(allNormalizedResponses))
 
-      return aMonth - bMonth
+  // Process each survey individually
+  const surveyResults = sortedSurveys.map((survey) => {
+    const responses = filteredResponses[survey._id] || []
+
+    // Count responses for each option with weights
+    const counts = {}
+    let totalWeight = 0
+
+    responses.forEach((response) => {
+      const answer = normalizeAnswer(response[selectedQuestion.key])
+      if (!answer) return
+
+      const weight = extractWeight(response)
+
+      // SEMPRE aplicar normalização NS/NR primeiro
+      const normalizedAnswer = normalizeAndGroupNSNR(answer)
+      // Depois aplicar agrupamento se necessário
+      const finalAnswer = useGrouping ? groupResponses(normalizedAnswer) : normalizedAnswer
+
+      counts[finalAnswer] = (counts[finalAnswer] || 0) + weight
+      totalWeight += weight
     })
 
-    // Check if we should use response grouping
-    const allActualResponses = new Set()
-    sortedSurveys.forEach((survey) => {
-      const responses = filteredResponses[survey._id] || []
-      responses.forEach((resp) => {
-        const answer = normalizeAnswer(resp[selectedQuestion.key])
-        if (answer) {
-          allActualResponses.add(answer)
-        }
-      })
+    // Calculate percentages
+    const result = {
+      surveyId: survey._id,
+      surveyTitle: survey.name
+        ? survey.name.replace("Dicionário de variáveis - ", "")
+        : `${survey.month || ""} ${survey.year || ""}`.trim(),
+      date: survey.name
+        ? survey.name.replace("Dicionário de variáveis - ", "")
+        : `${survey.month || ""} ${survey.year || ""}`.trim(),
+    }
+
+    Object.entries(counts).forEach(([answer, count]) => {
+      result[answer] = Math.round((count / totalWeight) * 1000) / 10 // One decimal place
     })
 
-    const useGrouping = shouldGroupResponses(Array.from(allActualResponses))
+    return result
+  })
 
-    // Process each survey individually
-    const surveyResults = sortedSurveys.map((survey) => {
-      const responses = filteredResponses[survey._id] || []
-
-      // Count responses for each option with weights
-      const counts = {}
-      let totalWeight = 0
-
-      responses.forEach((response) => {
-        const answer = normalizeAnswer(response[selectedQuestion.key])
-        if (!answer) return
-
-        const weight = extractWeight(response)
-
-        // Apply grouping if needed
-        const finalAnswer = useGrouping ? groupResponses(answer) : answer
-
-        counts[finalAnswer] = (counts[finalAnswer] || 0) + weight
-        totalWeight += weight
-      })
-
-      // Calculate percentages
-      const result = {
-        surveyId: survey._id,
-        surveyTitle: survey.name
-          ? survey.name.replace("Dicionário de variáveis - ", "")
-          : `${survey.month || ""} ${survey.year || ""}`.trim(),
-        date: survey.name
-          ? survey.name.replace("Dicionário de variáveis - ", "")
-          : `${survey.month || ""} ${survey.year || ""}`.trim(),
-      }
-
-      Object.entries(counts).forEach(([answer, count]) => {
-        result[answer] = Math.round((count / totalWeight) * 1000) / 10 // One decimal place
-      })
-
-      return result
-    })
-
-    return surveyResults
-  }, [selectedQuestion, surveys, filteredResponses, dateRange])
+  return surveyResults
+}, [selectedQuestion, surveys, filteredResponses, dateRange])
 
   // Prepare line chart data with CORRECT colors and order
   const lineChartData = useMemo(() => {
-    if (!timelineData.length) return []
+  if (!timelineData.length) return []
 
-    // Extract all unique response options across all surveys
-    const allOptions = new Set()
-    timelineData.forEach((dataPoint) => {
-      Object.keys(dataPoint).forEach((key) => {
-        if (key !== "surveyId" && key !== "surveyTitle" && key !== "date") {
-          allOptions.add(key)
-        }
-      })
-    })
-
-    // Determine if we should use grouped colors
-    const useGroupedColors = Array.from(allOptions).some((option) =>
-      ["Ótimo/Bom", "Regular", "Ruim/Péssimo", "NS/NR"].includes(option),
-    )
-
-    // Create series for each option with CORRECT colors
-    const chartData = Array.from(allOptions).map((option) => {
-      // APLICAR CORES CORRETAS usando as funções do chartUtils
-      let color
-      if (useGroupedColors) {
-        color = groupedResponseColorMap[option] || "#6c757d"
-      } else {
-        color = getResponseColor(option)
-      }
-
-      return {
-        id: option,
-        color: color,
-        data: timelineData.map((dataPoint) => ({
-          x: dataPoint.date,
-          y: dataPoint[option] || 0,
-          exactValue: dataPoint[option] || 0,
-        })),
+  // Extract all unique response options across all surveys
+  const allOptions = new Set()
+  timelineData.forEach((dataPoint) => {
+    Object.keys(dataPoint).forEach((key) => {
+      if (key !== "surveyId" && key !== "surveyTitle" && key !== "date") {
+        allOptions.add(key)
       }
     })
+  })
 
-    // Sort using appropriate order - APLICAR ORDENAÇÃO CORRETA PARA LEGENDAS
-    const orderToUse = useGroupedColors ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
+  // Determine if we should use grouped colors
+  const useGroupedColors = Array.from(allOptions).some((option) =>
+    ["Ótimo/Bom", "Regular", "Ruim/Péssimo", "NS/NR"].includes(option),
+  )
 
-    // Primeiro, separar os itens que estão na ordem definida dos que não estão
-    const itemsInOrder = []
-    const itemsNotInOrder = []
+  // Create series for each option with CORRECT colors
+  const chartData = Array.from(allOptions).map((option) => {
+    // APLICAR CORES CORRETAS usando as funções do chartUtils
+    let color
+    if (useGroupedColors) {
+      color = groupedResponseColorMap[option] || "#6c757d"
+    } else {
+      color = getResponseColor(option)
+    }
 
-    chartData.forEach((item) => {
-      const index = orderToUse.indexOf(item.id)
-      if (index !== -1) {
-        itemsInOrder.push({ ...item, orderIndex: index })
-      } else {
-        itemsNotInOrder.push(item)
-      }
-    })
-
-    // Ordenar os itens que estão na ordem definida
-    itemsInOrder.sort((a, b) => a.orderIndex - b.orderIndex)
-
-    // Ordenar os itens que não estão na ordem alfabeticamente
-    itemsNotInOrder.sort((a, b) => a.id.localeCompare(b.id))
-
-    // Combinar: primeiro os da ordem definida, depois os outros
-    const sortedChartData = [
-      ...itemsInOrder.map((item) => ({ id: item.id, color: item.color, data: item.data })),
-      ...itemsNotInOrder,
-    ]
-
-    console.log("Order used:", orderToUse)
-    console.log(
-      "Items in order:",
-      itemsInOrder.map((d) => ({ id: d.id, orderIndex: d.orderIndex })),
-    )
-    console.log(
-      "Final chart data order:",
-      sortedChartData.map((d, i) => ({
-        position: i,
-        id: d.id,
-        color: d.color,
+    return {
+      id: option,
+      color: color,
+      data: timelineData.map((dataPoint) => ({
+        x: dataPoint.date,
+        y: dataPoint[option] || 0,
+        exactValue: dataPoint[option] || 0,
       })),
-    )
+    }
+  })
 
-    return sortedChartData
-  }, [timelineData])
+  // Sort using appropriate order - APLICAR ORDENAÇÃO CORRETA PARA LEGENDAS
+  const orderToUse = useGroupedColors ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
+
+  // Primeiro, separar os itens que estão na ordem definida dos que não estão
+  const itemsInOrder = []
+  const itemsNotInOrder = []
+
+  chartData.forEach((item) => {
+    const index = orderToUse.indexOf(item.id)
+    if (index !== -1) {
+      itemsInOrder.push({ ...item, orderIndex: index })
+    } else {
+      itemsNotInOrder.push(item)
+    }
+  })
+
+  // Ordenar os itens que estão na ordem definida
+  itemsInOrder.sort((a, b) => a.orderIndex - b.orderIndex)
+
+  // Ordenar os itens que não estão na ordem alfabeticamente
+  itemsNotInOrder.sort((a, b) => a.id.localeCompare(b.id))
+
+  // Combinar: primeiro os da ordem definida, depois os outros
+  const sortedChartData = [
+    ...itemsInOrder.map((item) => ({ id: item.id, color: item.color, data: item.data })),
+    ...itemsNotInOrder,
+  ]
+
+  console.log("Order used:", orderToUse)
+  console.log(
+    "Items in order:",
+    itemsInOrder.map((d) => ({ id: d.id, orderIndex: d.orderIndex })),
+  )
+  console.log(
+    "Final chart data order:",
+    sortedChartData.map((d, i) => ({
+      position: i,
+      id: d.id,
+      color: d.color,
+    })),
+  )
+
+  return sortedChartData
+}, [timelineData])
 
   const legendData = useMemo(
     () =>

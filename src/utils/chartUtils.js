@@ -53,6 +53,18 @@ export const normalizeAnswer = (raw) => {
   return s || "Não respondeu"
 }
 
+// NOVA FUNÇÃO: Sempre agrupa NS/NR, independentemente de outras condições
+export const normalizeAndGroupNSNR = (response) => {
+  const normalized = normalizeAnswer(response)
+  
+  // SEMPRE agrupar "Não sabe" e "Não respondeu" em "NS/NR"
+  if (["Não sabe", "Não respondeu"].includes(normalized)) {
+    return "NS/NR"
+  }
+  
+  return normalized
+}
+
 // Função para ordenar as séries de dados
 export const sortChartData = (chartData) => {
   return [...chartData].sort((a, b) => {
@@ -100,34 +112,40 @@ export const formatSurveyTitle = (survey) => {
   }
 }
 
-// Função para agrupar respostas
+// Função para agrupar respostas (ATUALIZADA)
 export const groupResponses = (response) => {
-  const normalized = normalizeAnswer(response)
+  // PRIMEIRO: sempre normalizar e agrupar NS/NR
+  const withNSNR = normalizeAndGroupNSNR(response)
+  
+  // Se já foi convertido para NS/NR, retornar
+  if (withNSNR === "NS/NR") {
+    return withNSNR
+  }
 
-  if (["Ótimo", "Bom"].includes(normalized)) {
+  // SEGUNDO: aplicar outros agrupamentos se necessário
+  if (["Ótimo", "Bom"].includes(withNSNR)) {
     return "Ótimo/Bom"
   }
 
-  if (["Regular", "Regular mais para positivo", "Regular mais para negativo"].includes(normalized)) {
+  if (["Regular", "Regular mais para positivo", "Regular mais para negativo"].includes(withNSNR)) {
     return "Regular"
   }
 
-  if (["Ruim", "Péssimo"].includes(normalized)) {
+  if (["Ruim", "Péssimo"].includes(withNSNR)) {
     return "Ruim/Péssimo"
   }
 
-  if (["Não sabe", "Não respondeu"].includes(normalized)) {
-    return "NS/NR"
-  }
-
-  return normalized
+  return withNSNR
 }
 
-// Função para verificar se uma pergunta deve usar agrupamento
+// Função para verificar se uma pergunta deve usar agrupamento (ATUALIZADA)
 export const shouldGroupResponses = (responses) => {
-  const uniqueResponses = new Set(responses.map((r) => normalizeAnswer(r)))
-  const groupableResponses = ["Ótimo", "Bom", "Regular", "Ruim", "Péssimo", "Não sabe", "Não respondeu"]
-
+  // SEMPRE aplicar agrupamento NS/NR primeiro
+  const normalizedWithNSNR = responses.map(r => normalizeAndGroupNSNR(r))
+  const uniqueResponses = new Set(normalizedWithNSNR)
+  
+  // Verificar se deve usar agrupamento completo (Ótimo/Bom, etc.)
+  const groupableResponses = ["Ótimo", "Bom", "Regular", "Ruim", "Péssimo"]
   const hasGroupableResponses = groupableResponses.filter((r) => uniqueResponses.has(r)).length >= 4
 
   return hasGroupableResponses

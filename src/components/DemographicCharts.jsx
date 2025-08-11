@@ -12,6 +12,7 @@ import {
   groupedResponseColorMap,
   GROUPED_RESPONSE_ORDER,
   RESPONSE_ORDER,
+  normalizeAndGroupNSNR,
 } from "../utils/chartUtils"
 
 const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, availableDemographics }) => {
@@ -47,9 +48,9 @@ const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, avail
     const responses = filteredResponses[latestSurvey._id] || []
     if (!responses.length) return {}
 
-    // Check if we should use response grouping
-    const allActualResponses = responses.map((resp) => normalizeAnswer(resp[selectedQuestion.key])).filter(Boolean)
-    const useGrouping = shouldGroupResponses(allActualResponses)
+    // SEMPRE aplicar normalização NS/NR primeiro
+    const allNormalizedResponses = responses.map((resp) => normalizeAndGroupNSNR(resp[selectedQuestion.key])).filter(Boolean)
+    const useGrouping = shouldGroupResponses(allNormalizedResponses)
 
     // Process data for each demographic type
     const result = {}
@@ -70,8 +71,10 @@ const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, avail
 
         const weight = extractWeight(response)
 
-        // Apply grouping if needed
-        const finalAnswer = useGrouping ? groupResponses(answer) : answer
+        // SEMPRE aplicar normalização NS/NR primeiro
+        const normalizedAnswer = normalizeAndGroupNSNR(answer)
+        // Depois aplicar agrupamento se necessário
+        const finalAnswer = useGrouping ? groupResponses(normalizedAnswer) : normalizedAnswer
 
         groupedByDemographic[demographicValue] = groupedByDemographic[demographicValue] || {}
         groupedByDemographic[demographicValue][finalAnswer] =

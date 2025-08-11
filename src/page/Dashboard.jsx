@@ -14,6 +14,7 @@ import {
   getResponseColor,
   GROUPED_RESPONSE_ORDER,
   RESPONSE_ORDER,
+  normalizeAndGroupNSNR,
 } from "../utils/chartUtils"
 import { sortMapResponses } from "../utils/questionGrouping"
 import { DEMOGRAPHIC_LABELS } from "../utils/demographicUtils"
@@ -344,14 +345,21 @@ export default function Dashboard() {
   const availableMapResponses = useMemo(() => {
     if (!allHistoricalData || allHistoricalData.length === 0) return []
 
-    const allAnswers = new Set()
-    const useGrouping = shouldGroupResponses(allHistoricalData.flatMap((r) => r.distribution.map((d) => d.response)))
+    // SEMPRE aplicar normalização NS/NR primeiro
+    const allNormalizedAnswers = allHistoricalData.flatMap((r) => 
+      r.distribution.map((d) => normalizeAndGroupNSNR(d.response))
+    )
+    const useGrouping = shouldGroupResponses(allNormalizedAnswers)
 
+    const allAnswers = new Set()
     allHistoricalData.forEach((round) => {
       round.distribution.forEach((dist) => {
         const answer = dist.response
         if (answer) {
-          const finalAnswer = useGrouping ? groupResponses(answer) : answer
+          // SEMPRE aplicar normalização NS/NR primeiro
+          const normalizedAnswer = normalizeAndGroupNSNR(answer)
+          // Depois aplicar agrupamento se necessário
+          const finalAnswer = useGrouping ? groupResponses(normalizedAnswer) : normalizedAnswer
           allAnswers.add(finalAnswer)
         }
       })
@@ -417,7 +425,13 @@ export default function Dashboard() {
 
     // 1. Aplicar filtro de período específico PRIMEIRO
     if (selectedPeriod) {
-      filtered = filtered.filter((round) => round.period === selectedPeriod.period)
+      if (selectedPeriod.type === 'relative') {
+        // Para períodos relativos, filtrar por array de períodos
+        filtered = filtered.filter((round) => selectedPeriod.periods.includes(round.period))
+      } else if (selectedPeriod.type === 'specific') {
+        // Para período específico, filtrar por período único
+        filtered = filtered.filter((round) => round.period === selectedPeriod.period)
+      }
     }
 
     // 2. Aplicar filtros demográficos
@@ -515,19 +529,30 @@ export default function Dashboard() {
 
     console.log("🕐 Períodos encontrados:", allPeriods)
 
-    const allActualResponses = new Set(selectedChartData.flatMap((r) => r.distribution.map((d) => d.response)))
-    const useGrouping = shouldGroupResponses(Array.from(allActualResponses))
+    // SEMPRE aplicar normalização NS/NR primeiro
+    const allNormalizedResponses = selectedChartData.flatMap((r) => 
+      r.distribution.map((d) => normalizeAndGroupNSNR(d.response))
+    )
+    const uniqueNormalizedResponses = new Set(allNormalizedResponses)
+    
+    // Verificar se deve usar agrupamento completo
+    const useGrouping = shouldGroupResponses(allNormalizedResponses)
     const responseOrder = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
 
     const allSeriesIds = new Set()
     selectedChartData.forEach((rodada) => {
       rodada.distribution.forEach((dist) => {
-        const finalResponse = useGrouping ? groupResponses(dist.response) : dist.response
+        // SEMPRE aplicar normalização NS/NR primeiro
+        const normalizedResponse = normalizeAndGroupNSNR(dist.response)
+        // Depois aplicar agrupamento se necessário
+        const finalResponse = useGrouping ? groupResponses(normalizedResponse) : normalizedResponse
         if (finalResponse) allSeriesIds.add(finalResponse)
       })
     })
 
     if (allSeriesIds.size === 0) return []
+
+    console.log("🏷️ Séries identificadas:", Array.from(allSeriesIds))
 
     const series = Array.from(allSeriesIds).map((seriesId) => ({
       id: seriesId,
@@ -537,18 +562,18 @@ export default function Dashboard() {
 
         if (rodada && rodada.totalWeightedResponses > 0) {
           let weightedCount = 0
-          if (useGrouping) {
-            rodada.distribution.forEach((dist) => {
-              if (groupResponses(dist.response) === seriesId) {
-                weightedCount += dist.weightedCount
-              }
-            })
-          } else {
-            const dist = rodada.distribution.find((d) => d.response === seriesId)
-            if (dist) {
-              weightedCount = dist.weightedCount
+          
+          rodada.distribution.forEach((dist) => {
+            // SEMPRE aplicar normalização NS/NR primeiro
+            const normalizedResponse = normalizeAndGroupNSNR(dist.response)
+            // Depois aplicar agrupamento se necessário
+            const finalResponse = useGrouping ? groupResponses(normalizedResponse) : normalizedResponse
+            
+            if (finalResponse === seriesId) {
+              weightedCount += dist.weightedCount
             }
-          }
+          })
+          
           yValue = (weightedCount / rodada.totalWeightedResponses) * 100
         }
 
@@ -565,7 +590,15 @@ export default function Dashboard() {
 
     console.log("📈 Dados finais do gráfico:", series)
 
-    return series
+    // Filtrar séries duplicadas e ordenar
+    const uniqueSeries = new Map()
+    series.forEach(serie => {
+      if (!uniqueSeries.has(serie.id)) {
+        uniqueSeries.set(serie.id, serie)
+      }
+    })
+
+    return Array.from(uniqueSeries.values())
       .sort((a, b) => {
         const indexA = responseOrder.indexOf(a.id)
         const indexB = responseOrder.indexOf(b.id)
@@ -619,7 +652,7 @@ export default function Dashboard() {
   }
 
   const useGroupingForChart = shouldGroupResponses(
-    selectedChartData.flatMap((h) => h.distribution.map((d) => d.response)),
+    selectedChartData.flatMap((h) => h.distribution.map((d) => normalizeAndGroupNSNR(d.response))),
   )
   const chartColorFunc = (d) => (useGroupingForChart ? groupedResponseColorMap[d.id] : getResponseColor(d.id))
 
