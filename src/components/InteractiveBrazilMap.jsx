@@ -309,18 +309,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
             />
           </Box>
         </Grid>
-        <Grid item xs={12} md={4} sx={{ height: "100%", overflow: "auto" }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold" }}>
-            Legenda
-          </Typography>
-          {selectedMapResponse ? (
-            <ColorScaleLegend scale={colorScale} />
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              Selecione uma resposta para ver a legenda.
-            </Typography>
-          )}
-        </Grid>
+        
       </Grid>
     </Box>
   )
