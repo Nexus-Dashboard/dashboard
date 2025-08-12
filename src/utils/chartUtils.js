@@ -18,15 +18,20 @@ export const responseColorMap = {
   // Respostas positivas - VERDE
   Ótimo: "#28a745",
   Bom: "#28a745",
-  "Regular mais para positivo": "#ffc107",
+  "Regular mais para positivo": "#28a745",
+  "Melhorar muito": "#28a745",
+  "Melhorar um pouco": "#8ccc9bff",
 
   // Respostas neutras - AMARELO
   Regular: "#ffc107",
+  "Ficar igual": "#ffc107",
 
   // Respostas negativas - VERMELHO
   "Regular mais para negativo": "#dc3545",
   Ruim: "#dc3545",
   Péssimo: "#dc3545",
+  "Piorar um pouco": "#dc3545",
+  "Piorar muito": "#810814ff",
 
   // Outros - CINZA
   "Não sabe": "#6c757d",
@@ -43,19 +48,36 @@ export const getResponseColor = (response) => {
   return responseColorMap[response] || "#6c757d"
 }
 
-// Função para normalizar respostas
+// Função para normalizar respostas - ATUALIZADA para filtrar #NULL
 export const normalizeAnswer = (raw) => {
   const s = String(raw || "")
     .trim()
     .replace(/\s*$$NÃO LER$$\s*/i, "")
+  
+  // NOVA VERIFICAÇÃO: Filtrar respostas #NULL (case insensitive)
+  if (/^#null!?$/i.test(s) || s === "#NULL" || s === "#null") {
+    return null // Retorna null para ser filtrado
+  }
+  
   if (/^não sabe/i.test(s)) return "Não sabe"
   if (/^não respond/i.test(s)) return "Não respondeu"
-  return s || "Não respondeu"
+  
+  // Se string vazia ou só espaços, retorna null para ser filtrado
+  if (!s || s === "") {
+    return null
+  }
+  
+  return s
 }
 
-// NOVA FUNÇÃO: Sempre agrupa NS/NR, independentemente de outras condições
+// NOVA FUNÇÃO: Sempre agrupa NS/NR e filtra respostas nulas
 export const normalizeAndGroupNSNR = (response) => {
   const normalized = normalizeAnswer(response)
+  
+  // Se normalizeAnswer retornou null (resposta inválida), filtrar
+  if (normalized === null) {
+    return null
+  }
   
   // SEMPRE agrupar "Não sabe" e "Não respondeu" em "NS/NR"
   if (["Não sabe", "Não respondeu"].includes(normalized)) {
@@ -112,13 +134,18 @@ export const formatSurveyTitle = (survey) => {
   }
 }
 
-// Função para agrupar respostas (ATUALIZADA)
+// Função para agrupar respostas (ATUALIZADA com proteção)
 export const groupResponses = (response) => {
+  // ADICIONAR: Verificar se response é válido
+  if (!response || response === null || response === undefined) {
+    return null
+  }
+
   // PRIMEIRO: sempre normalizar e agrupar NS/NR
   const withNSNR = normalizeAndGroupNSNR(response)
   
-  // Se já foi convertido para NS/NR, retornar
-  if (withNSNR === "NS/NR") {
+  // Se já foi convertido para NS/NR ou é null, retornar
+  if (withNSNR === "NS/NR" || withNSNR === null) {
     return withNSNR
   }
 
@@ -171,3 +198,4 @@ export const aggregateResponses = (answer) => {
   if (["Não sabe", "Não respondeu"].includes(answer)) return "NS/NR"
   return answer
 }
+

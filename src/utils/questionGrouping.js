@@ -172,7 +172,17 @@ export const getGroupingStats = (questions) => {
  * @returns {string[]} - Array de respostas ordenado.
  */
 export const sortMapResponses = (responses) => {
-  return [...responses].sort((a, b) => {
+  // ADICIONAR: Filtrar valores null/undefined antes de ordenar
+  const validResponses = responses.filter(response => 
+    response !== null && 
+    response !== undefined && 
+    response !== ""
+  )
+  
+  return validResponses.sort((a, b) => {
+    // ADICIONAR: Proteção adicional contra valores inválidos
+    if (!a || !b) return 0
+    
     const indexA = MAP_RESPONSE_ORDER.indexOf(a)
     const indexB = MAP_RESPONSE_ORDER.indexOf(b)
 
@@ -185,7 +195,13 @@ export const sortMapResponses = (responses) => {
     if (indexB !== -1) {
       return 1 // B está na lista, A não -> B vem primeiro
     }
-    return a.localeCompare(b) // Nenhum está na lista, ordenar alfabeticamente
+    
+    // ATUALIZAR: Verificar se ambos são strings antes de localeCompare
+    if (typeof a === 'string' && typeof b === 'string') {
+      return a.localeCompare(b) // Nenhum está na lista, ordenar alfabeticamente
+    }
+    
+    return 0 // Fallback se houver problemas
   })
 }
 
@@ -195,8 +211,7 @@ export const CHART_LEGEND_ORDER = [
   "Ótimo/Bom",
   "Regular",
   "Ruim/Péssimo",
-  "NS/NR",
-
+  
   // Respostas individuais (fallback)
   "Ótimo",
   "Bom",
@@ -217,7 +232,15 @@ export const CHART_LEGEND_ORDER = [
   "Melhor",
   "Pior",
 
+  // Outros
+  "Melhorar muito",
+  "Melhorar um pouco",
+  "Ficar igual",
+  "Piorar um pouco",
+  "Piorar muito",
+
   // Neutros/Não sei (sempre por último)
+  "NS/NR",
   "Não sabe",
   "Não respondeu",
 ]

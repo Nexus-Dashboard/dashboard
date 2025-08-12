@@ -67,12 +67,16 @@ const DemographicCharts = ({ selectedQuestion, surveys, filteredResponses, avail
         if (!demographicValue) return
 
         const answer = normalizeAnswer(response[selectedQuestion.key])
-        if (!answer) return
+        if (!answer) return  // <-- Esta linha já filtra #NULL (se você atualizou normalizeAnswer)
 
         const weight = extractWeight(response)
 
         // SEMPRE aplicar normalização NS/NR primeiro
         const normalizedAnswer = normalizeAndGroupNSNR(answer)
+        
+        // NOVA VERIFICAÇÃO: Filtrar respostas nulas após normalização
+        if (normalizedAnswer === null) return  // <-- ADICIONAR ESTA LINHA
+        
         // Depois aplicar agrupamento se necessário
         const finalAnswer = useGrouping ? groupResponses(normalizedAnswer) : normalizedAnswer
 

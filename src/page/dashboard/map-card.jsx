@@ -230,6 +230,10 @@ export default function MapCard({
   const hasRounds = mapRoundsWithData?.length > 0
   const maxIndex = Math.max(0, (mapRoundsWithData?.length || 1) - 1)
 
+  console.log("MapCard - mapData:", mapData)
+  console.log("MapCard - selectedMapResponse:", selectedMapResponse)
+  console.log("MapCard - questionInfo:", questionInfo)
+
   return (
     <div className="map-card">
       <div
@@ -248,24 +252,26 @@ export default function MapCard({
         {/* Controles superiores - fixos */}
         <Box sx={{ mb: 2, flexShrink: 0 }}>
           <Box sx={{ display: "flex", gap: 2, alignItems: "stretch" }}>
-            {/* Seletor de resposta - 50% quando há múltiplas rodadas, 100% quando há apenas uma */}
+            {/* Seletor de resposta */}
             <Box sx={{ flex: mapRoundsWithData.length > 1 ? 1 : 1, minWidth: 0 }}>
               <Typography
                 variant="caption"
                 color="text.secondary"
                 sx={{
-                  fontSize: "12px",
+                  fontSize: "15px",
                   mb: 1,
                   display: "block",
                   fontWeight: "600",
                   color: "#495057",
                 }}
               >
-                Visualizar Resposta
+                Resposta Selecionada:
               </Typography>
               <Dropdown onSelect={onMapResponseChange} style={{ width: "100%" }}>
                 <Dropdown.Toggle as={ResponseSelectorToggle} id="response-selector-dropdown">
-                  <span style={{ fontSize: "14px" }}>{selectedMapResponse || "Selecione uma resposta"}</span>
+                  <span style={{ fontSize: "14px" }}>
+                    {selectedMapResponse || "Selecione uma resposta"}
+                  </span>
                 </Dropdown.Toggle>
                 <Dropdown.Menu as={ResponseSelectorMenu}>
                   {availableMapResponses.map((response) => (
@@ -291,13 +297,14 @@ export default function MapCard({
               </Dropdown>
             </Box>
 
+            {/* Seletor de rodada (só aparece se há múltiplas rodadas) */}
             {mapRoundsWithData.length > 1 && (
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography
                   variant="caption"
                   color="text.secondary"
                   sx={{
-                    fontSize: "12px",
+                    fontSize: "15px",
                     mb: 1,
                     display: "block",
                     fontWeight: "600",
@@ -356,7 +363,7 @@ export default function MapCard({
             flexGrow: 1,
             display: "flex",
             flexDirection: "column",
-            minHeight: 0, // Importante para permitir que o flex funcione corretamente
+            minHeight: 0, 
             position: "relative"
           }}
         >
@@ -371,13 +378,12 @@ export default function MapCard({
               borderRadius: "12px",
               border: "1px solid #e9ecef",
               padding: "1rem",
-              minHeight: "200px", // Altura mínima reduzida
-              maxHeight: "500px", // Altura máxima para evitar que fique muito grande
+              minHeight: "200px",
+              maxHeight: "500px",
               transition: "all 0.3s ease",
-              overflow: "hidden" // Para garantir que o conteúdo não vaze
             }}
           >
-            {hasRounds && mapData.length > 0 && selectedMapResponse ? (
+            {hasRounds && mapData.length > 0 ? (
               <div
                 style={{
                   width: "100%",

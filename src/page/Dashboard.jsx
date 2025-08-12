@@ -8,6 +8,7 @@ import { Box } from "@mui/material"
 import OffcanvasNavigation from "../components/OffcanvasNavigation"
 import DashboardHeader from "../components/DashboardHeader"
 import {
+  normalizeAnswer,
   groupResponses,
   shouldGroupResponses,
   groupedResponseColorMap,
@@ -353,31 +354,45 @@ export default function Dashboard() {
     }
   }, [data, questionText])
 
-  const availableMapResponses = useMemo(() => {
-    if (!allHistoricalData || allHistoricalData.length === 0) return []
+ const availableMapResponses = useMemo(() => {
+  if (!allHistoricalData || allHistoricalData.length === 0) return []
 
-    // SEMPRE aplicar normalização NS/NR primeiro
-    const allNormalizedAnswers = allHistoricalData.flatMap((r) =>
-      r.distribution.map((d) => normalizeAndGroupNSNR(d.response)),
-    )
-    const useGrouping = shouldGroupResponses(allNormalizedAnswers)
+  // SEMPRE aplicar normalização NS/NR primeiro
+  const allNormalizedAnswers = allHistoricalData.flatMap((r) =>
+    r.distribution
+      .map((d) => normalizeAndGroupNSNR(d.response))
+      .filter(answer => answer !== null) // Filtrar valores null
+  )
+  
+  const useGrouping = shouldGroupResponses(Array.from(allNormalizedAnswers))
 
-    const allAnswers = new Set()
-    allHistoricalData.forEach((round) => {
-      round.distribution.forEach((dist) => {
-        const answer = dist.response
-        if (answer) {
-          // SEMPRE aplicar normalização NS/NR primeiro
-          const normalizedAnswer = normalizeAndGroupNSNR(answer)
-          // Depois aplicar agrupamento se necessário
-          const finalAnswer = useGrouping ? groupResponses(normalizedAnswer) : normalizedAnswer
+  const allAnswers = new Set()
+  allHistoricalData.forEach((round) => {
+    round.distribution.forEach((dist) => {
+      const answer = dist.response
+      if (answer) {
+        // SEMPRE aplicar normalização NS/NR primeiro
+        const normalizedAnswer = normalizeAndGroupNSNR(answer)
+        
+        // Verificar se não é null antes de processar
+        if (normalizedAnswer === null) return
+        
+        // Depois aplicar agrupamento se necessário
+        const finalAnswer = useGrouping ? groupResponses(normalizedAnswer) : normalizedAnswer
+        
+        // Verificar se finalAnswer não é null antes de adicionar
+        if (finalAnswer !== null && finalAnswer !== undefined) {
           allAnswers.add(finalAnswer)
         }
-      })
+      }
     })
+  })
 
-    return sortMapResponses(Array.from(allAnswers))
-  }, [allHistoricalData])
+  // Filtrar valores null do array antes de passar para sortMapResponses
+  const validAnswers = Array.from(allAnswers).filter(answer => answer !== null && answer !== undefined)
+  
+  return sortMapResponses(validAnswers)
+}, [allHistoricalData])
 
   useEffect(() => {
     if (availableMapResponses.length > 0 && !selectedMapResponse) {
@@ -509,6 +524,11 @@ export default function Dashboard() {
 
     selectedRound.distribution.forEach((dist) => {
       const responseValue = dist.response
+      
+      // ADICIONAR: Filtrar respostas null antes de processar
+      const normalizedResponse = normalizeAnswer(responseValue)
+      if (normalizedResponse === null) return
+      
       const ufDemographics = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
 
       if (ufDemographics) {
@@ -526,89 +546,110 @@ export default function Dashboard() {
   }, [mapRoundsWithData, selectedMapRoundIndex, questionInfo])
 
   const chartData = useMemo(() => {
-    if (!selectedChartData || selectedChartData.length === 0) {
-      return []
-    }
+  if (!selectedChartData || selectedChartData.length === 0) {
+    return []
+  }
 
-    const dataByPeriod = new Map(selectedChartData.map((d) => [d.period, d]))
-    const allPeriods = Array.from(dataByPeriod.keys())
+  const dataByPeriod = new Map(selectedChartData.map((d) => [d.period, d]))
+  const allPeriods = Array.from(dataByPeriod.keys())
 
-    // SEMPRE aplicar normalização NS/NR primeiro
-    const allNormalizedResponses = selectedChartData.flatMap((r) =>
-      r.distribution.map((d) => normalizeAndGroupNSNR(d.response)),
-    )
-    const uniqueNormalizedResponses = new Set(allNormalizedResponses)
+  // SEMPRE aplicar normalização NS/NR primeiro E FILTRAR NULOS
+  const allNormalizedResponses = selectedChartData.flatMap((r) =>
+    r.distribution
+      .map((d) => normalizeAndGroupNSNR(d.response))
+      .filter(response => response !== null) // NOVA LINHA: Filtrar respostas nulas
+  )
+  const uniqueNormalizedResponses = new Set(allNormalizedResponses)
 
-    // Verificar se deve usar agrupamento completo
-    const useGrouping = shouldGroupResponses(allNormalizedResponses)
-    const responseOrder = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
+  // Verificar se deve usar agrupamento completo
+  const useGrouping = shouldGroupResponses(allNormalizedResponses)
+  const responseOrder = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
 
-    const allSeriesIds = new Set()
-    selectedChartData.forEach((rodada) => {
-      rodada.distribution.forEach((dist) => {
-        // SEMPRE aplicar normalização NS/NR primeiro
-        const normalizedResponse = normalizeAndGroupNSNR(dist.response)
-        // Depois aplicar agrupamento se necessário
-        const finalResponse = useGrouping ? groupResponses(normalizedResponse) : normalizedResponse
-        if (finalResponse) allSeriesIds.add(finalResponse)
-      })
-    })
-
-    if (allSeriesIds.size === 0) return []
-
-    const series = Array.from(allSeriesIds).map((seriesId) => ({
-      id: seriesId,
-      data: allPeriods.map((period) => {
-        const rodada = dataByPeriod.get(period)
-        let yValue = 0
-
-        if (rodada && rodada.totalWeightedResponses > 0) {
-          let weightedCount = 0
-
-          rodada.distribution.forEach((dist) => {
-            // SEMPRE aplicar normalização NS/NR primeiro
-            const normalizedResponse = normalizeAndGroupNSNR(dist.response)
-            // Depois aplicar agrupamento se necessário
-            const finalResponse = useGrouping ? groupResponses(normalizedResponse) : normalizedResponse
-
-            if (finalResponse === seriesId) {
-              weightedCount += dist.weightedCount
-            }
-          })
-
-          yValue = (weightedCount / rodada.totalWeightedResponses) * 100
-        }
-
-        const roundNumber = period.split("-R")[1]
-        const dateLabel = surveyDateMap.get(roundNumber)
-        const xLabel = formatChartXAxis(period, dateLabel)
-
-        return {
-          x: xLabel,
-          y: Number.isFinite(yValue) ? yValue : 0,
-        }
-      }),
-    }))
-
-    // Filtrar séries duplicadas e ordenar
-    const uniqueSeries = new Map()
-    series.forEach((serie) => {
-      if (!uniqueSeries.has(serie.id)) {
-        uniqueSeries.set(serie.id, serie)
+  const allSeriesIds = new Set()
+  selectedChartData.forEach((rodada) => {
+    rodada.distribution.forEach((dist) => {
+      // SEMPRE aplicar normalização NS/NR primeiro
+      const normalizedResponse = normalizeAndGroupNSNR(dist.response)
+      
+      // NOVA VERIFICAÇÃO: Só processar se não for null
+      if (normalizedResponse === null) {
+        return // Skip respostas nulas
       }
+      
+      // Depois aplicar agrupamento se necessário
+      const finalResponse = useGrouping ? groupResponses(normalizedResponse) : normalizedResponse
+      if (finalResponse) allSeriesIds.add(finalResponse)
     })
+  })
 
-    return Array.from(uniqueSeries.values())
-      .sort((a, b) => {
-        const indexA = responseOrder.indexOf(a.id)
-        const indexB = responseOrder.indexOf(b.id)
-        if (indexA > -1 && indexB > -1) return indexA - indexB
-        if (indexA > -1) return -1
-        if (indexB > -1) return 1
-        return a.id.localeCompare(b.id)
-      })
-      .filter((serie) => serie.data && serie.data.length > 0)
-  }, [selectedChartData, surveyDateMap, formatChartXAxis])
+  if (allSeriesIds.size === 0) return []
+
+  const series = Array.from(allSeriesIds).map((seriesId) => ({
+    id: seriesId,
+    data: allPeriods.map((period) => {
+      const rodada = dataByPeriod.get(period)
+      let yValue = 0
+
+      if (rodada && rodada.totalWeightedResponses > 0) {
+        let weightedCount = 0
+        let totalValidResponses = 0 // NOVA VARIÁVEL: Para recalcular o total sem #NULL
+
+        rodada.distribution.forEach((dist) => {
+          // SEMPRE aplicar normalização NS/NR primeiro
+          const normalizedResponse = normalizeAndGroupNSNR(dist.response)
+          
+          // NOVA VERIFICAÇÃO: Só processar se não for null
+          if (normalizedResponse === null) {
+            return // Skip respostas #NULL
+          }
+          
+          // Adicionar ao total de respostas válidas
+          totalValidResponses += dist.weightedCount
+          
+          // Depois aplicar agrupamento se necessário
+          const finalResponse = useGrouping ? groupResponses(normalizedResponse) : normalizedResponse
+
+          if (finalResponse === seriesId) {
+            weightedCount += dist.weightedCount
+          }
+        })
+
+        // ATUALIZAÇÃO: Usar totalValidResponses em vez de totalWeightedResponses
+        if (totalValidResponses > 0) {
+          yValue = (weightedCount / totalValidResponses) * 100
+        }
+      }
+
+      const roundNumber = period.split("-R")[1]
+      const dateLabel = surveyDateMap.get(roundNumber)
+      const xLabel = formatChartXAxis(period, dateLabel)
+
+      return {
+        x: xLabel,
+        y: Number.isFinite(yValue) ? yValue : 0,
+      }
+    }),
+  }))
+
+  // Filtrar séries duplicadas e ordenar
+  const uniqueSeries = new Map()
+  series.forEach((serie) => {
+    if (!uniqueSeries.has(serie.id)) {
+      uniqueSeries.set(serie.id, serie)
+    }
+  })
+
+  return Array.from(uniqueSeries.values())
+    .sort((a, b) => {
+      const indexA = responseOrder.indexOf(a.id)
+      const indexB = responseOrder.indexOf(b.id)
+      if (indexA > -1 && indexB > -1) return indexA - indexB
+      if (indexA > -1) return -1
+      if (indexB > -1) return 1
+      return a.id.localeCompare(b.id)
+    })
+    .filter((serie) => serie.data && serie.data.length > 0)
+}, [selectedChartData, surveyDateMap, formatChartXAxis])
 
   const getXAxisLabel = (rodada) => {
     if (!rodada || !surveyDateMap) return "N/A"
