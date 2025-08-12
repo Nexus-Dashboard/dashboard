@@ -112,6 +112,8 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
           borderBottom: isOpen ? "1px solid #dee2e6" : "2px solid #dee2e6",
           cursor: "pointer",
           transition: "all 0.3s ease",
+          zIndex: 100,
+          position: "relative",
           "&:hover": {
             backgroundColor: "#e9ecef",
             borderColor: "#0d6efd",
@@ -146,6 +148,8 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
             borderRadius: "0 0 12px 12px",
             border: "2px solid #dee2e6",
             borderTop: "none",
+            zIndex: 100,
+            position: "relative",
           }}
         >
           {relevantFilters.map((group) => (
@@ -269,9 +273,7 @@ export default function MapCard({
               </Typography>
               <Dropdown onSelect={onMapResponseChange} style={{ width: "100%" }}>
                 <Dropdown.Toggle as={ResponseSelectorToggle} id="response-selector-dropdown">
-                  <span style={{ fontSize: "14px" }}>
-                    {selectedMapResponse || "Selecione uma resposta"}
-                  </span>
+                  <span style={{ fontSize: "14px" }}>{selectedMapResponse || "Selecione uma resposta"}</span>
                 </Dropdown.Toggle>
                 <Dropdown.Menu as={ResponseSelectorMenu}>
                   {availableMapResponses.map((response) => (
@@ -363,8 +365,8 @@ export default function MapCard({
             flexGrow: 1,
             display: "flex",
             flexDirection: "column",
-            minHeight: 0, 
-            position: "relative"
+            minHeight: 0,
+            position: "relative",
           }}
         >
           {/* Mapa */}
@@ -381,6 +383,8 @@ export default function MapCard({
               minHeight: "200px",
               maxHeight: "500px",
               transition: "all 0.3s ease",
+              position: "relative",
+              zIndex: 1,
             }}
           >
             {hasRounds && mapData.length > 0 ? (

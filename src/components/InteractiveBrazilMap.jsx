@@ -3,28 +3,44 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as d3 from "d3"
 import { Box, Grid } from "@mui/material"
-import {
-  normalizeAnswer,
-  groupResponses,
-  shouldGroupResponses,
-  normalizeAndGroupNSNR,
-} from "../utils/chartUtils"
+import { normalizeAnswer, groupResponses, shouldGroupResponses, normalizeAndGroupNSNR } from "../utils/chartUtils"
 import { MAP_RESPONSE_BASE_COLORS } from "../utils/questionGrouping"
 
 const ABBR_TO_STATE_NAMES = {
-  AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas", BA: "Bahia",
-  CE: "Ceará", DF: "Distrito Federal", ES: "Espírito Santo", GO: "Goiás",
-  MA: "Maranhão", MT: "Mato Grosso", MS: "Mato Grosso do Sul", MG: "Minas Gerais",
-  PA: "Pará", PB: "Paraíba", PR: "Paraná", PE: "Pernambuco", PI: "Piauí",
-  RJ: "Rio de Janeiro", RN: "Rio Grande do Norte", RS: "Rio Grande do Sul",
-  RO: "Rondônia", RR: "Roraima", SC: "Santa Catarina", SP: "São Paulo",
-  SE: "Sergipe", TO: "Tocantins",
+  AC: "Acre",
+  AL: "Alagoas",
+  AP: "Amapá",
+  AM: "Amazonas",
+  BA: "Bahia",
+  CE: "Ceará",
+  DF: "Distrito Federal",
+  ES: "Espírito Santo",
+  GO: "Goiás",
+  MA: "Maranhão",
+  MT: "Mato Grosso",
+  MS: "Mato Grosso do Sul",
+  MG: "Minas Gerais",
+  PA: "Pará",
+  PB: "Paraíba",
+  PR: "Paraná",
+  PE: "Pernambuco",
+  PI: "Piauí",
+  RJ: "Rio de Janeiro",
+  RN: "Rio Grande do Norte",
+  RS: "Rio Grande do Sul",
+  RO: "Rondônia",
+  RR: "Roraima",
+  SC: "Santa Catarina",
+  SP: "São Paulo",
+  SE: "Sergipe",
+  TO: "Tocantins",
 }
 
 const STATE_NAME_TO_ABBR = Object.fromEntries(Object.entries(ABBR_TO_STATE_NAMES).map(([abbr, name]) => [name, abbr]))
 
 const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selectedMapResponse }) => {
   const svgRef = useRef(null)
+  const containerRef = useRef(null)
   const [geoData, setGeoData] = useState(null)
   const [hoveredState, setHoveredState] = useState(null)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
@@ -81,7 +97,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
         Object.keys(stateData.counts).forEach((response) => {
           stateData.percentages[response] = (stateData.counts[response] / stateData.total) * 100
         })
-        
+
         // Encontrar resposta dominante
         stateData.dominantResponse = Object.keys(stateData.counts).reduce((a, b) =>
           stateData.counts[a] > stateData.counts[b] ? a : b,
@@ -130,30 +146,32 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
     }
 
     const marginOfError = calculateMarginOfError(stateData.total)
-    
+
     // Ordenar respostas por percentual (maior para menor)
     const sortedResponses = Object.entries(stateData.percentages)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 3) // Mostrar apenas as 3 principais
 
     return (
       <div>
-        <strong style={{ fontSize: "15px", display: "block", marginBottom: "8px" }}>
-          {stateData.name}
-        </strong>
-        
+        <strong style={{ fontSize: "15px", display: "block", marginBottom: "8px" }}>{stateData.name}</strong>
+
         {/* Informações da resposta selecionada (se houver) */}
         {selectedMapResponse && stateData.percentages[selectedMapResponse] !== undefined && (
-          <div style={{ 
-            marginBottom: "8px", 
-            paddingBottom: "8px",
-            borderBottom: "1px solid rgba(255,255,255,0.3)"
-          }}>
-            <span style={{ 
-              color: MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#ffffff", 
-              fontWeight: "bold",
-              fontSize: "14px"
-            }}>
+          <div
+            style={{
+              marginBottom: "8px",
+              paddingBottom: "8px",
+              borderBottom: "1px solid rgba(255,255,255,0.3)",
+            }}
+          >
+            <span
+              style={{
+                color: MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#ffffff",
+                fontWeight: "bold",
+                fontSize: "14px",
+              }}
+            >
               {selectedMapResponse}: {stateData.percentages[selectedMapResponse].toFixed(1)}%
             </span>
             <br />
@@ -169,24 +187,27 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
             Principais respostas:
           </span>
           {sortedResponses.map(([response, percentage], index) => (
-            <div key={response} style={{ 
-              marginTop: "4px",
-              fontSize: "12px",
-              color: index === 0 ? "#90EE90" : "rgba(255,255,255,0.9)"
-            }}>
+            <div
+              key={response}
+              style={{
+                marginTop: "4px",
+                fontSize: "12px",
+                color: index === 0 ? "#90EE90" : "rgba(255,255,255,0.9)",
+              }}
+            >
               {index + 1}. {response}: {percentage.toFixed(1)}%
-              <span style={{ color: "rgba(255,255,255,0.7)", marginLeft: "5px" }}>
-                ({stateData.counts[response]})
-              </span>
+              <span style={{ color: "rgba(255,255,255,0.7)", marginLeft: "5px" }}>({stateData.counts[response]})</span>
             </div>
           ))}
         </div>
 
         {/* Informações gerais */}
-        <div style={{ 
-          borderTop: "1px solid rgba(255,255,255,0.3)",
-          paddingTop: "8px"
-        }}>
+        <div
+          style={{
+            borderTop: "1px solid rgba(255,255,255,0.3)",
+            paddingTop: "8px",
+          }}
+        >
           <span style={{ color: "rgba(255,255,255,0.9)", fontSize: "12px" }}>
             <strong>Total de respostas:</strong> {stateData.total}
           </span>
@@ -232,23 +253,27 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .attr("stroke-width", 0.5)
       .style("cursor", "pointer")
       .on("mouseover", function (event, d) {
-        d3.select(this)
-          .attr("stroke", "#343a40")
-          .attr("stroke-width", 2)
-          .style("filter", "brightness(1.1)")
-        
+        d3.select(this).attr("stroke", "#343a40").attr("stroke-width", 2).style("filter", "brightness(1.1)")
+
         const stateData = stateResults.get(d.properties.sigla)
         setHoveredState({ abbr: d.properties.sigla, data: stateData })
-        setMousePosition({ x: event.pageX, y: event.pageY })
+
+        // Posição relativa ao container do mapa
+        const containerRect = containerRef.current.getBoundingClientRect()
+        setMousePosition({
+          x: event.clientX - containerRect.left,
+          y: event.clientY - containerRect.top,
+        })
       })
       .on("mousemove", (event) => {
-        setMousePosition({ x: event.pageX, y: event.pageY })
+        const containerRect = containerRef.current.getBoundingClientRect()
+        setMousePosition({
+          x: event.clientX - containerRect.left,
+          y: event.clientY - containerRect.top,
+        })
       })
       .on("mouseout", function () {
-        d3.select(this)
-          .attr("stroke", "#fff")
-          .attr("stroke-width", 0.5)
-          .style("filter", "none")
+        d3.select(this).attr("stroke", "#fff").attr("stroke-width", 0.5).style("filter", "none")
         setHoveredState(null)
       })
       .on("click", (event, d) => {
@@ -259,12 +284,21 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
   }, [geoData, mapData, onStateClick, colorScale, selectedMapResponse])
 
   return (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", position: "relative" }}>
+    <Box
+      ref={containerRef}
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        zIndex: 1,
+      }}
+    >
       {/* Tooltip personalizado */}
       {hoveredState && (
         <div
           style={{
-            position: "fixed",
+            position: "absolute",
             left: mousePosition.x + 15,
             top: mousePosition.y - 10,
             backgroundColor: "rgba(0, 0, 0, 0.92)",
@@ -273,7 +307,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
             borderRadius: "12px",
             fontSize: "13px",
             lineHeight: "1.4",
-            zIndex: 9999,
+            zIndex: 10000,
             pointerEvents: "none",
             maxWidth: "320px",
             boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
@@ -284,14 +318,11 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
           {renderTooltipContent(hoveredState.data, hoveredState.abbr)}
         </div>
       )}
-      
+
       <Grid container sx={{ height: "100%" }}>
         <Grid item xs={12} sx={{ height: "100%" }}>
           <Box sx={{ width: "100%", height: "100%", minHeight: "300px" }}>
-            <svg
-              ref={svgRef}
-              style={{ width: "100%", height: "100%", display: "block" }}
-            />
+            <svg ref={svgRef} style={{ width: "100%", height: "100%", display: "block" }} />
           </Box>
         </Grid>
       </Grid>
