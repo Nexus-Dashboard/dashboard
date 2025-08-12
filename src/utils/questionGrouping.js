@@ -47,19 +47,30 @@ export const getAnswerTypeTitle = (possibleAnswers) => {
  * A chave deve ser a resposta normalizada (ex: "Aprova", "Desaprova").
  */
 export const MAP_RESPONSE_BASE_COLORS = {
-  // Cores para Aprovação/Desaprovação
-  Aprova: "#0f9d58", // Verde
-  Desaprova: "#db4437", // Vermelho
-  "Ótimo/Bom": "#0f9d58", // Verde
-  "Ruim/Péssimo": "#db4437", // Vermelho
-  Regular: "#f4b400", // Amarelo/Laranja
-  "NS/NR": "#9e9e9e", // Cinza
+  // Respostas positivas - VERDE
+  Ótimo: "#28a745",
+  Bom: "#28a745",
+  "Regular mais para positivo": "#28a745",
+  "Melhorar muito": "#28a745",
+  "Melhorar um pouco": "#8ccc9b",
+  Aprova: "#28a745",
 
-  // Fallback para outras respostas comuns
-  Sim: "#0f9d58",
-  Não: "#db4437",
-  "Não sabe": "#9e9e9e",
-  "Não respondeu": "#9e9e9e",
+  // Respostas neutras - AMARELO
+  Regular: "#ffc107",
+  "Ficar igual": "#ffc107",
+
+  // Respostas negativas - VERMELHO
+  "Regular mais para negativo": "#dc3545",
+  Ruim: "#dc3545",
+  Péssimo: "#dc3545",
+  "Piorar um pouco": "#dc3545",
+  "Piorar muito": "#810814",
+  Desaprova: "#dc3545",
+
+  // Outros - CINZA
+  "Não sabe": "#6c757d",
+  "Não respondeu": "#6c757d",
+  "NS/NR": "#6c757d",
 }
 
 /**
@@ -67,16 +78,23 @@ export const MAP_RESPONSE_BASE_COLORS = {
  * As respostas não listadas aqui aparecerão depois, em ordem alfabética.
  */
 export const MAP_RESPONSE_ORDER = [
-  "Aprova",
-  "Desaprova",
-  "Ótimo/Bom",
-  "Regular",
-  "Ruim/Péssimo",
-  "Sim",
-  "Não",
-  "NS/NR",
-  "Não sabe",
-  "Não respondeu",
+  "Melhorar muito",
+    "Melhorar um pouco",
+    "Ficar igual",
+    "Piorar um pouco",
+    "Piorar muito",
+    "Ótimo",
+    "Bom",
+    "Regular mais para positivo",
+    "Regular",
+    "Regular mais para negativo",
+    "Ruim",
+    "Péssimo",
+    "Aprova",
+    "Desaprova",
+    "NS/NR",
+    "Não sabe",
+    "Não respondeu",
 ]
 
 // Função para obter descrição do grupo

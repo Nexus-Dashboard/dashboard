@@ -7,6 +7,11 @@ export const RESPONSE_ORDER = [
   "Regular mais para negativo",
   "Ruim",
   "Péssimo",
+  "Melhorar muito",
+  "Melhorar um pouco",
+  "Ficar igual",
+  "Piorar um pouco",
+  "Piorar muito",
   "Aprova",
   "Desaprova",
   "Não sabe",
@@ -53,37 +58,37 @@ export const normalizeAnswer = (raw) => {
   const s = String(raw || "")
     .trim()
     .replace(/\s*$$NÃO LER$$\s*/i, "")
-  
+
   // NOVA VERIFICAÇÃO: Filtrar respostas #NULL (case insensitive)
   if (/^#null!?$/i.test(s) || s === "#NULL" || s === "#null") {
     return null // Retorna null para ser filtrado
   }
-  
+
   if (/^não sabe/i.test(s)) return "Não sabe"
   if (/^não respond/i.test(s)) return "Não respondeu"
-  
+
   // Se string vazia ou só espaços, retorna null para ser filtrado
   if (!s || s === "") {
     return null
   }
-  
+
   return s
 }
 
 // NOVA FUNÇÃO: Sempre agrupa NS/NR e filtra respostas nulas
 export const normalizeAndGroupNSNR = (response) => {
   const normalized = normalizeAnswer(response)
-  
+
   // Se normalizeAnswer retornou null (resposta inválida), filtrar
   if (normalized === null) {
     return null
   }
-  
+
   // SEMPRE agrupar "Não sabe" e "Não respondeu" em "NS/NR"
   if (["Não sabe", "Não respondeu"].includes(normalized)) {
     return "NS/NR"
   }
-  
+
   return normalized
 }
 
@@ -143,7 +148,7 @@ export const groupResponses = (response) => {
 
   // PRIMEIRO: sempre normalizar e agrupar NS/NR
   const withNSNR = normalizeAndGroupNSNR(response)
-  
+
   // Se já foi convertido para NS/NR ou é null, retornar
   if (withNSNR === "NS/NR" || withNSNR === null) {
     return withNSNR
@@ -168,9 +173,9 @@ export const groupResponses = (response) => {
 // Função para verificar se uma pergunta deve usar agrupamento (ATUALIZADA)
 export const shouldGroupResponses = (responses) => {
   // SEMPRE aplicar agrupamento NS/NR primeiro
-  const normalizedWithNSNR = responses.map(r => normalizeAndGroupNSNR(r))
+  const normalizedWithNSNR = responses.map((r) => normalizeAndGroupNSNR(r))
   const uniqueResponses = new Set(normalizedWithNSNR)
-  
+
   // Verificar se deve usar agrupamento completo (Ótimo/Bom, etc.)
   const groupableResponses = ["Ótimo", "Bom", "Regular", "Ruim", "Péssimo"]
   const hasGroupableResponses = groupableResponses.filter((r) => uniqueResponses.has(r)).length >= 4
@@ -198,4 +203,3 @@ export const aggregateResponses = (answer) => {
   if (["Não sabe", "Não respondeu"].includes(answer)) return "NS/NR"
   return answer
 }
-

@@ -41,9 +41,11 @@ const STATE_NAME_TO_ABBR = Object.fromEntries(Object.entries(ABBR_TO_STATE_NAMES
 const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selectedMapResponse }) => {
   const svgRef = useRef(null)
   const containerRef = useRef(null)
+  const tooltipRef = useRef(null)
   const [geoData, setGeoData] = useState(null)
   const [hoveredState, setHoveredState] = useState(null)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0, position: "right" })
   const [colorScale, setColorScale] = useState(() => d3.scaleLinear().domain([0, 100]).range(["#e9ecef", "#e9ecef"]))
 
   useEffect(() => {
@@ -131,6 +133,47 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
   const calculateMarginOfError = (n) => {
     if (!n || n === 0) return 0
     return Math.sqrt(1 / n) * 100
+  }
+
+  // Função para calcular posição inteligente do tooltip
+  const calculateTooltipPosition = (mouseX, mouseY, containerRect) => {
+    const tooltipWidth = 320 // largura máxima do tooltip
+    const tooltipHeight = 200 // altura estimada do tooltip
+    const margin = 15 // margem de segurança
+
+    let x = mouseX
+    let y = mouseY
+    let position = "right"
+
+    // Verificar se há espaço à direita
+    if (mouseX + tooltipWidth + margin > containerRect.width) {
+      // Não há espaço à direita, tentar à esquerda
+      if (mouseX - tooltipWidth - margin > 0) {
+        x = mouseX - tooltipWidth - margin
+        position = "left"
+      } else {
+        // Não há espaço nem à direita nem à esquerda, centralizar
+        x = Math.max(margin, Math.min(mouseX - tooltipWidth / 2, containerRect.width - tooltipWidth - margin))
+        position = "center"
+      }
+    } else {
+      x = mouseX + margin
+      position = "right"
+    }
+
+    // Verificar se há espaço embaixo
+    if (mouseY + tooltipHeight + margin > containerRect.height) {
+      // Não há espaço embaixo, colocar em cima
+      y = Math.max(margin, mouseY - tooltipHeight - margin)
+    } else {
+      y = mouseY + margin
+    }
+
+    // Garantir que o tooltip não saia dos limites
+    x = Math.max(margin, Math.min(x, containerRect.width - tooltipWidth - margin))
+    y = Math.max(margin, Math.min(y, containerRect.height - tooltipHeight - margin))
+
+    return { x, y, position }
   }
 
   // Tooltip completo que mostra todas as informações
@@ -260,17 +303,31 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
 
         // Posição relativa ao container do mapa
         const containerRect = containerRef.current.getBoundingClientRect()
-        setMousePosition({
-          x: event.clientX - containerRect.left,
-          y: event.clientY - containerRect.top,
+        const mouseX = event.clientX - containerRect.left
+        const mouseY = event.clientY - containerRect.top
+
+        setMousePosition({ x: mouseX, y: mouseY })
+
+        // Calcular posição inteligente do tooltip
+        const tooltipPos = calculateTooltipPosition(mouseX, mouseY, {
+          width: containerRect.width,
+          height: containerRect.height,
         })
+        setTooltipPosition(tooltipPos)
       })
       .on("mousemove", (event) => {
         const containerRect = containerRef.current.getBoundingClientRect()
-        setMousePosition({
-          x: event.clientX - containerRect.left,
-          y: event.clientY - containerRect.top,
+        const mouseX = event.clientX - containerRect.left
+        const mouseY = event.clientY - containerRect.top
+
+        setMousePosition({ x: mouseX, y: mouseY })
+
+        // Recalcular posição do tooltip durante o movimento
+        const tooltipPos = calculateTooltipPosition(mouseX, mouseY, {
+          width: containerRect.width,
+          height: containerRect.height,
         })
+        setTooltipPosition(tooltipPos)
       })
       .on("mouseout", function () {
         d3.select(this).attr("stroke", "#fff").attr("stroke-width", 0.5).style("filter", "none")
@@ -294,13 +351,14 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
         zIndex: 1,
       }}
     >
-      {/* Tooltip personalizado */}
+      {/* Tooltip personalizado com posicionamento inteligente */}
       {hoveredState && (
         <div
+          ref={tooltipRef}
           style={{
             position: "absolute",
-            left: mousePosition.x + 15,
-            top: mousePosition.y - 10,
+            left: tooltipPosition.x,
+            top: tooltipPosition.y,
             backgroundColor: "rgba(0, 0, 0, 0.92)",
             color: "white",
             padding: "16px 20px",
@@ -310,9 +368,11 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
             zIndex: 10000,
             pointerEvents: "none",
             maxWidth: "320px",
+            minWidth: "280px",
             boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
             border: "1px solid rgba(255, 255, 255, 0.15)",
             backdropFilter: "blur(10px)",
+            transition: "all 0.1s ease-out",
           }}
         >
           {renderTooltipContent(hoveredState.data, hoveredState.abbr)}
