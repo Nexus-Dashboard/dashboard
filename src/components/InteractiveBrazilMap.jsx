@@ -3,7 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as d3 from "d3"
 import { Box, Typography, Grid } from "@mui/material"
-import { normalizeAnswer, groupResponses, shouldGroupResponses } from "../utils/chartUtils"
+import { 
+  normalizeAnswer, 
+  getResponseColor, 
+  groupResponses, 
+  shouldGroupResponses,
+  groupedResponseColorMap,
+  GROUPED_RESPONSE_ORDER,
+  RESPONSE_ORDER 
+} from "../utils/chartUtils"
 import { MAP_RESPONSE_BASE_COLORS } from "../utils/questionGrouping"
 
 const ABBR_TO_STATE_NAMES = {
@@ -43,10 +51,9 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
   const [geoData, setGeoData] = useState(null)
   const [hoveredState, setHoveredState] = useState(null)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  // Linha corrigida
   const [colorScale, setColorScale] = useState(() =>
     d3.scaleLinear().domain([0, 100]).range(["#e9ecef", "#e9ecef"])
-  );
+  )
 
   useEffect(() => {
     fetch("/brazil-states.json")
@@ -98,6 +105,12 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
           stateData.percentages[response] = (stateData.counts[response] / stateData.total) * 100
         })
         stateData.marginOfError = Math.sqrt(1 / stateData.total) * 100
+        
+        // Encontrar resposta dominante para colorir o mapa quando não há resposta selecionada
+        stateData.dominantResponse = Object.keys(stateData.counts).reduce((a, b) =>
+          stateData.counts[a] > stateData.counts[b] ? a : b,
+        )
+        stateData.dominantPercentage = stateData.percentages[stateData.dominantResponse].toFixed(1)
       }
     })
 
@@ -106,71 +119,94 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
 
   useEffect(() => {
     if (!selectedMapResponse || !mapData.stateResults.size) {
-      const defaultScale = d3.scaleLinear().domain([0, 100]).range(["#e9ecef", "#e9ecef"]).clamp(true);
-      // CORREÇÃO AQUI
-      setColorScale(() => defaultScale);
-      return;
+      const defaultScale = d3.scaleLinear().domain([0, 100]).range(["#e9ecef", "#e9ecef"]).clamp(true)
+      setColorScale(() => defaultScale)
+      return
     }
 
-    const baseColor = MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#9e9e9e";
-    const lightColor = d3.color(baseColor).brighter(2.5).formatHex();
+    const baseColor = MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#9e9e9e"
+    const lightColor = d3.color(baseColor).brighter(2.5).formatHex()
 
     const percentages = Array.from(mapData.stateResults.values())
       .map((state) => state.percentages[selectedMapResponse] || 0)
-      .filter((p) => p > 0);
+      .filter((p) => p > 0)
 
-    const maxPercentage = percentages.length > 0 ? Math.max(...percentages) : 100;
+    const maxPercentage = percentages.length > 0 ? Math.max(...percentages) : 100
 
-    const scale = d3.scaleLinear().domain([0, maxPercentage]).range([lightColor, baseColor]).clamp(true);
+    const scale = d3.scaleLinear().domain([0, maxPercentage]).range([lightColor, baseColor]).clamp(true)
 
-    // CORREÇÃO AQUI
-    setColorScale(() => scale);
-}, [selectedMapResponse, mapData]);
+    setColorScale(() => scale)
+  }, [selectedMapResponse, mapData])
 
+  // Função para calcular a margem de erro
   const calculateMarginOfError = (n) => {
     if (!n || n === 0) return 0
     return Math.sqrt(1 / n) * 100
   }
 
+  // Criar tooltip content
   const renderTooltipContent = (stateData, stateAbbr) => {
     if (!stateData) {
       return (
         <div>
           <strong>{ABBR_TO_STATE_NAMES[stateAbbr] || stateAbbr}</strong>
           <br />
-          <span className="text-muted">Sem dados disponíveis</span>
+          <span style={{ color: 'rgba(255,255,255,0.8)' }}>Sem dados disponíveis</span>
         </div>
       )
     }
 
-    const percentage = stateData.percentages?.[selectedMapResponse]
     const marginOfError = calculateMarginOfError(stateData.total)
 
-    return (
-      <div>
-        <strong>{stateData.name}</strong>
-        <br />
-        {typeof percentage !== "undefined" ? (
-          <span style={{ color: colorScale(percentage), fontWeight: "bold" }}>
+    if (selectedMapResponse) {
+      // Mostrar dados para a resposta selecionada
+      const percentage = stateData.percentages[selectedMapResponse] || 0
+      const responseCount = stateData.counts[selectedMapResponse] || 0
+      const responseColor = colorScale(percentage)
+
+      return (
+        <div>
+          <strong>{stateData.name}</strong>
+          <br />
+          <span style={{ color: responseColor, fontWeight: 'bold' }}>
             {selectedMapResponse}: {percentage.toFixed(1)}%
           </span>
-        ) : (
-          <span style={{ color: "#ccc" }}>{selectedMapResponse}: N/A</span>
-        )}
-        <br />
-        <span className="text-white">Total: {stateData.total} respostas</span>
-        <br />
-        <span className="text-white" style={{ fontSize: "0.85em" }}>
-          Margem de erro: ±{marginOfError.toFixed(1)}pp
-        </span>
-      </div>
-    )
+          <br />
+          <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '12px' }}>
+            {responseCount} de {stateData.total} respostas
+          </span>
+          <br />
+          <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '11px' }}>
+            Margem de erro: ±{marginOfError.toFixed(1)}pp
+          </span>
+        </div>
+      )
+    } else {
+      // Mostrar resposta dominante quando não há resposta selecionada
+      return (
+        <div>
+          <strong>{stateData.name}</strong>
+          <br />
+          <span style={{ color: '#28a745', fontWeight: 'bold' }}>
+            {stateData.dominantResponse}: {stateData.dominantPercentage}%
+          </span>
+          <br />
+          <span style={{ color: 'rgba(255,255,255,0.9)' }}>
+            Total: {stateData.total} respostas
+          </span>
+          <br />
+          <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85em' }}>
+            Margem de erro: ±{marginOfError.toFixed(1)}pp
+          </span>
+        </div>
+      )
+    }
   }
 
   useEffect(() => {
     if (!geoData || !svgRef.current) return
 
-    const { stateResults } = mapData
+    const { stateResults, useGrouping } = mapData
 
     const svg = d3.select(svgRef.current)
     svg.selectAll("*").remove()
@@ -197,6 +233,10 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
         const stateData = stateResults.get(d.properties.sigla)
         if (stateData && selectedMapResponse && typeof stateData.percentages[selectedMapResponse] !== "undefined") {
           return colorScale(stateData.percentages[selectedMapResponse])
+        } else if (stateData && stateData.dominantResponse && !selectedMapResponse) {
+          // Usar resposta dominante quando não há resposta selecionada
+          const colorFn = useGrouping ? (d) => groupedResponseColorMap[d] : getResponseColor
+          return colorFn(stateData.dominantResponse)
         }
         return "#e9ecef"
       })
@@ -206,10 +246,12 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .on("mouseover", function (event, d) {
         d3.select(this).attr("stroke", "#343a40").attr("stroke-width", 2)
         const stateData = stateResults.get(d.properties.sigla)
+        
         setHoveredState({
           abbr: d.properties.sigla,
           data: stateData,
         })
+        
         setMousePosition({
           x: event.pageX,
           y: event.pageY,
@@ -233,17 +275,16 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
   }, [geoData, mapData, onStateClick, colorScale, selectedMapResponse])
 
   const ColorScaleLegend = ({ scale }) => {
-    // ADICIONE ESTA VERIFICAÇÃO
     if (!scale || typeof scale.domain !== 'function') {
-      return null;
+      return null
     }
   
-    const legendHeight = 20;
-    const legendWidth = 150;
-    const domain = scale.domain();
-    const range = scale.range();
+    const legendHeight = 20
+    const legendWidth = 150
+    const domain = scale.domain()
+    const range = scale.range()
 
-    if (!domain || domain.length < 2 || !range) return null;
+    if (!domain || domain.length < 2 || !range) return null
 
     const gradientId = `legend-gradient-${selectedMapResponse?.replace(/\s/g, "-")}`
 
@@ -273,23 +314,25 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column", position: "relative" }}>
+      {/* Tooltip personalizado baseado no arquivo anterior */}
       {hoveredState && (
         <div
           style={{
             position: "fixed",
             left: mousePosition.x + 15,
             top: mousePosition.y - 10,
-            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            backgroundColor: "rgba(0, 0, 0, 0.92)",
             color: "white",
-            padding: "12px",
+            padding: "12px 16px",
             borderRadius: "8px",
-            fontSize: "14px",
+            fontSize: "13px",
             lineHeight: "1.4",
             zIndex: 9999,
             pointerEvents: "none",
-            maxWidth: "250px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
+            maxWidth: "280px",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            backdropFilter: "blur(10px)"
           }}
         >
           {renderTooltipContent(hoveredState.data, hoveredState.abbr)}
@@ -309,7 +352,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
             />
           </Box>
         </Grid>
-        
       </Grid>
     </Box>
   )

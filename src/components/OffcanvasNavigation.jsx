@@ -1,6 +1,6 @@
 "use client"
 import { Offcanvas, Nav, Button, Accordion, Form, Badge } from "react-bootstrap"
-import { House, Upload, X, Funnel, Filter } from "react-bootstrap-icons"
+import { House, X, Funnel, Filter } from "react-bootstrap-icons"
 import { useNavigate, useLocation } from "react-router-dom"
 
 const OffcanvasNavigation = ({
@@ -214,14 +214,14 @@ const OffcanvasNavigation = ({
 
   return (
     <Offcanvas show={show} onHide={onHide} placement="start" style={customStyles.offcanvas}>
-      <Offcanvas.Header style={customStyles.header}>
+      <Offcanvas.Header style={{ ...customStyles.header, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={customStyles.headerOverlay}></div>
         <Offcanvas.Title style={customStyles.title}>
           <Funnel className="me-2" size={20} />
           Navegação e Filtros
         </Offcanvas.Title>
         <Button 
-          style={customStyles.closeButton}
+          style={{ ...customStyles.closeButton, marginLeft: "auto" }}
           onClick={onHide}
           onMouseEnter={(e) => {
             e.target.style.background = "rgba(255,255,255,0.3)"
@@ -268,32 +268,7 @@ const OffcanvasNavigation = ({
             >
               <House className="me-3" size={16} />
               Home
-            </Nav.Link>
-            <Nav.Link
-              style={{
-                ...customStyles.navLink,
-                ...(location.pathname === "/upload" 
-                  ? customStyles.navLinkActive 
-                  : customStyles.navLinkInactive
-                )
-              }}
-              onClick={() => handleNavigation("/upload")}
-              onMouseEnter={(e) => {
-                if (location.pathname !== "/upload") {
-                  e.target.style.background = "rgba(102, 126, 234, 0.1)"
-                  e.target.style.transform = "translateX(4px)"
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (location.pathname !== "/upload") {
-                  e.target.style.background = "rgba(255,255,255,0.7)"
-                  e.target.style.transform = "translateX(0)"
-                }
-              }}
-            >
-              <Upload className="me-3" size={16} />
-              Upload de Dados
-            </Nav.Link>
+            </Nav.Link>            
           </Nav>
         </div>
 

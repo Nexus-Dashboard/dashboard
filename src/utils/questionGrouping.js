@@ -201,7 +201,6 @@ export const CHART_LEGEND_ORDER = [
   "Ótimo",
   "Bom",
   "Regular mais para positivo",
-  "Regular",
   "Regular mais para negativo",
   "Ruim",
   "Péssimo",

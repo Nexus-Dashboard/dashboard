@@ -98,14 +98,14 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
   if (relevantFilters.length === 0) return null
 
   return (
-    <Box sx={{ mt: 2 }}>
+    <Box sx={{ mt: 1, mb: 0 }}>
       {/* Header do Collapse */}
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          p: 2,
+          p: 1.5,
           backgroundColor: "#f8f9fa",
           borderRadius: "12px 12px 0 0",
           border: "2px solid #dee2e6",
@@ -120,11 +120,11 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
         onClick={() => setIsOpen(!isOpen)}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Filter size={18} />
+          <Filter size={16} />
           <Typography
             variant="subtitle2"
             sx={{
-              fontSize: "14px",
+              fontSize: "13px",
               fontWeight: "600",
               color: "#495057",
             }}
@@ -132,8 +132,8 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
             Filtros Demográficos
           </Typography>
         </Box>
-        <IconButton size="small" sx={{ color: "#6c757d" }}>
-          {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        <IconButton size="small" sx={{ color: "#6c757d", p: 0 }}>
+          {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </IconButton>
       </Box>
 
@@ -141,7 +141,7 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
       <Collapse in={isOpen}>
         <Box
           sx={{
-            p: 2,
+            p: 1.5,
             backgroundColor: "#ffffff",
             borderRadius: "0 0 12px 12px",
             border: "2px solid #dee2e6",
@@ -149,20 +149,20 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
           }}
         >
           {relevantFilters.map((group) => (
-            <Box key={group.key} sx={{ mb: 2, "&:last-child": { mb: 0 } }}>
+            <Box key={group.key} sx={{ mb: 1.5, "&:last-child": { mb: 0 } }}>
               <Typography
                 variant="caption"
                 sx={{
-                  fontSize: "12px",
+                  fontSize: "11px",
                   fontWeight: "600",
                   color: "#495057",
-                  mb: 1,
+                  mb: 0.5,
                   display: "block",
                 }}
               >
                 {group.label}
               </Typography>
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                 {group.values.map((value) => {
                   const isActive = activeFilters[group.key]?.[0] === value
                   return (
@@ -174,11 +174,11 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
                       startIcon={ICONS[value] || <div style={{ width: 16 }} />}
                       sx={{
                         minWidth: "auto",
-                        px: 1.5,
-                        py: 0.5,
-                        fontSize: "11px",
+                        px: 1,
+                        py: 0.25,
+                        fontSize: "10px",
                         fontWeight: "500",
-                        borderRadius: "20px",
+                        borderRadius: "16px",
                         textTransform: "none",
                         transition: "all 0.2s ease",
                         ...(isActive
@@ -210,100 +210,6 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
         </Box>
       </Collapse>
     </Box>
-  )
-}
-
-const InteractiveBrazilMapWithTooltip = ({ responses, selectedQuestion, selectedMapResponse, onStateClick }) => {
-  const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, content: null })
-
-  const handleMouseEnter = (event, stateData) => {
-    if (!stateData || !responses) return
-
-    // Calcular estatísticas para o estado
-    const stateResponses = responses.filter((r) => r.UF === stateData.uf)
-    const totalResponses = stateResponses.length
-
-    if (totalResponses === 0) return
-
-    // Contar respostas para a resposta selecionada
-    const selectedResponses = stateResponses.filter((r) => r[selectedQuestion?.variable] === selectedMapResponse).length
-
-    // Calcular porcentagem
-    const percentage = ((selectedResponses / totalResponses) * 100).toFixed(1)
-
-    // Calcular margem de erro: raiz quadrada de (1/N)
-    const marginOfError = (Math.sqrt(1 / totalResponses) * 100).toFixed(1)
-
-    const rect = event.currentTarget.getBoundingClientRect()
-    setTooltip({
-      visible: true,
-      x: event.clientX,
-      y: event.clientY,
-      content: {
-        state: stateData.name,
-        percentage: percentage,
-        marginOfError: marginOfError,
-        totalResponses: totalResponses,
-        selectedResponse: selectedMapResponse,
-      },
-    })
-  }
-
-  const handleMouseLeave = () => {
-    setTooltip({ visible: false, x: 0, y: 0, content: null })
-  }
-
-  const handleMouseMove = (event) => {
-    if (tooltip.visible) {
-      setTooltip((prev) => ({
-        ...prev,
-        x: event.clientX,
-        y: event.clientY,
-      }))
-    }
-  }
-
-  return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <InteractiveBrazilMap
-        responses={responses}
-        selectedQuestion={selectedQuestion}
-        selectedMapResponse={selectedMapResponse}
-        onStateClick={onStateClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onMouseMove={handleMouseMove}
-      />
-
-      {/* Tooltip */}
-      {tooltip.visible && tooltip.content && (
-        <div
-          style={{
-            position: "fixed",
-            left: tooltip.x + 10,
-            top: tooltip.y - 10,
-            background: "rgba(0, 0, 0, 0.9)",
-            color: "white",
-            borderRadius: "8px",
-            padding: "12px 16px",
-            fontSize: "13px",
-            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            backdropFilter: "blur(10px)",
-            zIndex: 1000,
-            pointerEvents: "none",
-            maxWidth: "250px",
-          }}
-        >
-          <div style={{ fontWeight: "600", marginBottom: "4px" }}>{tooltip.content.state}</div>
-          <div style={{ marginBottom: "2px" }}>
-            <strong>{tooltip.content.selectedResponse}:</strong> {tooltip.content.percentage}%
-          </div>
-          <div style={{ fontSize: "11px", color: "#ccc" }}>Margem de erro: ±{tooltip.content.marginOfError}pp</div>
-          <div style={{ fontSize: "11px", color: "#ccc" }}>({tooltip.content.totalResponses} respostas)</div>
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -339,7 +245,8 @@ export default function MapCard({
           Mapa Interativo do Brasil
         </Typography>
 
-        <Box sx={{ mb: 2 }}>
+        {/* Controles superiores - fixos */}
+        <Box sx={{ mb: 2, flexShrink: 0 }}>
           <Box sx={{ display: "flex", gap: 2, alignItems: "stretch" }}>
             {/* Seletor de resposta - 50% quando há múltiplas rodadas, 100% quando há apenas uma */}
             <Box sx={{ flex: mapRoundsWithData.length > 1 ? 1 : 1, minWidth: 0 }}>
@@ -443,21 +350,20 @@ export default function MapCard({
           </Box>
         </Box>
 
-        {/* Mapa - ocupa o espaço restante e centralizado */}
+        {/* Container do mapa - área principal que se adapta */}
         <Box
           sx={{
             flexGrow: 1,
             display: "flex",
             flexDirection: "column",
-            minHeight: 0,
-            mt: 2,
-            // position: "relative", // Removed position relative to avoid overlap
+            minHeight: 0, // Importante para permitir que o flex funcione corretamente
+            position: "relative"
           }}
         >
-          <div
-            style={{
+          {/* Mapa */}
+          <Box
+            sx={{
               flexGrow: 1,
-              height: "100%",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -465,9 +371,10 @@ export default function MapCard({
               borderRadius: "12px",
               border: "1px solid #e9ecef",
               padding: "1rem",
-              // minHeight: "350px", // Reduced minimum height for better responsiveness
-              minHeight: "280px",
-              transition: "all 0.3s ease", // Added transition for smooth height changes
+              minHeight: "200px", // Altura mínima reduzida
+              maxHeight: "500px", // Altura máxima para evitar que fique muito grande
+              transition: "all 0.3s ease",
+              overflow: "hidden" // Para garantir que o conteúdo não vaze
             }}
           >
             {hasRounds && mapData.length > 0 && selectedMapResponse ? (
@@ -480,7 +387,7 @@ export default function MapCard({
                   justifyContent: "center",
                 }}
               >
-                <InteractiveBrazilMapWithTooltip
+                <InteractiveBrazilMap
                   responses={mapData}
                   selectedQuestion={questionInfo}
                   selectedMapResponse={selectedMapResponse}
@@ -508,15 +415,15 @@ export default function MapCard({
                 </Typography>
               </Box>
             )}
-          </div>
-        </Box>
+          </Box>
 
-        {/* Filtros moved outside the container flexGrow to avoid overlap */}
-        <CollapsibleMapFilters
-          availableDemographics={availableDemographics}
-          activeFilters={activeFilters}
-          onFilterToggle={onFilterToggle}
-        />
+          {/* Filtros - fixos na parte inferior, fora do container do mapa */}
+          <CollapsibleMapFilters
+            availableDemographics={availableDemographics}
+            activeFilters={activeFilters}
+            onFilterToggle={onFilterToggle}
+          />
+        </Box>
       </div>
 
       {/* Estilos CSS para o slider customizado */}
