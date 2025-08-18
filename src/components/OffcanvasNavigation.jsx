@@ -2,6 +2,8 @@
 import { Offcanvas, Nav, Button, Accordion, Form, Badge } from "react-bootstrap"
 import { House, X, Funnel, Filter } from "react-bootstrap-icons"
 import { useNavigate, useLocation } from "react-router-dom"
+import { STATES_BY_REGION } from "../utils/regionMapping"
+
 
 const OffcanvasNavigation = ({
   show,
@@ -303,45 +305,130 @@ const OffcanvasNavigation = ({
           </div>
 
           <Accordion flush>
-            {availableDemographics.map((demographic, index) => (
-              <Accordion.Item key={demographic.key} eventKey={index.toString()} style={customStyles.accordionItem}>
-                <Accordion.Header style={customStyles.accordionHeader}>
-                  <div className="d-flex justify-content-between align-items-center w-100 me-3">
-                    <span style={{ fontSize: "14px", fontWeight: "500", color: "#495057" }}>
-                      {demographic.label}
-                    </span>
-                    {filters[demographic.key]?.length > 0 && (
-                      <Badge style={{
-                        ...customStyles.badge,
-                        borderRadius: "50%",
-                        width: "24px",
-                        height: "24px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "10px"
-                      }}>
-                        {filters[demographic.key].length}
-                      </Badge>
-                    )}
-                  </div>
-                </Accordion.Header>
-                <Accordion.Body style={customStyles.accordionBody}>
-                  {demographic.values.map((value) => (
-                    <Form.Check
-                      key={value}
-                      type="checkbox"
-                      id={`${demographic.key}-${value}`}
-                      label={value}
-                      checked={(filters[demographic.key] || []).includes(value)}
-                      onChange={(e) => handleFilterChange(demographic.key, value, e.target.checked)}
-                      style={customStyles.checkbox}
-                      className="custom-checkbox"
-                    />
-                  ))}
-                </Accordion.Body>
-              </Accordion.Item>
-            ))}
+            {availableDemographics.map((demographic, index) => {
+              // Tratamento especial para região virtual
+              if (demographic.key === "REGIAO_VIRTUAL") {
+                return (
+                  <Accordion.Item key={demographic.key} eventKey={index.toString()} style={customStyles.accordionItem}>
+                    <Accordion.Header style={customStyles.accordionHeader}>
+                      <div className="d-flex justify-content-between align-items-center w-100 me-3">
+                        <span style={{ fontSize: "14px", fontWeight: "500", color: "#495057" }}>
+                          {demographic.label}
+                        </span>
+                        {filters[demographic.key]?.length > 0 && (
+                          <Badge style={{
+                            ...customStyles.badge,
+                            borderRadius: "50%",
+                            width: "24px",
+                            height: "24px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "10px"
+                          }}>
+                            {filters[demographic.key].length}
+                          </Badge>
+                        )}
+                      </div>
+                    </Accordion.Header>
+                    <Accordion.Body style={customStyles.accordionBody}>
+                      {/* Filtro especial para regiões */}
+                      {Object.keys(STATES_BY_REGION).sort().map(region => (
+                        <div key={region} style={customStyles.checkbox}>
+                          <Form.Check
+                            type="checkbox"
+                            id={`region-${region}`}
+                            checked={(filters[demographic.key] || []).includes(region)}
+                            onChange={(e) => handleFilterChange(demographic.key, region, e.target.checked)}
+                            className="custom-checkbox"
+                            label={
+                              <div className="d-flex justify-content-between align-items-center w-100">
+                                <span style={{ fontSize: "13px" }}>{region}</span>
+                                <Badge bg="secondary" pill style={{ fontSize: "10px" }}>
+                                  {STATES_BY_REGION[region].length}
+                                </Badge>
+                              </div>
+                            }
+                          />
+                          
+                          {/* Mostrar estados quando região está selecionada */}
+                          {(filters[demographic.key] || []).includes(region) && (
+                            <div style={{ 
+                              marginLeft: "1.5rem", 
+                              marginTop: "0.5rem",
+                              padding: "0.5rem",
+                              backgroundColor: "#f8f9fa",
+                              borderRadius: "4px",
+                              border: "1px solid #dee2e6"
+                            }}>
+                              <small style={{ 
+                                color: "#6c757d", 
+                                fontSize: "11px",
+                                fontWeight: "500"
+                              }}>
+                                Estados incluídos:
+                              </small>
+                              <div style={{ marginTop: "0.25rem" }}>
+                                {STATES_BY_REGION[region].map((state, idx) => (
+                                  <span key={state} style={{ 
+                                    fontSize: "10px", 
+                                    color: "#495057",
+                                    marginRight: "0.5rem"
+                                  }}>
+                                    {state}{idx < STATES_BY_REGION[region].length - 1 ? "," : ""}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </Accordion.Body>
+                  </Accordion.Item>
+                );
+              }
+
+              // Tratamento normal para outros filtros demográficos
+              return (
+                <Accordion.Item key={demographic.key} eventKey={index.toString()} style={customStyles.accordionItem}>
+                  <Accordion.Header style={customStyles.accordionHeader}>
+                    <div className="d-flex justify-content-between align-items-center w-100 me-3">
+                      <span style={{ fontSize: "14px", fontWeight: "500", color: "#495057" }}>
+                        {demographic.label}
+                      </span>
+                      {filters[demographic.key]?.length > 0 && (
+                        <Badge style={{
+                          ...customStyles.badge,
+                          borderRadius: "50%",
+                          width: "24px",
+                          height: "24px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "10px"
+                        }}>
+                          {filters[demographic.key].length}
+                        </Badge>
+                      )}
+                    </div>
+                  </Accordion.Header>
+                  <Accordion.Body style={customStyles.accordionBody}>
+                    {demographic.values.map((value) => (
+                      <Form.Check
+                        key={value}
+                        type="checkbox"
+                        id={`${demographic.key}-${value}`}
+                        label={value}
+                        checked={(filters[demographic.key] || []).includes(value)}
+                        onChange={(e) => handleFilterChange(demographic.key, value, e.target.checked)}
+                        style={customStyles.checkbox}
+                        className="custom-checkbox"
+                      />
+                    ))}
+                  </Accordion.Body>
+                </Accordion.Item>
+              );
+            })}
           </Accordion>
 
           {availableDemographics.length === 0 && (

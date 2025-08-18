@@ -25,6 +25,11 @@ import ChartCard from "./dashboard/chart-card"
 import MapCard from "./dashboard/map-card"
 import "./Dashboard.css"
 import { formatApiDateForDisplay } from "../hooks/dateUtils"
+import { 
+  STATES_BY_REGION, 
+  getStatesFromRegion, 
+  isStateInSelectedRegions 
+} from "../utils/regionMapping"
 
 // Função para buscar dados agrupados
 export const fetchGroupedQuestionData = async ({ queryKey }) => {
@@ -310,8 +315,10 @@ export default function Dashboard() {
       if (r.includes("SUL")) return "Sul"
       return region
     }
+
+    // Processar campos demográficos normais (exceto região que será tratada especialmente)
     ;(data.demographicFields || []).forEach((key) => {
-      if (key !== UF_DEMOGRAPHIC_KEY && key !== "PF10") {
+      if (key !== UF_DEMOGRAPHIC_KEY && key !== "PF10" && key !== "REGIAO" && key !== "Regiao") {
         demographicsMap.set(key, {
           key,
           label: DEMOGRAPHIC_LABELS[key] || key,
@@ -320,6 +327,7 @@ export default function Dashboard() {
       }
     })
 
+    // Processar dados demográficos
     sortedRounds.forEach((round) => {
       round.distribution.forEach((dist) => {
         if (dist.demographics) {
@@ -342,6 +350,14 @@ export default function Dashboard() {
       values: Array.from(d.values).sort((a, b) => a.localeCompare(b)),
     }))
 
+    // Adicionar filtro de Região baseado nos estados (NOVA IMPLEMENTAÇÃO)
+    demographics.push({
+      key: "REGIAO_VIRTUAL",
+      label: "Região",
+      values: Object.keys(STATES_BY_REGION).sort()
+    });
+
+    // Filtrar PF2_FAIXAS se houver
     if (demographicsMap.has("PF2_FAIXAS")) {
       demographics = demographics.filter((d) => d.key !== "PF2" && d.key !== "Faixa de idade")
     }
@@ -450,10 +466,8 @@ export default function Dashboard() {
     // 1. Aplicar filtro de período específico PRIMEIRO
     if (selectedPeriod) {
       if (selectedPeriod.type === "relative") {
-        // Para períodos relativos, filtrar por array de períodos
         filtered = filtered.filter((round) => selectedPeriod.periods.includes(round.period))
       } else if (selectedPeriod.type === "specific") {
-        // Para período específico, filtrar por período único
         filtered = filtered.filter((round) => round.period === selectedPeriod.period)
       }
     }
@@ -463,28 +477,42 @@ export default function Dashboard() {
       return filtered
     }
 
-    const filterKey = Object.keys(filters)[0]
-    const filterValues = filters[filterKey]
-
-    if (!filterKey || !filterValues || filterValues.length === 0) {
-      return filtered
-    }
-
     return filtered.map((round) => {
       let totalForFilter = 0
       const distributionForFilter = {}
 
       round.distribution.forEach((dist) => {
-        const demoGroup = dist.demographics?.[filterKey]
-        if (demoGroup) {
-          demoGroup.forEach((demoValue) => {
-            if (filterValues.includes(demoValue.response)) {
-              totalForFilter += demoValue.weightedCount
-              distributionForFilter[dist.response] =
-                (distributionForFilter[dist.response] || 0) + demoValue.weightedCount
+        Object.entries(filters).forEach(([filterKey, filterValues]) => {
+          if (filterValues && filterValues.length > 0) {
+            
+            // NOVA LÓGICA: Tratar filtro de região especial
+            if (filterKey === "REGIAO_VIRTUAL") {
+              // Para região virtual, verificar se algum estado da distribuição pertence às regiões selecionadas
+              const ufDemoGroup = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
+              if (ufDemoGroup) {
+                ufDemoGroup.forEach((ufValue) => {
+                  if (isStateInSelectedRegions(ufValue.response, filterValues)) {
+                    totalForFilter += ufValue.weightedCount
+                    distributionForFilter[dist.response] =
+                      (distributionForFilter[dist.response] || 0) + ufValue.weightedCount
+                  }
+                })
+              }
+            } else {
+              // Lógica original para outros filtros demográficos
+              const demoGroup = dist.demographics?.[filterKey]
+              if (demoGroup) {
+                demoGroup.forEach((demoValue) => {
+                  if (filterValues.includes(demoValue.response)) {
+                    totalForFilter += demoValue.weightedCount
+                    distributionForFilter[dist.response] =
+                      (distributionForFilter[dist.response] || 0) + demoValue.weightedCount
+                  }
+                })
+              }
             }
-          })
-        }
+          }
+        })
       })
 
       const newDistribution = round.distribution.map((dist) => ({
@@ -523,7 +551,6 @@ export default function Dashboard() {
     selectedRound.distribution.forEach((dist) => {
       const responseValue = dist.response
 
-      // ADICIONAR: Filtrar respostas null antes de processar
       const normalizedResponse = normalizeAnswer(responseValue)
       if (normalizedResponse === null) return
 
@@ -531,17 +558,46 @@ export default function Dashboard() {
 
       if (ufDemographics) {
         ufDemographics.forEach((ufDemo) => {
-          for (let i = 0; i < ufDemo.count; i++) {
-            mapResponses.push({
-              [questionInfo.variable]: responseValue,
-              UF: ufDemo.response,
-            })
+          // NOVA VERIFICAÇÃO: Aplicar filtro de região se estiver ativo
+          const regionFilters = filters["REGIAO_VIRTUAL"]
+          if (regionFilters && regionFilters.length > 0) {
+            if (!isStateInSelectedRegions(ufDemo.response, regionFilters)) {
+              return // Pular este estado se não pertencer às regiões selecionadas
+            }
+          }
+
+          // Aplicar outros filtros demográficos normalmente
+          let shouldInclude = true
+          Object.entries(filters).forEach(([filterKey, filterValues]) => {
+            if (filterKey !== "REGIAO_VIRTUAL" && filterValues && filterValues.length > 0) {
+              // Verificar se esta resposta tem o valor demográfico correto
+              const relevantDemo = selectedRound.distribution.find(d => d.response === responseValue)
+              const demoGroup = relevantDemo?.demographics?.[filterKey]
+              if (demoGroup) {
+                const hasMatchingDemo = demoGroup.some(demoValue => 
+                  filterValues.includes(demoValue.response)
+                )
+                if (!hasMatchingDemo) {
+                  shouldInclude = false
+                }
+              }
+            }
+          })
+
+          if (shouldInclude) {
+            for (let i = 0; i < ufDemo.count; i++) {
+              mapResponses.push({
+                [questionInfo.variable]: responseValue,
+                UF: ufDemo.response,
+              })
+            }
           }
         })
       }
     })
+    
     return mapResponses
-  }, [mapRoundsWithData, selectedMapRoundIndex, questionInfo])
+  }, [mapRoundsWithData, selectedMapRoundIndex, questionInfo, filters])
 
   const chartData = useMemo(() => {
     if (!selectedChartData || selectedChartData.length === 0) {
