@@ -35,8 +35,10 @@ export default function SurveyTypePage() {
             <p className="main-description">Escolha o tipo de pesquisa que deseja visualizar</p>
           </div>
 
-          <Row className="survey-type-cards">
-            <Col lg={isAdmin() ? 4 : 6} md={6} className="mb-4">
+          {/* Cards centralizados quando não é admin */}
+          <Row className={`survey-type-cards ${!isAdmin() ? 'justify-content-center' : ''}`}>
+            {/* Card Telefônicas - SEMPRE VISÍVEL */}
+            <Col lg={12} md={12} >
               <Card
                 className={`survey-type-card telefonica ${selectedType === "telefonica" ? "selected" : ""}`}
                 onClick={() => handleTypeSelect("telefonica")}
@@ -56,6 +58,8 @@ export default function SurveyTypePage() {
               </Card>
             </Col>
 
+            {/* Card F2F - OCULTO */}
+            {/* 
             <Col lg={isAdmin() ? 4 : 6} md={6} className="mb-4">
               <Card
                 className={`survey-type-card f2f ${selectedType === "f2f" ? "selected" : ""}`}
@@ -75,9 +79,10 @@ export default function SurveyTypePage() {
                 </Card.Body>
               </Card>
             </Col>
+            */}
 
             {/* Card de Upload - Visível apenas para admins */}
-            {isAdmin() && (
+            {/*isAdmin() && (
               <Col lg={4} md={6} className="mb-4">
                 <Card className={`survey-type-card upload-card`} onClick={() => navigate("/upload")}>
                   <Card.Body>
@@ -94,10 +99,10 @@ export default function SurveyTypePage() {
                   </Card.Body>
                 </Card>
               </Col>
-            )}
+            )*/}
 
             {/* Card de Administração - Visível apenas para admins */}
-            {isAdmin() && (
+            {/*isAdmin() && (
               <Col lg={4} md={6} className="mb-4">
                 <Card className="survey-type-card admin-card" onClick={handleUserManagement}>
                   <Card.Body>
@@ -114,7 +119,7 @@ export default function SurveyTypePage() {
                   </Card.Body>
                 </Card>
               </Col>
-            )}
+            )*/}
           </Row>
         </Container>
       </main>

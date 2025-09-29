@@ -44,7 +44,7 @@ export default function HomePage() {
           const fetchedThemes = response.data.themes
 
           // Processar os temas vindos da API
-          const processedThemes = fetchedThemes.map((theme) => {
+          let processedThemes = fetchedThemes.map((theme) => {
             let themeName = theme.theme
 
             // Mapear temas de popularidade para "Avaliação do Governo" baseado no tipo de pesquisa
@@ -61,6 +61,13 @@ export default function HomePage() {
               id: theme.id || theme.slug,
             }
           })
+
+          // *** NOVO FILTRO: Se for telefônica, mostrar APENAS "Avaliação do Governo" ***
+          if (surveyType === "telefonica") {
+            processedThemes = processedThemes.filter(theme => 
+              theme.theme === "Avaliação do Governo"
+            )
+          }
 
           // Separar "Avaliação do Governo" dos demais temas
           const avaliacaoIndex = processedThemes.findIndex((t) => t.theme === "Avaliação do Governo")
@@ -202,7 +209,7 @@ export default function HomePage() {
                 <p className="page-description">
                   {loading
                     ? "Carregando temas disponíveis..."
-                    : `Explore ${filteredThemes.length} temas de pesquisa disponíveis`}
+                    : `Explore ${filteredThemes.length} tema${filteredThemes.length !== 1 ? 's' : ''} de pesquisa disponível${filteredThemes.length !== 1 ? 'is' : ''}`}
                 </p>
               </div>
               <Button variant="outline-secondary" onClick={handleBack} className="back-button">
@@ -293,7 +300,7 @@ export default function HomePage() {
               ) : (
                 <Row className="g-4">
                   {filteredThemes.map((theme) => (
-                    <Col key={theme.id} lg={4} md={6}>
+                    <Col key={theme.id} lg={12} md={12}>
                       <Card className="theme-card" onClick={() => handleThemeClick(theme)}>
                         <Card.Body>                          
 
