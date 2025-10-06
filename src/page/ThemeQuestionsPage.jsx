@@ -62,12 +62,10 @@ export default function ThemeQuestionsPage() {
     queryKey: ["allQuestions", surveyType],
     queryFn: async () => {
       try {
-        // Usar o método que busca TODAS as páginas
         const response = await ApiMethods.getAllQuestionsComplete()
         return response?.success ? response.data.questions : []
       } catch (error) {
         console.warn("Erro ao buscar dados de questões:", error)
-        // Fallback para busca simples com mais registros
         try {
           const fallbackResponse = await ApiBase.get("/api/data/questions/all?page=1&limit=1000")
           return fallbackResponse.data?.success ? fallbackResponse.data.data.questions : []
@@ -86,7 +84,6 @@ export default function ThemeQuestionsPage() {
     const allRounds = data.questionGroups.flatMap((g) => g.rounds || [])
     const uniqueRounds = [...new Set(allRounds)]
     
-    // Mapear rodadas com datas
     const roundsWithDates = uniqueRounds.map(round => {
       const questionWithDate = questionsData?.find(q => q.surveyNumber?.toString() === round.toString())
       const dateStr = questionWithDate?.date ? formatApiDateForDisplay(questionWithDate.date) : ""
@@ -110,13 +107,11 @@ export default function ThemeQuestionsPage() {
   }, [data])
 
   const sortLogic = (a, b) => {
-    // 1. Sort by number of rounds (descending)
     const roundsDiff = (b.rounds?.length || 0) - (a.rounds?.length || 0)
     if (roundsDiff !== 0) {
       return roundsDiff
     }
 
-    // 2. Sort by the first variable (alphanumerically, ascending)
     const varA = a.variables?.[0]
     const varB = b.variables?.[0]
 
@@ -177,18 +172,13 @@ export default function ThemeQuestionsPage() {
         params.append("variables", JSON.stringify(group.variables))
         navigate(`/dashboard/matrix?${params.toString()}`)
       } else {
-        // type === 'text-grouped'
         params.append("questionText", group.questionText)
 
-        // Check if it's a single-round question
         if ((group.rounds || []).length === 1 && (group.variables || []).length === 1) {
-          // Navigate to SingleMentionDashboard with parameters for a GET request
           params.append("questionCode", group.variables[0])
           params.append("surveyNumber", group.rounds[0])
           navigate(`/dashboard/single-mention?${params.toString()}`)
         } else {
-          // Navigate to the main Dashboard for historical view (multi-round)
-          // This uses a POST request with theme and questionText
           navigate(`/dashboard?${params.toString()}`)
         }
       }
@@ -203,6 +193,18 @@ export default function ThemeQuestionsPage() {
     setSelectedRound("")
   }, [])
 
+  // NOVA FUNÇÃO: Determina o título da página
+  const getPageTitle = () => {
+    if (loading) return "Carregando tema...";
+    
+    // Se for um dos temas de popularidade, mostrar título customizado
+    if (themeSlug === 'popularidade-tracking' || themeSlug === 'popularidade-face-a-face') {
+      return "Avaliação e Aprovação do Governo";
+    }
+    
+    return themeName;
+  };
+
   const loading = isLoadingTheme || isLoading
   const hasError = themeError || error
 
@@ -215,7 +217,7 @@ export default function ThemeQuestionsPage() {
           <div className="page-title-section">
             <div className="d-flex align-items-center justify-content-between">
               <div>
-                <h1 className="main-title">{loading ? "Carregando tema..." : themeName}</h1>
+                <h1 className="main-title">{getPageTitle()}</h1>
                 <p className="main-description">
                   {loading 
                     ? "Carregando perguntas disponíveis..." 
@@ -281,7 +283,6 @@ export default function ThemeQuestionsPage() {
             </Card.Body>
           </Card>
 
-          {/* Mostrar erro se houver */}
           {hasError && (
             <Alert variant="danger">
               <Alert.Heading>Erro ao carregar dados</Alert.Heading>
@@ -292,7 +293,6 @@ export default function ThemeQuestionsPage() {
             </Alert>
           )}
 
-          {/* Mostrar loading ou conteúdo */}
           {loading && !hasError && (
             <div className="loading-state">
               <Spinner animation="border" variant="primary" />

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Container, Row, Col, Card, Button, Image } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
-import { Phone, Users, Settings, Upload } from "lucide-react"
+import { Phone, Users } from "lucide-react"
 import { useAuth } from "../contexts/AuthContext"
 import "./SurveyTypePage.css"
 import CommonHeader from "../components/CommonHeader"
@@ -16,7 +16,13 @@ export default function SurveyTypePage() {
 
   const handleTypeSelect = (type) => {
     setSelectedType(type)
-    navigate(`/themes/${type}`)
+    
+    // Navegar diretamente para o tema específico de cada tipo
+    if (type === 'telefonica') {
+      navigate('/theme/telefonica/popularidade-tracking')
+    } else if (type === 'f2f') {
+      navigate('/theme/f2f/popularidade-face-a-face')
+    }
   }
 
   const handleUserManagement = () => {
@@ -38,7 +44,7 @@ export default function SurveyTypePage() {
           {/* Cards centralizados quando não é admin */}
           <Row className={`survey-type-cards ${!isAdmin() ? 'justify-content-center' : ''}`}>
             {/* Card Telefônicas - SEMPRE VISÍVEL */}
-            <Col lg={12} md={12} >
+            <Col lg={6} md={6} >
               <Card
                 className={`survey-type-card telefonica ${selectedType === "telefonica" ? "selected" : ""}`}
                 onClick={() => handleTypeSelect("telefonica")}
@@ -58,9 +64,9 @@ export default function SurveyTypePage() {
               </Card>
             </Col>
 
-            {/* Card F2F - OCULTO */}
-            {/* 
-            <Col lg={isAdmin() ? 4 : 6} md={6} className="mb-4">
+            {/* Card F2F - OCULTO POR ENQUANTO */}
+            {
+            <Col lg={6} md={6} >
               <Card
                 className={`survey-type-card f2f ${selectedType === "f2f" ? "selected" : ""}`}
                 onClick={() => handleTypeSelect("f2f")}
@@ -79,47 +85,7 @@ export default function SurveyTypePage() {
                 </Card.Body>
               </Card>
             </Col>
-            */}
-
-            {/* Card de Upload - Visível apenas para admins */}
-            {/*isAdmin() && (
-              <Col lg={4} md={6} className="mb-4">
-                <Card className={`survey-type-card upload-card`} onClick={() => navigate("/upload")}>
-                  <Card.Body>
-                    <div className="card-icon upload-icon" style={{ background: "rgb(0, 0, 0)", color: "white" }}>
-                      <Upload size={48} />
-                    </div>
-                    <Card.Title className="card-title">Upload de Dados</Card.Title>
-                    <Card.Text className="card-description">
-                      Envie novas pesquisas e dicionários de variáveis para o sistema.
-                    </Card.Text>
-                    <Button variant="dark" className="select-button">
-                      Acessar
-                    </Button>
-                  </Card.Body>
-                </Card>
-              </Col>
-            )*/}
-
-            {/* Card de Administração - Visível apenas para admins */}
-            {/*isAdmin() && (
-              <Col lg={4} md={6} className="mb-4">
-                <Card className="survey-type-card admin-card" onClick={handleUserManagement}>
-                  <Card.Body>
-                    <div className="card-icon admin-icon">
-                      <Settings size={48} />
-                    </div>
-                    <Card.Title className="card-title">Gerenciar Usuários</Card.Title>
-                    <Card.Text className="card-description">
-                      Administrar usuários, permissões e acessos do sistema
-                    </Card.Text>
-                    <Button variant="dark" className="select-button">
-                      Acessar
-                    </Button>
-                  </Card.Body>
-                </Card>
-              </Col>
-            )*/}
+            }
           </Row>
         </Container>
       </main>

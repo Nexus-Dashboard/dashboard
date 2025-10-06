@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react" // 1. Importar useCallback
+import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { useLocation } from "react-router-dom"
 import ApiBase from "../service/ApiBase"
 import { useQuery } from "@tanstack/react-query"
@@ -30,6 +30,36 @@ import {
   getStatesFromRegion, 
   isStateInSelectedRegions 
 } from "../utils/regionMapping"
+
+// Mapeamento de meses completos para abreviados
+const FULL_MONTH_TO_SHORT = {
+  "Janeiro": "jan",
+  "Fevereiro": "fev",
+  "Março": "mar",
+  "Abril": "abr",
+  "Maio": "mai",
+  "Junho": "jun",
+  "Julho": "jul",
+  "Agosto": "ago",
+  "Setembro": "set",
+  "Outubro": "out",
+  "Novembro": "nov",
+  "Dezembro": "dez"
+}
+
+// Função para converter formato de data para abreviado com ponto
+const convertToShortFormat = (dateLabel) => {
+  if (!dateLabel) return ""
+  
+  // Se já está no formato "Maio/25" ou similar
+  if (dateLabel.includes('/')) {
+    const [month, year] = dateLabel.split('/')
+    const shortMonth = FULL_MONTH_TO_SHORT[month] || month.substring(0, 3).toLowerCase()
+    return `${shortMonth}./${year}`
+  }
+  
+  return dateLabel
+}
 
 // Função para buscar dados agrupados
 export const fetchGroupedQuestionData = async ({ queryKey }) => {
@@ -112,8 +142,6 @@ export const fetchAllQuestions = async ({ queryKey }) => {
   }
 }
 
-// 2. A função formatChartXAxis foi removida daqui
-
 // UF demographic key
 const UF_DEMOGRAPHIC_KEY = "UF"
 
@@ -126,7 +154,7 @@ export default function Dashboard() {
   const [filters, setFilters] = useState({})
   const [numberOfRoundsToShow, setNumberOfRoundsToShow] = useState(10)
   const [selectedMapRoundIndex, setSelectedMapRoundIndex] = useState(0)
-  const [selectedPeriod, setSelectedPeriod] = useState(null) // NOVO: Estado para período específico
+  const [selectedPeriod, setSelectedPeriod] = useState(null)
   const [selectedMapResponse, setSelectedMapResponse] = useState(null)
 
   const [loadingProgress, setLoadingProgress] = useState(0)
@@ -239,15 +267,14 @@ export default function Dashboard() {
     return map
   }, [allQuestionsData])
 
-  // 3. Mover a função para dentro do componente e envolvê-la com useCallback
+  // FUNÇÃO ATUALIZADA: formatChartXAxis com novo formato
   const formatChartXAxis = useCallback(
     (period, dateLabel) => {
       const roundNumber = period ? period.split("-R")[1] : ""
 
-      // Se temos uma label de data, usá-la com o formato correto
       if (dateLabel && roundNumber) {
-        const formatted = `R${roundNumber.padStart(2, "0")} - ${dateLabel}`
-        return formatted
+        const shortDate = convertToShortFormat(dateLabel)
+        return `R${roundNumber.padStart(2, "0")} - ${shortDate}`
       }
 
       // Fallback se não houver data
@@ -257,23 +284,20 @@ export default function Dashboard() {
           const year = parts[0]
           const round = parts[1]
 
-          // Tentar buscar a data do surveyDateMap se disponível
-          const dateFromMap = surveyDateMap.get(round) // Agora surveyDateMap está acessível
+          const dateFromMap = surveyDateMap.get(round)
           if (dateFromMap) {
-            const formatted = `R${round.padStart(2, "0")} - ${dateFromMap}`
-            return formatted
+            const shortDate = convertToShortFormat(dateFromMap)
+            return `R${round.padStart(2, "0")} - ${shortDate}`
           }
 
-          // Último fallback
-          const formatted = `R${round.padStart(2, "0")}/${year.slice(-2)}`
-          return formatted
+          return `R${round.padStart(2, "0")}/${year.slice(-2)}`
         }
       }
 
       return period || ""
     },
     [surveyDateMap],
-  ) // A função depende de surveyDateMap
+  )
 
   const { questionInfo, allHistoricalData, availableDemographics, mapRoundsWithData } = useMemo(() => {
     if (!data) {
@@ -316,7 +340,6 @@ export default function Dashboard() {
       return region
     }
 
-    // Processar campos demográficos normais (exceto região que será tratada especialmente)
     ;(data.demographicFields || []).forEach((key) => {
       if (key !== UF_DEMOGRAPHIC_KEY && key !== "PF10" && key !== "REGIAO" && key !== "Regiao") {
         demographicsMap.set(key, {
@@ -327,7 +350,6 @@ export default function Dashboard() {
       }
     })
 
-    // Processar dados demográficos
     sortedRounds.forEach((round) => {
       round.distribution.forEach((dist) => {
         if (dist.demographics) {
@@ -350,14 +372,12 @@ export default function Dashboard() {
       values: Array.from(d.values).sort((a, b) => a.localeCompare(b)),
     }))
 
-    // Adicionar filtro de Região baseado nos estados (NOVA IMPLEMENTAÇÃO)
     demographics.push({
       key: "REGIAO_VIRTUAL",
       label: "Região",
       values: Object.keys(STATES_BY_REGION).sort()
     });
 
-    // Filtrar PF2_FAIXAS se houver
     if (demographicsMap.has("PF2_FAIXAS")) {
       demographics = demographics.filter((d) => d.key !== "PF2" && d.key !== "Faixa de idade")
     }
@@ -373,9 +393,8 @@ export default function Dashboard() {
   const availableMapResponses = useMemo(() => {
     if (!allHistoricalData || allHistoricalData.length === 0) return []
 
-    // SEMPRE aplicar normalização NS/NR primeiro
     const allNormalizedAnswers = allHistoricalData.flatMap(
-      (r) => r.distribution.map((d) => normalizeAndGroupNSNR(d.response)).filter((answer) => answer !== null), // Filtrar valores null
+      (r) => r.distribution.map((d) => normalizeAndGroupNSNR(d.response)).filter((answer) => answer !== null),
     )
 
     const useGrouping = shouldGroupResponses(Array.from(allNormalizedAnswers))
@@ -385,16 +404,12 @@ export default function Dashboard() {
       round.distribution.forEach((dist) => {
         const answer = dist.response
         if (answer) {
-          // SEMPRE aplicar normalização NS/NR primeiro
           const normalizedAnswer = normalizeAndGroupNSNR(answer)
 
-          // Verificar se não é null antes de processar
           if (normalizedAnswer === null) return
 
-          // Depois aplicar agrupamento se necessário
           const finalAnswer = useGrouping ? groupResponses(normalizedAnswer) : normalizedAnswer
 
-          // Verificar se finalAnswer não é null antes de adicionar
           if (finalAnswer !== null && finalAnswer !== undefined) {
             allAnswers.add(finalAnswer)
           }
@@ -402,7 +417,6 @@ export default function Dashboard() {
       })
     })
 
-    // Filtrar valores null do array antes de passar para sortMapResponses
     const validAnswers = Array.from(allAnswers).filter((answer) => answer !== null && answer !== undefined)
 
     return sortMapResponses(validAnswers)
@@ -454,16 +468,13 @@ export default function Dashboard() {
     setFilters({})
   }
 
-  // NOVA FUNÇÃO: Handle mudança de período específico
   const handlePeriodChange = (periodData) => {
     setSelectedPeriod(periodData)
   }
 
-  // NOVA LÓGICA: Filtrar dados históricos por período específico
   const filteredHistoricalData = useMemo(() => {
     let filtered = allHistoricalData
 
-    // 1. Aplicar filtro de período específico PRIMEIRO
     if (selectedPeriod) {
       if (selectedPeriod.type === "relative") {
         filtered = filtered.filter((round) => selectedPeriod.periods.includes(round.period))
@@ -472,7 +483,6 @@ export default function Dashboard() {
       }
     }
 
-    // 2. Aplicar filtros demográficos
     if (Object.keys(filters).length === 0) {
       return filtered
     }
@@ -485,9 +495,7 @@ export default function Dashboard() {
         Object.entries(filters).forEach(([filterKey, filterValues]) => {
           if (filterValues && filterValues.length > 0) {
             
-            // NOVA LÓGICA: Tratar filtro de região especial
             if (filterKey === "REGIAO_VIRTUAL") {
-              // Para região virtual, verificar se algum estado da distribuição pertence às regiões selecionadas
               const ufDemoGroup = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
               if (ufDemoGroup) {
                 ufDemoGroup.forEach((ufValue) => {
@@ -499,7 +507,6 @@ export default function Dashboard() {
                 })
               }
             } else {
-              // Lógica original para outros filtros demográficos
               const demoGroup = dist.demographics?.[filterKey]
               if (demoGroup) {
                 demoGroup.forEach((demoValue) => {
@@ -558,19 +565,16 @@ export default function Dashboard() {
 
       if (ufDemographics) {
         ufDemographics.forEach((ufDemo) => {
-          // NOVA VERIFICAÇÃO: Aplicar filtro de região se estiver ativo
           const regionFilters = filters["REGIAO_VIRTUAL"]
           if (regionFilters && regionFilters.length > 0) {
             if (!isStateInSelectedRegions(ufDemo.response, regionFilters)) {
-              return // Pular este estado se não pertencer às regiões selecionadas
+              return
             }
           }
 
-          // Aplicar outros filtros demográficos normalmente
           let shouldInclude = true
           Object.entries(filters).forEach(([filterKey, filterValues]) => {
             if (filterKey !== "REGIAO_VIRTUAL" && filterValues && filterValues.length > 0) {
-              // Verificar se esta resposta tem o valor demográfico correto
               const relevantDemo = selectedRound.distribution.find(d => d.response === responseValue)
               const demoGroup = relevantDemo?.demographics?.[filterKey]
               if (demoGroup) {
@@ -607,28 +611,23 @@ export default function Dashboard() {
     const dataByPeriod = new Map(selectedChartData.map((d) => [d.period, d]))
     const allPeriods = Array.from(dataByPeriod.keys())
 
-    // SEMPRE aplicar normalização NS/NR primeiro E FILTRAR NULOS
     const allNormalizedResponses = selectedChartData.flatMap(
-      (r) => r.distribution.map((d) => normalizeAndGroupNSNR(d.response)).filter((response) => response !== null), // NOVA LINHA: Filtrar respostas nulas
+      (r) => r.distribution.map((d) => normalizeAndGroupNSNR(d.response)).filter((response) => response !== null),
     )
     const uniqueNormalizedResponses = new Set(allNormalizedResponses)
 
-    // Verificar se deve usar agrupamento completo
     const useGrouping = shouldGroupResponses(allNormalizedResponses)
     const responseOrder = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER
 
     const allSeriesIds = new Set()
     selectedChartData.forEach((rodada) => {
       rodada.distribution.forEach((dist) => {
-        // SEMPRE aplicar normalização NS/NR primeiro
         const normalizedResponse = normalizeAndGroupNSNR(dist.response)
 
-        // NOVA VERIFICAÇÃO: Só processar se não for null
         if (normalizedResponse === null) {
-          return // Skip respostas nulas
+          return
         }
 
-        // Depois aplicar agrupamento se necessário
         const finalResponse = useGrouping ? groupResponses(normalizedResponse) : normalizedResponse
         if (finalResponse) allSeriesIds.add(finalResponse)
       })
@@ -644,21 +643,17 @@ export default function Dashboard() {
 
         if (rodada && rodada.totalWeightedResponses > 0) {
           let weightedCount = 0
-          let totalValidResponses = 0 // NOVA VARIÁVEL: Para recalcular o total sem #NULL
+          let totalValidResponses = 0
 
           rodada.distribution.forEach((dist) => {
-            // SEMPRE aplicar normalização NS/NR primeiro
             const normalizedResponse = normalizeAndGroupNSNR(dist.response)
 
-            // NOVA VERIFICAÇÃO: Só processar se não for null
             if (normalizedResponse === null) {
-              return // Skip respostas #NULL
+              return
             }
 
-            // Adicionar ao total de respostas válidas
             totalValidResponses += dist.weightedCount
 
-            // Depois aplicar agrupamento se necessário
             const finalResponse = useGrouping ? groupResponses(normalizedResponse) : normalizedResponse
 
             if (finalResponse === seriesId) {
@@ -666,7 +661,6 @@ export default function Dashboard() {
             }
           })
 
-          // ATUALIZAÇÃO: Usar totalValidResponses em vez de totalWeightedResponses
           if (totalValidResponses > 0) {
             yValue = (weightedCount / totalValidResponses) * 100
           }
@@ -683,7 +677,6 @@ export default function Dashboard() {
       }),
     }))
 
-    // Filtrar séries duplicadas e ordenar
     const uniqueSeries = new Map()
     series.forEach((serie) => {
       if (!uniqueSeries.has(serie.id)) {
@@ -703,7 +696,7 @@ export default function Dashboard() {
       .filter((serie) => serie.data && serie.data.length > 0)
   }, [selectedChartData, surveyDateMap, formatChartXAxis])
 
-  // NOVA FUNÇÃO: Para formatar o período nos cards (diferente do eixo X do gráfico)
+  // NOVA FUNÇÃO ATUALIZADA: Para formatar o período nos cards
   const getCardPeriodLabel = useCallback(
     (rodada) => {
       if (!rodada || !surveyDateMap) return "N/A"
@@ -712,10 +705,10 @@ export default function Dashboard() {
       const dateLabel = surveyDateMap.get(roundNumber)
 
       if (dateLabel && roundNumber) {
-        return `R${roundNumber} - ${dateLabel}`
+        const shortDate = convertToShortFormat(dateLabel)
+        return `R${roundNumber} - ${shortDate}`
       }
 
-      // Fallback
       const parts = rodada.period.split("-R")
       if (parts.length === 2) {
         const year = parts[0]
@@ -804,7 +797,6 @@ export default function Dashboard() {
             chartRef={chartRef}
             chartColorFunc={chartColorFunc}
             getXAxisLabel={getXAxisLabel}
-            // NOVAS PROPS para o dropdown de período
             surveyDateMap={surveyDateMap}
             selectedPeriod={selectedPeriod}
             onPeriodChange={handlePeriodChange}
@@ -820,7 +812,7 @@ export default function Dashboard() {
             availableDemographics={availableDemographics}
             activeFilters={filters}
             onFilterToggle={handleQuickFilterToggle}
-            getXAxisLabel={getCardPeriodLabel} // MUDANÇA: Usar a nova função para o card
+            getXAxisLabel={getCardPeriodLabel}
             availableMapResponses={availableMapResponses}
             selectedMapResponse={selectedMapResponse}
             onMapResponseChange={setSelectedMapResponse}

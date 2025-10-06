@@ -1,3 +1,4 @@
+// src/components/InteractiveBrazilMap.jsx - CORREÇÃO
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -62,9 +63,22 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
 
     const questionKey = selectedQuestion.variable
     const stateResults = new Map()
-    const allAnswersInMap = new Set(responses.map((r) => normalizeAnswer(r[questionKey])).filter(Boolean))
+    
+    // IMPORTANTE: Primeiro, vamos identificar todas as respostas possíveis e determinar se devemos agrupar
+    const allAnswersInMap = new Set()
+    responses.forEach((response) => {
+      const answer = normalizeAnswer(response[questionKey])
+      if (answer) {
+        const normalizedAnswer = normalizeAndGroupNSNR(answer)
+        if (normalizedAnswer !== null) {
+          allAnswersInMap.add(normalizedAnswer)
+        }
+      }
+    })
+    
     const useGrouping = shouldGroupResponses(Array.from(allAnswersInMap))
 
+    // Agora processar as respostas por estado
     responses.forEach((response) => {
       const stateName = response.UF
       if (!stateName || !STATE_NAME_TO_ABBR[stateName]) return
@@ -76,6 +90,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       const normalizedAnswer = normalizeAndGroupNSNR(answer)
       if (normalizedAnswer === null) return
 
+      // IMPORTANTE: Aplicar agrupamento SOMENTE se necessário
       const finalAnswer = useGrouping ? groupResponses(normalizedAnswer) : normalizedAnswer
 
       if (!stateResults.has(stateAbbr)) {
@@ -85,12 +100,15 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
           counts: {},
           total: 0,
           percentages: {},
+          // NOVO: Armazenar mapa de respostas originais para debug
+          rawResponses: new Set()
         })
       }
 
       const stateData = stateResults.get(stateAbbr)
       stateData.counts[finalAnswer] = (stateData.counts[finalAnswer] || 0) + 1
       stateData.total += 1
+      stateData.rawResponses.add(normalizedAnswer) // Guardar resposta original normalizada
     })
 
     // Calcular percentuais para todas as respostas
@@ -108,25 +126,66 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       }
     })
 
-    return { stateResults }
+    // Debug: Log para verificar os dados
+    console.log("MapData Debug:", {
+      useGrouping,
+      selectedMapResponse,
+      sampleState: stateResults.get("SP"),
+      allPossibleResponses: Array.from(new Set(
+        Array.from(stateResults.values()).flatMap(state => Object.keys(state.percentages))
+      ))
+    })
+
+    return { stateResults, useGrouping }
   }, [responses, selectedQuestion])
 
+  // CORREÇÃO PRINCIPAL: Garantir que a escala de cores use a resposta correta
   useEffect(() => {
-    if (!selectedMapResponse || !mapData.stateResults.size) {
+    if (!selectedMapResponse || !mapData.stateResults?.size) {
       const defaultScale = d3.scaleLinear().domain([0, 100]).range(["#e9ecef", "#e9ecef"]).clamp(true)
       setColorScale(() => defaultScale)
       return
     }
 
-    const baseColor = MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#9e9e9e"
+    // IMPORTANTE: Aplicar a mesma lógica de agrupamento ao selectedMapResponse
+    let processedResponse = selectedMapResponse
+    
+    // Se estamos usando agrupamento, verificar se a resposta selecionada precisa ser agrupada
+    if (mapData.useGrouping) {
+      // Primeiro normalizar NS/NR
+      const normalized = normalizeAndGroupNSNR(selectedMapResponse)
+      if (normalized !== null) {
+        // Depois aplicar agrupamento se necessário
+        processedResponse = groupResponses(normalized)
+      }
+    } else {
+      // Apenas normalizar NS/NR sem agrupamento completo
+      const normalized = normalizeAndGroupNSNR(selectedMapResponse)
+      if (normalized !== null) {
+        processedResponse = normalized
+      }
+    }
+
+    // Usar a resposta processada para buscar a cor
+    const baseColor = MAP_RESPONSE_BASE_COLORS[processedResponse] || MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#9e9e9e"
     const lightColor = d3.color(baseColor).brighter(2.5).formatHex()
 
+    // Coletar percentuais para a resposta processada
     const percentages = Array.from(mapData.stateResults.values())
-      .map((state) => state.percentages[selectedMapResponse] || 0)
+      .map((state) => state.percentages[processedResponse] || 0)
       .filter((p) => p > 0)
 
     const maxPercentage = percentages.length > 0 ? Math.max(...percentages) : 100
     const scale = d3.scaleLinear().domain([0, maxPercentage]).range([lightColor, baseColor]).clamp(true)
+    
+    console.log("Color Scale Debug:", {
+      selectedMapResponse,
+      processedResponse,
+      baseColor,
+      maxPercentage,
+      percentagesFound: percentages.length
+    })
+    
     setColorScale(() => scale)
   }, [selectedMapResponse, mapData])
 
@@ -135,24 +194,20 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
     return Math.sqrt(1 / n) * 100
   }
 
-  // Função para calcular posição inteligente do tooltip
   const calculateTooltipPosition = (mouseX, mouseY, containerRect) => {
-    const tooltipWidth = 320 // largura máxima do tooltip
-    const tooltipHeight = 200 // altura estimada do tooltip
-    const margin = 15 // margem de segurança
+    const tooltipWidth = 320
+    const tooltipHeight = 200
+    const margin = 15
 
     let x = mouseX
     let y = mouseY
     let position = "right"
 
-    // Verificar se há espaço à direita
     if (mouseX + tooltipWidth + margin > containerRect.width) {
-      // Não há espaço à direita, tentar à esquerda
       if (mouseX - tooltipWidth - margin > 0) {
         x = mouseX - tooltipWidth - margin
         position = "left"
       } else {
-        // Não há espaço nem à direita nem à esquerda, centralizar
         x = Math.max(margin, Math.min(mouseX - tooltipWidth / 2, containerRect.width - tooltipWidth - margin))
         position = "center"
       }
@@ -161,22 +216,18 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       position = "right"
     }
 
-    // Verificar se há espaço embaixo
     if (mouseY + tooltipHeight + margin > containerRect.height) {
-      // Não há espaço embaixo, colocar em cima
       y = Math.max(margin, mouseY - tooltipHeight - margin)
     } else {
       y = mouseY + margin
     }
 
-    // Garantir que o tooltip não saia dos limites
     x = Math.max(margin, Math.min(x, containerRect.width - tooltipWidth - margin))
     y = Math.max(margin, Math.min(y, containerRect.height - tooltipHeight - margin))
 
     return { x, y, position }
   }
 
-  // Tooltip completo que mostra todas as informações
   const renderTooltipContent = (stateData, stateAbbr) => {
     if (!stateData) {
       return (
@@ -193,14 +244,27 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
     // Ordenar respostas por percentual (maior para menor)
     const sortedResponses = Object.entries(stateData.percentages)
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 3) // Mostrar apenas as 3 principais
+      .slice(0, 3)
+
+    // IMPORTANTE: Processar selectedMapResponse da mesma forma que nos dados
+    let processedSelectedResponse = selectedMapResponse
+    if (mapData.useGrouping && selectedMapResponse) {
+      const normalized = normalizeAndGroupNSNR(selectedMapResponse)
+      if (normalized !== null) {
+        processedSelectedResponse = groupResponses(normalized)
+      }
+    } else if (selectedMapResponse) {
+      const normalized = normalizeAndGroupNSNR(selectedMapResponse)
+      if (normalized !== null) {
+        processedSelectedResponse = normalized
+      }
+    }
 
     return (
       <div>
         <strong style={{ fontSize: "15px", display: "block", marginBottom: "8px" }}>{stateData.name}</strong>
 
-        {/* Informações da resposta selecionada (se houver) */}
-        {selectedMapResponse && stateData.percentages[selectedMapResponse] !== undefined && (
+        {processedSelectedResponse && stateData.percentages[processedSelectedResponse] !== undefined && (
           <div
             style={{
               marginBottom: "8px",
@@ -210,21 +274,20 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
           >
             <span
               style={{
-                color: MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#ffffff",
+                color: MAP_RESPONSE_BASE_COLORS[processedSelectedResponse] || MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#ffffff",
                 fontWeight: "bold",
                 fontSize: "14px",
               }}
             >
-              {selectedMapResponse}: {stateData.percentages[selectedMapResponse].toFixed(1)}%
+              {selectedMapResponse}: {stateData.percentages[processedSelectedResponse].toFixed(1)}%
             </span>
             <br />
             <span style={{ color: "rgba(255,255,255,0.9)", fontSize: "12px" }}>
-              {stateData.counts[selectedMapResponse] || 0} respostas
+              {stateData.counts[processedSelectedResponse] || 0} respostas
             </span>
           </div>
         )}
 
-        {/* Top 3 respostas */}
         <div style={{ marginBottom: "8px" }}>
           <span style={{ color: "rgba(255,255,255,0.8)", fontSize: "12px", fontWeight: "bold" }}>
             Principais respostas:
@@ -244,7 +307,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
           ))}
         </div>
 
-        {/* Informações gerais */}
         <div
           style={{
             borderTop: "1px solid rgba(255,255,255,0.3)",
@@ -266,7 +328,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
   useEffect(() => {
     if (!geoData || !svgRef.current) return
 
-    const { stateResults } = mapData
+    const { stateResults, useGrouping } = mapData
     const svg = d3.select(svgRef.current)
     svg.selectAll("*").remove()
 
@@ -276,6 +338,20 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
 
     const projection = d3.geoMercator().fitSize([width, height], geoData)
     const path = d3.geoPath().projection(projection)
+
+    // IMPORTANTE: Processar selectedMapResponse consistentemente
+    let processedSelectedResponse = selectedMapResponse
+    if (useGrouping && selectedMapResponse) {
+      const normalized = normalizeAndGroupNSNR(selectedMapResponse)
+      if (normalized !== null) {
+        processedSelectedResponse = groupResponses(normalized)
+      }
+    } else if (selectedMapResponse) {
+      const normalized = normalizeAndGroupNSNR(selectedMapResponse)
+      if (normalized !== null) {
+        processedSelectedResponse = normalized
+      }
+    }
 
     svg
       .attr("width", width)
@@ -287,8 +363,9 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .attr("d", path)
       .attr("fill", (d) => {
         const stateData = stateResults.get(d.properties.sigla)
-        if (stateData && selectedMapResponse && typeof stateData.percentages[selectedMapResponse] !== "undefined") {
-          return colorScale(stateData.percentages[selectedMapResponse])
+        if (stateData && processedSelectedResponse && typeof stateData.percentages[processedSelectedResponse] !== "undefined") {
+          const percentage = stateData.percentages[processedSelectedResponse]
+          return colorScale(percentage)
         }
         return "#e9ecef"
       })
@@ -301,14 +378,12 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
         const stateData = stateResults.get(d.properties.sigla)
         setHoveredState({ abbr: d.properties.sigla, data: stateData })
 
-        // Posição relativa ao container do mapa
         const containerRect = containerRef.current.getBoundingClientRect()
         const mouseX = event.clientX - containerRect.left
         const mouseY = event.clientY - containerRect.top
 
         setMousePosition({ x: mouseX, y: mouseY })
 
-        // Calcular posição inteligente do tooltip
         const tooltipPos = calculateTooltipPosition(mouseX, mouseY, {
           width: containerRect.width,
           height: containerRect.height,
@@ -322,7 +397,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
 
         setMousePosition({ x: mouseX, y: mouseY })
 
-        // Recalcular posição do tooltip durante o movimento
         const tooltipPos = calculateTooltipPosition(mouseX, mouseY, {
           width: containerRect.width,
           height: containerRect.height,
@@ -351,7 +425,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
         zIndex: 1,
       }}
     >
-      {/* Tooltip personalizado com posicionamento inteligente */}
       {hoveredState && (
         <div
           ref={tooltipRef}
