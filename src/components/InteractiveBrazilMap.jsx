@@ -1,4 +1,4 @@
-// src/components/InteractiveBrazilMap.jsx - CORREÇÃO
+// src/components/InteractiveBrazilMap.jsx - VERSÃO POR REGIÕES
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -6,6 +6,7 @@ import * as d3 from "d3"
 import { Box, Grid } from "@mui/material"
 import { normalizeAnswer, groupResponses, shouldGroupResponses, normalizeAndGroupNSNR } from "../utils/chartUtils"
 import { MAP_RESPONSE_BASE_COLORS } from "../utils/questionGrouping"
+import { REGION_BY_STATE, STATES_BY_REGION } from "../utils/regionMapping"
 
 const ABBR_TO_STATE_NAMES = {
   AC: "Acre",
@@ -44,7 +45,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
   const containerRef = useRef(null)
   const tooltipRef = useRef(null)
   const [geoData, setGeoData] = useState(null)
-  const [hoveredState, setHoveredState] = useState(null)
+  const [hoveredRegion, setHoveredRegion] = useState(null)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0, position: "right" })
   const [colorScale, setColorScale] = useState(() => d3.scaleLinear().domain([0, 100]).range(["#e9ecef", "#e9ecef"]))
@@ -56,15 +57,16 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .catch((err) => console.error("Error loading Brazil GeoJSON:", err))
   }, [])
 
+  // Processar dados agregados por REGIÃO
   const mapData = useMemo(() => {
     if (!responses || responses.length === 0 || !selectedQuestion?.variable) {
-      return { stateResults: new Map() }
+      return { regionResults: new Map() }
     }
 
     const questionKey = selectedQuestion.variable
-    const stateResults = new Map()
+    const regionResults = new Map()
     
-    // IMPORTANTE: Primeiro, vamos identificar todas as respostas possíveis e determinar se devemos agrupar
+    // Identificar todas as respostas possíveis e determinar se devemos agrupar
     const allAnswersInMap = new Set()
     responses.forEach((response) => {
       const answer = normalizeAnswer(response[questionKey])
@@ -78,91 +80,87 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
     
     const useGrouping = shouldGroupResponses(Array.from(allAnswersInMap))
 
-    // Agora processar as respostas por estado
+    // Processar respostas e agregar por REGIÃO
     responses.forEach((response) => {
       const stateName = response.UF
       if (!stateName || !STATE_NAME_TO_ABBR[stateName]) return
 
-      const stateAbbr = STATE_NAME_TO_ABBR[stateName]
+      // Obter REGIÃO do estado
+      const region = REGION_BY_STATE[stateName]
+      if (!region) return
+
       const answer = normalizeAnswer(response[questionKey])
       if (!answer) return
 
       const normalizedAnswer = normalizeAndGroupNSNR(answer)
       if (normalizedAnswer === null) return
 
-      // IMPORTANTE: Aplicar agrupamento SOMENTE se necessário
       const finalAnswer = useGrouping ? groupResponses(normalizedAnswer) : normalizedAnswer
 
-      if (!stateResults.has(stateAbbr)) {
-        stateResults.set(stateAbbr, {
-          id: stateAbbr,
-          name: stateName,
+      // Inicializar região se não existir
+      if (!regionResults.has(region)) {
+        regionResults.set(region, {
+          id: region,
+          name: region,
+          states: STATES_BY_REGION[region] || [],
           counts: {},
           total: 0,
           percentages: {},
-          // NOVO: Armazenar mapa de respostas originais para debug
           rawResponses: new Set()
         })
       }
 
-      const stateData = stateResults.get(stateAbbr)
-      stateData.counts[finalAnswer] = (stateData.counts[finalAnswer] || 0) + 1
-      stateData.total += 1
-      stateData.rawResponses.add(normalizedAnswer) // Guardar resposta original normalizada
+      const regionData = regionResults.get(region)
+      regionData.counts[finalAnswer] = (regionData.counts[finalAnswer] || 0) + 1
+      regionData.total += 1
+      regionData.rawResponses.add(normalizedAnswer)
     })
 
-    // Calcular percentuais para todas as respostas
-    stateResults.forEach((stateData) => {
-      if (stateData.total > 0) {
-        Object.keys(stateData.counts).forEach((response) => {
-          stateData.percentages[response] = (stateData.counts[response] / stateData.total) * 100
+    // Calcular percentuais para todas as respostas por região
+    regionResults.forEach((regionData) => {
+      if (regionData.total > 0) {
+        Object.keys(regionData.counts).forEach((response) => {
+          regionData.percentages[response] = (regionData.counts[response] / regionData.total) * 100
         })
 
         // Encontrar resposta dominante
-        stateData.dominantResponse = Object.keys(stateData.counts).reduce((a, b) =>
-          stateData.counts[a] > stateData.counts[b] ? a : b,
+        regionData.dominantResponse = Object.keys(regionData.counts).reduce((a, b) =>
+          regionData.counts[a] > regionData.counts[b] ? a : b,
         )
-        stateData.dominantPercentage = stateData.percentages[stateData.dominantResponse]
+        regionData.dominantPercentage = regionData.percentages[regionData.dominantResponse]
       }
     })
 
-    return { stateResults, useGrouping }
+    return { regionResults, useGrouping }
   }, [responses, selectedQuestion])
 
-  // CORREÇÃO PRINCIPAL: Garantir que a escala de cores use a resposta correta
+  // Escala de cores baseada na resposta selecionada
   useEffect(() => {
-    if (!selectedMapResponse || !mapData.stateResults?.size) {
+    if (!selectedMapResponse || !mapData.regionResults?.size) {
       const defaultScale = d3.scaleLinear().domain([0, 100]).range(["#e9ecef", "#e9ecef"]).clamp(true)
       setColorScale(() => defaultScale)
       return
     }
 
-    // IMPORTANTE: Aplicar a mesma lógica de agrupamento ao selectedMapResponse
     let processedResponse = selectedMapResponse
     
-    // Se estamos usando agrupamento, verificar se a resposta selecionada precisa ser agrupada
     if (mapData.useGrouping) {
-      // Primeiro normalizar NS/NR
       const normalized = normalizeAndGroupNSNR(selectedMapResponse)
       if (normalized !== null) {
-        // Depois aplicar agrupamento se necessário
         processedResponse = groupResponses(normalized)
       }
     } else {
-      // Apenas normalizar NS/NR sem agrupamento completo
       const normalized = normalizeAndGroupNSNR(selectedMapResponse)
       if (normalized !== null) {
         processedResponse = normalized
       }
     }
 
-    // Usar a resposta processada para buscar a cor
     const baseColor = MAP_RESPONSE_BASE_COLORS[processedResponse] || MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#9e9e9e"
     const lightColor = d3.color(baseColor).brighter(2.5).formatHex()
 
-    // Coletar percentuais para a resposta processada
-    const percentages = Array.from(mapData.stateResults.values())
-      .map((state) => state.percentages[processedResponse] || 0)
+    const percentages = Array.from(mapData.regionResults.values())
+      .map((region) => region.percentages[processedResponse] || 0)
       .filter((p) => p > 0)
 
     const maxPercentage = percentages.length > 0 ? Math.max(...percentages) : 100
@@ -210,25 +208,22 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
     return { x, y, position }
   }
 
-  const renderTooltipContent = (stateData, stateAbbr) => {
-    if (!stateData) {
+  const renderTooltipContent = (regionData) => {
+    if (!regionData) {
       return (
         <div>
-          <strong>{ABBR_TO_STATE_NAMES[stateAbbr] || stateAbbr}</strong>
-          <br />
-          <span style={{ color: "rgba(255,255,255,0.8)" }}>Sem dados disponíveis</span>
+          <strong>Região sem dados</strong>
         </div>
       )
     }
 
-    const marginOfError = calculateMarginOfError(stateData.total)
+    const marginOfError = calculateMarginOfError(regionData.total)
 
     // Ordenar respostas por percentual (maior para menor)
-    const sortedResponses = Object.entries(stateData.percentages)
+    const sortedResponses = Object.entries(regionData.percentages)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 3)
 
-    // IMPORTANTE: Processar selectedMapResponse da mesma forma que nos dados
     let processedSelectedResponse = selectedMapResponse
     if (mapData.useGrouping && selectedMapResponse) {
       const normalized = normalizeAndGroupNSNR(selectedMapResponse)
@@ -244,9 +239,12 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
 
     return (
       <div>
-        <strong style={{ fontSize: "15px", display: "block", marginBottom: "8px" }}>{stateData.name}</strong>
+        <strong style={{ fontSize: "15px", display: "block", marginBottom: "8px" }}>{regionData.name}</strong>
+        <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)", display: "block", marginBottom: "8px" }}>
+          Estados: {regionData.states.join(", ")}
+        </span>
 
-        {processedSelectedResponse && stateData.percentages[processedSelectedResponse] !== undefined && (
+        {processedSelectedResponse && regionData.percentages[processedSelectedResponse] !== undefined && (
           <div
             style={{
               marginBottom: "8px",
@@ -261,11 +259,11 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
                 fontSize: "14px",
               }}
             >
-              {selectedMapResponse}: {stateData.percentages[processedSelectedResponse].toFixed(1)}%
+              {selectedMapResponse}: {regionData.percentages[processedSelectedResponse].toFixed(1)}%
             </span>
             <br />
             <span style={{ color: "rgba(255,255,255,0.9)", fontSize: "12px" }}>
-              {stateData.counts[processedSelectedResponse] || 0} respostas
+              {regionData.counts[processedSelectedResponse] || 0} respostas
             </span>
           </div>
         )}
@@ -284,7 +282,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
               }}
             >
               {index + 1}. {response}: {percentage.toFixed(1)}%
-              <span style={{ color: "rgba(255,255,255,0.7)", marginLeft: "5px" }}>({stateData.counts[response]})</span>
+              <span style={{ color: "rgba(255,255,255,0.7)", marginLeft: "5px" }}>({regionData.counts[response]})</span>
             </div>
           ))}
         </div>
@@ -296,7 +294,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
           }}
         >
           <span style={{ color: "rgba(255,255,255,0.9)", fontSize: "12px" }}>
-            <strong>Total de respostas:</strong> {stateData.total}
+            <strong>Total de respostas:</strong> {regionData.total}
           </span>
           <br />
           <span style={{ color: "rgba(255,255,255,0.8)", fontSize: "11px" }}>
@@ -310,7 +308,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
   useEffect(() => {
     if (!geoData || !svgRef.current) return
 
-    const { stateResults, useGrouping } = mapData
+    const { regionResults, useGrouping } = mapData
     const svg = d3.select(svgRef.current)
     svg.selectAll("*").remove()
 
@@ -321,7 +319,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
     const projection = d3.geoMercator().fitSize([width, height], geoData)
     const path = d3.geoPath().projection(projection)
 
-    // IMPORTANTE: Processar selectedMapResponse consistentemente
     let processedSelectedResponse = selectedMapResponse
     if (useGrouping && selectedMapResponse) {
       const normalized = normalizeAndGroupNSNR(selectedMapResponse)
@@ -335,6 +332,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       }
     }
 
+    // Renderizar estados, mas colorir por região
     svg
       .attr("width", width)
       .attr("height", height)
@@ -344,9 +342,12 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .join("path")
       .attr("d", path)
       .attr("fill", (d) => {
-        const stateData = stateResults.get(d.properties.sigla)
-        if (stateData && processedSelectedResponse && typeof stateData.percentages[processedSelectedResponse] !== "undefined") {
-          const percentage = stateData.percentages[processedSelectedResponse]
+        const stateName = ABBR_TO_STATE_NAMES[d.properties.sigla]
+        const region = REGION_BY_STATE[stateName]
+        const regionData = regionResults.get(region)
+        
+        if (regionData && processedSelectedResponse && typeof regionData.percentages[processedSelectedResponse] !== "undefined") {
+          const percentage = regionData.percentages[processedSelectedResponse]
           return colorScale(percentage)
         }
         return "#e9ecef"
@@ -355,10 +356,22 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       .attr("stroke-width", 0.5)
       .style("cursor", "pointer")
       .on("mouseover", function (event, d) {
-        d3.select(this).attr("stroke", "#343a40").attr("stroke-width", 2).style("filter", "brightness(1.1)")
+        const stateName = ABBR_TO_STATE_NAMES[d.properties.sigla]
+        const region = REGION_BY_STATE[stateName]
+        
+        // Destacar TODA a região
+        svg.selectAll("path")
+          .filter(pathData => {
+            const pathStateName = ABBR_TO_STATE_NAMES[pathData.properties.sigla]
+            const pathRegion = REGION_BY_STATE[pathStateName]
+            return pathRegion === region
+          })
+          .attr("stroke", "#343a40")
+          .attr("stroke-width", 2)
+          .style("filter", "brightness(1.1)")
 
-        const stateData = stateResults.get(d.properties.sigla)
-        setHoveredState({ abbr: d.properties.sigla, data: stateData })
+        const regionData = regionResults.get(region)
+        setHoveredRegion({ name: region, data: regionData })
 
         const containerRect = containerRef.current.getBoundingClientRect()
         const mouseX = event.clientX - containerRect.left
@@ -386,12 +399,17 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
         setTooltipPosition(tooltipPos)
       })
       .on("mouseout", function () {
-        d3.select(this).attr("stroke", "#fff").attr("stroke-width", 0.5).style("filter", "none")
-        setHoveredState(null)
+        svg.selectAll("path")
+          .attr("stroke", "#fff")
+          .attr("stroke-width", 0.5)
+          .style("filter", "none")
+        setHoveredRegion(null)
       })
       .on("click", (event, d) => {
         if (onStateClick) {
-          onStateClick(d.properties.sigla)
+          const stateName = ABBR_TO_STATE_NAMES[d.properties.sigla]
+          const region = REGION_BY_STATE[stateName]
+          onStateClick(region) // Retorna a região ao invés do estado
         }
       })
   }, [geoData, mapData, onStateClick, colorScale, selectedMapResponse])
@@ -407,7 +425,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
         zIndex: 1,
       }}
     >
-      {hoveredState && (
+      {hoveredRegion && (
         <div
           ref={tooltipRef}
           style={{
@@ -430,7 +448,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
             transition: "all 0.1s ease-out",
           }}
         >
-          {renderTooltipContent(hoveredState.data, hoveredState.abbr)}
+          {renderTooltipContent(hoveredRegion.data)}
         </div>
       )}
 

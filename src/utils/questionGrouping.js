@@ -1,4 +1,5 @@
 // Utilitários para agrupamento de perguntas por tipo de resposta
+import { RESPONSE_ORDER } from './chartUtils'
 
 // Função para criar uma chave única baseada nas possíveis respostas
 export const createAnswerTypeKey = (possibleAnswers) => {
@@ -33,18 +34,16 @@ export const getAnswerTypeTitle = (possibleAnswers) => {
   if (labels.some((l) => l.includes("sim") && l.includes("não"))) {
     return "Sim/Não"
   }
-  // ... (outras lógicas existentes)
 
   return `Múltipla Escolha (${possibleAnswers.length} opções)`
 }
 
 // =============================================================================
-// NOVA CONFIGURAÇÃO PARA O MAPA INTERATIVO
+// CONFIGURAÇÃO PARA O MAPA INTERATIVO
 // =============================================================================
 
 /**
  * Define as cores base para respostas específicas.
- * A chave deve ser a resposta normalizada (ex: "Aprova", "Desaprova").
  */
 export const MAP_RESPONSE_BASE_COLORS = {
   // Respostas positivas - azul
@@ -53,7 +52,7 @@ export const MAP_RESPONSE_BASE_COLORS = {
   "Regular mais para positivo": "#334D99",
   "Melhorar muito": "#334D99",
   "Melhorar um pouco": "#4D66CC",
-  "Ótimo/Bom": "#334D99", // Azul
+  "Ótimo/Bom": "#334D99",
 
   // Respostas neutras - laranja
   Regular: "#CC804D",
@@ -65,7 +64,7 @@ export const MAP_RESPONSE_BASE_COLORS = {
   Péssimo: "#801A1A",
   "Piorar um pouco": "#B33333",
   "Piorar muito": "#801A1A",
-  "Ruim/Péssimo": "#B33333", // Vermelho
+  "Ruim/Péssimo": "#B33333",
 
   // Outros - CINZA
   "Não sabe": "#999999",
@@ -76,30 +75,6 @@ export const MAP_RESPONSE_BASE_COLORS = {
   Aprova: "#334D99",
   Desaprova: "#B33333",
 }
-
-/**
- * Ordem de exibição das respostas na caixa de seleção do mapa.
- * As respostas não listadas aqui aparecerão depois, em ordem alfabética.
- */
-export const MAP_RESPONSE_ORDER = [
-  "Melhorar muito",
-    "Melhorar um pouco",
-    "Ficar igual",
-    "Piorar um pouco",
-    "Piorar muito",
-    "Ótimo",
-    "Bom",
-    "Regular mais para positivo",
-    "Regular",
-    "Regular mais para negativo",
-    "Ruim",
-    "Péssimo",
-    "Aprova",
-    "Desaprova",
-    "NS/NR",
-    "Não sabe",
-    "Não respondeu",
-]
 
 // Função para obter descrição do grupo
 export const getAnswerTypeDescription = (possibleAnswers) => {
@@ -136,7 +111,6 @@ export const getAnswerTypeColor = (possibleAnswers) => {
 
 // Função principal para agrupar perguntas por tipo de resposta
 export const groupQuestionsByAnswerType = (questions) => {
-  // ... lógica original
   const groups = {}
 
   questions.forEach((question) => {
@@ -145,7 +119,6 @@ export const groupQuestionsByAnswerType = (questions) => {
       groups[answerKey] = {
         key: answerKey,
         title: getAnswerTypeTitle(question.possibleAnswers || []),
-        // ...outras propriedades
         questions: [],
       }
     }
@@ -185,16 +158,15 @@ export const getGroupingStats = (questions) => {
 }
 
 // =============================================================================
-// NOVAS FUNÇÕES PARA ORDENAÇÃO DE LEGENDAS EM GRÁFICOS
+// FUNÇÕES PARA ORDENAÇÃO DE RESPOSTAS NO MAPA
 // =============================================================================
 
 /**
- * Ordena um array de respostas com base na ordem definida em MAP_RESPONSE_ORDER.
+ * ATUALIZADO: Ordena respostas usando RESPONSE_ORDER do chartUtils.js
  * @param {string[]} responses - Array de respostas a serem ordenadas.
  * @returns {string[]} - Array de respostas ordenado.
  */
 export const sortMapResponses = (responses) => {
-  // ADICIONAR: Filtrar valores null/undefined antes de ordenar
   const validResponses = responses.filter(response => 
     response !== null && 
     response !== undefined && 
@@ -202,76 +174,60 @@ export const sortMapResponses = (responses) => {
   )
   
   return validResponses.sort((a, b) => {
-    // ADICIONAR: Proteção adicional contra valores inválidos
     if (!a || !b) return 0
     
-    const indexA = MAP_RESPONSE_ORDER.indexOf(a)
-    const indexB = MAP_RESPONSE_ORDER.indexOf(b)
+    const indexA = RESPONSE_ORDER.indexOf(a)
+    const indexB = RESPONSE_ORDER.indexOf(b)
 
     if (indexA !== -1 && indexB !== -1) {
-      return indexA - indexB // Ambos estão na lista, ordenar por índice
+      return indexA - indexB
     }
     if (indexA !== -1) {
-      return -1 // A está na lista, B não -> A vem primeiro
+      return -1
     }
     if (indexB !== -1) {
-      return 1 // B está na lista, A não -> B vem primeiro
+      return 1
     }
     
-    // ATUALIZAR: Verificar se ambos são strings antes de localeCompare
     if (typeof a === 'string' && typeof b === 'string') {
-      return a.localeCompare(b) // Nenhum está na lista, ordenar alfabeticamente
+      return a.localeCompare(b)
     }
     
-    return 0 // Fallback se houver problemas
+    return 0
   })
 }
 
-// Ordem de prioridade para legendas de gráficos (do melhor para o pior)
+// Ordem de prioridade para legendas de gráficos
 export const CHART_LEGEND_ORDER = [
-  // Respostas agrupadas (ordem preferencial)
   "Ótimo/Bom",
   "Regular",
   "Ruim/Péssimo",
-  
-  // Respostas individuais (fallback)
   "Ótimo",
   "Bom",
   "Regular mais para positivo",
   "Regular mais para negativo",
   "Ruim",
   "Péssimo",
-
-  // Aprovação
   "Aprova",
   "Desaprova",
-
-  // Outros
   "Sim",
   "Não",
   "Muito",
   "Pouco",
   "Melhor",
   "Pior",
-
-  // Outros
   "Melhorar muito",
   "Melhorar um pouco",
   "Ficar igual",
   "Piorar um pouco",
   "Piorar muito",
-
-  // Neutros/Não sei (sempre por último)
   "NS/NR",
   "Não sabe",
   "Não respondeu",
 ]
 
 /**
- * Cria uma legenda ordenada para gráficos baseada nas séries disponíveis
- * @param {Array} chartData - Array de séries do gráfico (formato Nivo)
- * @param {Function} colorFunction - Função para obter cores das séries
- * @returns {Array} Array de objetos de legenda ordenados
+ * Cria uma legenda ordenada para gráficos
  */
 export const createOrderedChartLegend = (chartData, colorFunction) => {
   if (!chartData || chartData.length === 0) return []
@@ -279,7 +235,6 @@ export const createOrderedChartLegend = (chartData, colorFunction) => {
   const availableSeries = chartData.map((serie) => serie.id)
   const orderedLegend = []
 
-  // Primeiro: adicionar itens na ordem de prioridade
   CHART_LEGEND_ORDER.forEach((item) => {
     if (availableSeries.includes(item)) {
       const serie = chartData.find((s) => s.id === item)
@@ -291,7 +246,6 @@ export const createOrderedChartLegend = (chartData, colorFunction) => {
     }
   })
 
-  // Segundo: adicionar séries que não estão na ordem predefinida (alfabeticamente)
   const remainingSeries = availableSeries.filter((serieId) => !CHART_LEGEND_ORDER.includes(serieId)).sort()
 
   remainingSeries.forEach((serieId) => {
@@ -306,21 +260,11 @@ export const createOrderedChartLegend = (chartData, colorFunction) => {
   return orderedLegend
 }
 
-/**
- * Obtém a ordem de prioridade de uma resposta específica
- * @param {string} response - Nome da resposta
- * @returns {number} Índice de prioridade (menor = maior prioridade)
- */
 export const getResponsePriority = (response) => {
   const index = CHART_LEGEND_ORDER.indexOf(response)
-  return index === -1 ? 999 : index // Itens não encontrados vão para o final
+  return index === -1 ? 999 : index
 }
 
-/**
- * Ordena um array de respostas pela ordem de prioridade
- * @param {Array} responses - Array de strings com nomes das respostas
- * @returns {Array} Array ordenado pela prioridade
- */
 export const sortResponsesByPriority = (responses) => {
   return [...responses].sort((a, b) => {
     const priorityA = getResponsePriority(a)
@@ -330,7 +274,6 @@ export const sortResponsesByPriority = (responses) => {
       return priorityA - priorityB
     }
 
-    // Se mesma prioridade, ordenar alfabeticamente
     return a.localeCompare(b)
   })
 }
