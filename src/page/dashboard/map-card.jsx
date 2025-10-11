@@ -234,10 +234,6 @@ export default function MapCard({
   const hasRounds = mapRoundsWithData?.length > 0
   const maxIndex = Math.max(0, (mapRoundsWithData?.length || 1) - 1)
 
-  console.log("MapCard - mapData:", mapData)
-  console.log("MapCard - selectedMapResponse:", selectedMapResponse)
-  console.log("MapCard - questionInfo:", questionInfo)
-
   return (
     <div className="map-card">
       <div

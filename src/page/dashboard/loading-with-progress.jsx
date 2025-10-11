@@ -1,12 +1,47 @@
-import { Box, Typography, CircularProgress, LinearProgress } from "@mui/material"
+import React, { useEffect, useRef } from 'react'; // Adicione o useRef
+import { Box, Typography, CircularProgress, LinearProgress } from "@mui/material";
 
 export default function LoadingWithProgress({ loadingProgress = 0, loadingStage = "" }) {
+
+  // useRef é usado para criar uma "trava" que persiste durante a vida do componente,
+  // garantindo que nosso código de recarregamento execute apenas uma vez.
+  const effectRan = useRef(false);
+
+  useEffect(() => {
+    // Em modo de desenvolvimento (Strict Mode), o useEffect roda duas vezes.
+    // Esta verificação com useRef garante que nossa lógica só prossiga na segunda execução,
+    // que é a montagem "real" do componente, evitando o loop.
+    if (effectRan.current === false) {
+      // Na primeira execução do useEffect, apenas marcamos que ele rodou e saímos.
+      effectRan.current = true;
+      return; 
+    }
+
+    // A partir daqui, o código só executa uma vez, com segurança.
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasReloaded = urlParams.get('reloaded');
+
+    if (!hasReloaded) {
+      // Se não tiver o parâmetro, adiciona e recarrega a página.
+      urlParams.set('reloaded', 'true');
+      const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+      window.location.replace(newUrl);
+    }
+    // Se o parâmetro JÁ EXISTIR, não fazemos nada. A página simplesmente carrega normalmente.
+    // Não precisamos mais limpar a URL, o que era a causa do loop. Deixar o parâmetro
+    // é mais seguro e garante que se o usuário der F5 manualmente, a página não tente recarregar de novo.
+
+  }, []); // O array de dependências vazio ainda é necessário.
+
+  // O resto do seu componente permanece exatamente igual.
   return (
     <Box className="loading-container">
       <CircularProgress size={80} sx={{ mb: 3, color: "#1976d2" }} />
       <Typography variant="h5" color="text.primary" sx={{ mb: 2, fontWeight: 600 }}>
         Carregando Dados da Pergunta
       </Typography>
+
+      {/* ... o resto do seu JSX ... */}
 
       <Box sx={{ width: "100%", maxWidth: "500px", mb: 3 }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>

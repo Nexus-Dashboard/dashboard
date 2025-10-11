@@ -126,16 +126,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       }
     })
 
-    // Debug: Log para verificar os dados
-    console.log("MapData Debug:", {
-      useGrouping,
-      selectedMapResponse,
-      sampleState: stateResults.get("SP"),
-      allPossibleResponses: Array.from(new Set(
-        Array.from(stateResults.values()).flatMap(state => Object.keys(state.percentages))
-      ))
-    })
-
     return { stateResults, useGrouping }
   }, [responses, selectedQuestion])
 
@@ -177,15 +167,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
 
     const maxPercentage = percentages.length > 0 ? Math.max(...percentages) : 100
     const scale = d3.scaleLinear().domain([0, maxPercentage]).range([lightColor, baseColor]).clamp(true)
-    
-    console.log("Color Scale Debug:", {
-      selectedMapResponse,
-      processedResponse,
-      baseColor,
-      maxPercentage,
-      percentagesFound: percentages.length
-    })
-    
+
     setColorScale(() => scale)
   }, [selectedMapResponse, mapData])
 

@@ -65,8 +65,6 @@ const convertToShortFormat = (dateLabel) => {
 export const fetchGroupedQuestionData = async ({ queryKey }) => {
   const [, theme, questionText, surveyType] = queryKey
 
-  console.log(`🔄 Buscando dados agrupados para tema: ${theme}, questão: ${questionText}, tipo: ${surveyType}`)
-
   try {
     const { data: groupedData } = await ApiBase.post(
       `/api/data/question/grouped/responses`,
@@ -77,13 +75,10 @@ export const fetchGroupedQuestionData = async ({ queryKey }) => {
       { params: { type: surveyType } },
     )
 
-    console.log("📊 Dados recebidos:", groupedData)
-
     if (!groupedData.success) {
       throw new Error("Erro ao buscar dados agrupados")
     }
 
-    console.log("✅ Dados agrupados recebidos:", groupedData)
     return groupedData
   } catch (error) {
     console.error("💥 Erro ao buscar dados agrupados:", error.message)
@@ -94,7 +89,6 @@ export const fetchGroupedQuestionData = async ({ queryKey }) => {
 // Função para buscar todas as questões
 export const fetchAllQuestions = async ({ queryKey }) => {
   const [, surveyType] = queryKey
-  console.log(`🔍 Iniciando busca COMPLETA de todas as questões...`)
 
   try {
     const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`)
@@ -103,8 +97,7 @@ export const fetchAllQuestions = async ({ queryKey }) => {
       throw new Error("API returned an error")
     }
 
-    const { totalPages, totalQuestions } = firstResponse.data.data.pagination
-    console.log(`📊 Total de páginas: ${totalPages}, Total de questões: ${totalQuestions}`)
+    const { totalPages } = firstResponse.data.data.pagination
 
     let allQuestions = [...firstResponse.data.data.questions]
 
@@ -126,8 +119,6 @@ export const fetchAllQuestions = async ({ queryKey }) => {
     additionalPages.forEach((pageQuestions) => {
       allQuestions = [...allQuestions, ...pageQuestions]
     })
-
-    console.log(`🎉 SUCESSO! Total de questões carregadas: ${allQuestions.length}`)
 
     return {
       success: true,
@@ -181,6 +172,19 @@ export default function Dashboard() {
     return params.get("type")
   }, [location.search])
 
+  const {
+    data: allQuestionsData,
+    isLoading: isLoadingAllQuestions,
+    error: allQuestionsError,
+  } = useQuery({
+    queryKey: ["allQuestions", surveyType],
+    queryFn: fetchAllQuestions,
+    staleTime: 1000 * 60 * 60,
+    cacheTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  })
+
   const { data, error, status } = useQuery({
     queryKey: ["groupedQuestionData", theme, questionText, surveyType],
     queryFn: async (queryKey) => {
@@ -217,7 +221,7 @@ export default function Dashboard() {
         throw error
       }
     },
-    enabled: !!theme && !!questionText,
+    enabled: !!theme && !!questionText && !!allQuestionsData,
     staleTime: 1000 * 60 * 10,
     cacheTime: 1000 * 60 * 15,
     refetchOnWindowFocus: false,
@@ -225,31 +229,13 @@ export default function Dashboard() {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   })
 
-  const {
-    data: allQuestionsData,
-    isLoading: isLoadingAllQuestions,
-    error: allQuestionsError,
-  } = useQuery({
-    queryKey: ["allQuestions", surveyType],
-    queryFn: fetchAllQuestions,
-    staleTime: 1000 * 60 * 60,
-    cacheTime: 1000 * 60 * 60,
-    refetchOnWindowFocus: false,
-    retry: 1,
-  })
-
   const surveyDateMap = useMemo(() => {
-    console.log("🗺️ Criando Survey Date Map...")
-
     if (!allQuestionsData?.data?.questions) {
-      console.log("❌ Sem dados de questões para criar o mapa")
       return new Map()
     }
 
     const map = new Map()
     const questions = allQuestionsData.data.questions
-
-    console.log(`📊 Processando ${questions.length} questões...`)
 
     questions.forEach((q) => {
       if (q.surveyNumber && q.date) {
@@ -262,7 +248,6 @@ export default function Dashboard() {
     })
 
     console.log("🎯 Survey Date Map final:", Array.from(map.entries()))
-    console.log(`📈 Total de mapeamentos: ${map.size}`)
 
     return map
   }, [allQuestionsData])
@@ -728,18 +713,13 @@ export default function Dashboard() {
     return formatChartXAxis(rodada.period, dateLabel)
   }
 
-  useEffect(() => {
-    if (allQuestionsError) {
-      console.error("💥 Erro ao carregar todas as questões:", allQuestionsError)
-    }
-  }, [allQuestionsError])
-
-  if (status === "loading" || !data) {
-    return <LoadingWithProgress loadingProgress={loadingProgress} loadingStage={loadingStage} />
-  }
 
   if (isLoadingAllQuestions) {
     return <LoadingWithProgress loadingProgress={30} loadingStage="Carregando informações de datas..." />
+  }
+
+  if (status === "loading" || !data) {
+    return <LoadingWithProgress loadingProgress={loadingProgress} loadingStage={loadingStage} />
   }
 
   if (status === "error") {
