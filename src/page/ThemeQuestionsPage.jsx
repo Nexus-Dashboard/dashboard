@@ -315,6 +315,47 @@ export default function ThemeQuestionsPage() {
                 </div>
               ) : (
                 <>
+
+                  {filteredTextGrouped.length > 0 && (
+                    <section>
+                      <div className="question-group-header">
+                        <FileText />
+                        <h4>Perguntas Individuais (Agrupadas por Texto)</h4>
+                      </div>
+                      <div className="questions-grid">
+                        {filteredTextGrouped.map((group) => (
+                          <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
+                            <Card.Body>
+                              <h6 className="question-card-title">
+                                {group.shortText || group.questionText}
+                              </h6>
+
+                              <div className="question-card-footer">
+                                <OverlayTrigger
+                                  placement="top"
+                                  overlay={
+                                    <Tooltip id={`tooltip-${group.id}`}>
+                                      {(group.variables || []).length} variável(eis): {(group.variables || []).join(", ")}
+                                    </Tooltip>
+                                  }
+                                >
+                                  <Badge bg="secondary" style={{ cursor: 'pointer' }}>
+                                    {(group.rounds || []).length} Rodadas
+                                  </Badge>
+                                </OverlayTrigger>
+
+                                <Button variant="outline-primary" size="sm" className="analyze-button">
+                                  <BarChart3 size={14} className="me-1" />
+                                  Ver Histórico
+                                </Button>
+                              </div>
+                            </Card.Body>
+                          </Card>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                  
                   {filteredMultiple.length > 0 && (
                     <section>
                       <div className="question-group-header">
@@ -361,45 +402,7 @@ export default function ThemeQuestionsPage() {
                     </section>
                   )}
 
-                  {filteredTextGrouped.length > 0 && (
-                    <section>
-                      <div className="question-group-header">
-                        <FileText />
-                        <h4>Perguntas Individuais (Agrupadas por Texto)</h4>
-                      </div>
-                      <div className="questions-grid">
-                        {filteredTextGrouped.map((group) => (
-                          <Card key={group.id} className="question-card" onClick={() => handleQuestionClick(group)}>
-                            <Card.Body>
-                              <h6 className="question-card-title">
-                                {group.shortText || group.questionText}
-                              </h6>
-
-                              <div className="question-card-footer">
-                                <OverlayTrigger
-                                  placement="top"
-                                  overlay={
-                                    <Tooltip id={`tooltip-${group.id}`}>
-                                      {(group.variables || []).length} variável(eis): {(group.variables || []).join(", ")}
-                                    </Tooltip>
-                                  }
-                                >
-                                  <Badge bg="secondary" style={{ cursor: 'pointer' }}>
-                                    {(group.rounds || []).length} Rodadas
-                                  </Badge>
-                                </OverlayTrigger>
-
-                                <Button variant="outline-primary" size="sm" className="analyze-button">
-                                  <BarChart3 size={14} className="me-1" />
-                                  Ver Histórico
-                                </Button>
-                              </div>
-                            </Card.Body>
-                          </Card>
-                        ))}
-                      </div>
-                    </section>
-                  )}
+                  
                 </>
               )}
             </>

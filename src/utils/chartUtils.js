@@ -2,6 +2,7 @@
 export const RESPONSE_ORDER = [
   "Ótimo",
   "Bom",
+  "Ótimo/Bom",
   "Regular mais para positivo",
   "Regular",
   "Regular mais para negativo",
@@ -12,6 +13,8 @@ export const RESPONSE_ORDER = [
   "Ficar igual",
   "Piorar um pouco",
   "Piorar muito",
+  "Ruim/Péssimo",
+  "NS/NR",
   "Aprova",
   "Desaprova",
   "Não sabe",
@@ -20,37 +23,39 @@ export const RESPONSE_ORDER = [
 
 // Mapas de cores CORRETOS
 export const responseColorMap = {
-  // Respostas positivas - VERDE
-  Ótimo: "#28a745",
-  Bom: "#28a745",
-  "Regular mais para positivo": "#28a745",
-  "Melhorar muito": "#28a745",
-  "Melhorar um pouco": "#8ccc9bff",
+  // Respostas positivas - azul
+  Ótimo: "#334D99",
+  Bom: "#4D66CC",
+  "Regular mais para positivo": "#334D99",
+  "Melhorar muito": "#334D99",
+  "Melhorar um pouco": "#4D66CC",
+  "Ótimo/Bom": "#334D99", // Azul
 
-  // Respostas neutras - AMARELO
-  Regular: "#ffc107",
-  "Ficar igual": "#ffc107",
+  // Respostas neutras - laranja
+  Regular: "#CC804D",
+  "Ficar igual": "#CC804D",
 
   // Respostas negativas - VERMELHO
-  "Regular mais para negativo": "#dc3545",
-  Ruim: "#dc3545",
-  Péssimo: "#dc3545",
-  "Piorar um pouco": "#dc3545",
-  "Piorar muito": "#810814ff",
+  "Regular mais para negativo": "#B33333",
+  Ruim: "#B33333",
+  Péssimo: "#801A1A",
+  "Piorar um pouco": "#B33333",
+  "Piorar muito": "#801A1A",
+  "Ruim/Péssimo": "#B33333", // Vermelho
 
   // Outros - CINZA
-  "Não sabe": "#6c757d",
-  "Não respondeu": "#6c757d",
-  "NS/NR": "#6c757d",
+  "Não sabe": "#999999",
+  "Não respondeu": "#999999",
+  "NS/NR": "#999999",
 
   // Aprovação
-  Aprova: "#28a745",
-  Desaprova: "#dc3545",
+  Aprova: "#334D99",
+  Desaprova: "#B33333",
 }
 
 // Função para obter cor com base na resposta
 export const getResponseColor = (response) => {
-  return responseColorMap[response] || "#6c757d"
+  return responseColorMap[response] || "#999999"
 }
 
 // Função para normalizar respostas - ATUALIZADA para filtrar #NULL
@@ -185,12 +190,12 @@ export const shouldGroupResponses = (responses) => {
 
 // Cores para respostas agrupadas - CORRETAS
 export const groupedResponseColorMap = {
-  "Ótimo/Bom": "#28a745", // Verde
-  Regular: "#ffc107", // Amarelo
-  "Ruim/Péssimo": "#dc3545", // Vermelho
+  "Ótimo/Bom": "#334D99", // Azul
+  Regular: "#CC804D", // Amarelo
+  "Ruim/Péssimo": "#B33333", // Vermelho
   "NS/NR": "#6c757d", // Cinza
-  Aprova: "#28a745", // Verde
-  Desaprova: "#dc3545", // Vermelho
+  Aprova: "#334D99", // Azul
+  Desaprova: "#B33333", // Vermelho
 }
 
 // Ordem para respostas agrupadas (do melhor para o pior) - CORRIGIDA PARA LEGENDAS
