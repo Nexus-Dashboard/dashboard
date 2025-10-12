@@ -166,7 +166,19 @@ export default function ThemeQuestionsPage() {
 
   const handleQuestionClick = useCallback(
     (group) => {
-      const params = new URLSearchParams({ theme: themeName, type: surveyType })
+      // Calcular o título correto diretamente
+      let pageTitle;
+      if (themeSlug === 'popularidade-tracking' || themeSlug === 'popularidade-face-a-face') {
+        pageTitle = "Avaliação e Aprovação do Governo";
+      } else {
+        pageTitle = themeName;
+      }
+      
+      const params = new URLSearchParams({ 
+        theme: themeName, 
+        type: surveyType,
+        pageTitle: pageTitle // Usar a variável calculada
+      })
       if (group.type === "multiple") {
         params.append("baseCode", group.baseCode)
         params.append("variables", JSON.stringify(group.variables))
@@ -355,7 +367,7 @@ export default function ThemeQuestionsPage() {
                       </div>
                     </section>
                   )}
-                  
+
                   {filteredMultiple.length > 0 && (
                     <section>
                       <div className="question-group-header">

@@ -65,7 +65,7 @@ const DashboardHeader = ({ questionInfo, allHistoricalData, pageRef, onMenuClick
         <IconButton color="inherit" onClick={onMenuClick}>
           <MenuIcon />
         </IconButton>
-        <h2>{questionInfo?.questionText || questionInfo?.label || "Dashboard"}</h2>
+        <h2>{questionInfo?.label || questionInfo?.questionText || "Dashboard"}</h2>
       </Box>
       <Box sx={{ display: "flex", gap: 1 }}>
         <Button variant="outlined" color="inherit" startIcon={<Download />} onClick={downloadCSV}>

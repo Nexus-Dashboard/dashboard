@@ -50,7 +50,6 @@ export const PresentationModeManager = () => {
             return indexA - indexB
           })
 
-        console.log(`✅ Perguntas fixas carregadas para apresentação: ${selectedQuestions.length}`)
         setTopQuestions(selectedQuestions)
       }
     } catch (error) {
@@ -62,7 +61,6 @@ export const PresentationModeManager = () => {
     // Don't start if already in presentation mode or no questions are loaded
     if (isPresentationMode || topQuestions.length === 0) return
 
-    console.log("Starting presentation mode...")
     setIsPresentationMode(true)
     window.isPresentationModeActive = true
     
@@ -84,7 +82,6 @@ export const PresentationModeManager = () => {
     presentationIntervalRef.current = setInterval(() => {
       currentQuestionIndexRef.current = (currentQuestionIndexRef.current + 1) % topQuestions.length
       const nextQuestion = topQuestions[currentQuestionIndexRef.current]
-      console.log(`Switching to question ${currentQuestionIndexRef.current + 1}: ${nextQuestion.questionText}`)
       navigate(
         `/dashboard?theme=${encodeURIComponent(nextQuestion.theme)}&questionText=${encodeURIComponent(nextQuestion.questionText)}&type=telephonic`,
       )
@@ -93,7 +90,6 @@ export const PresentationModeManager = () => {
 
   const stopPresentationMode = useCallback(() => {
     if (isPresentationMode) {
-      console.log("Stopping presentation mode due to activity.")
       setIsPresentationMode(false)
       window.isPresentationModeActive = false
       
@@ -121,7 +117,6 @@ export const PresentationModeManager = () => {
     // Listener para quando sair da tela cheia manualmente
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && isPresentationMode) {
-        console.log("Saiu da tela cheia, finalizando apresentação")
         stopPresentationMode()
       }
     }
@@ -136,7 +131,6 @@ export const PresentationModeManager = () => {
   // Listener para evento manual de iniciar apresentação
   useEffect(() => {
     const handleManualStart = () => {
-      console.log("Manual presentation mode triggered")
       startPresentationMode()
     }
 

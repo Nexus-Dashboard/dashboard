@@ -501,21 +501,7 @@ const TimelinePage = () => {
   const sortedChartData = [
     ...itemsInOrder.map((item) => ({ id: item.id, color: item.color, data: item.data })),
     ...itemsNotInOrder,
-  ]
-
-  console.log("Order used:", orderToUse)
-  console.log(
-    "Items in order:",
-    itemsInOrder.map((d) => ({ id: d.id, orderIndex: d.orderIndex })),
-  )
-  console.log(
-    "Final chart data order:",
-    sortedChartData.map((d, i) => ({
-      position: i,
-      id: d.id,
-      color: d.color,
-    })),
-  )
+  ]  
 
   return sortedChartData
 }, [timelineData])

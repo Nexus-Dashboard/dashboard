@@ -47,6 +47,8 @@ const FULL_MONTH_TO_SHORT = {
   "Dezembro": "dez"
 }
 
+
+
 // Função para converter formato de data para abreviado com ponto
 const convertToShortFormat = (dateLabel) => {
   if (!dateLabel) return ""
@@ -246,8 +248,6 @@ export default function Dashboard() {
         }
       }
     })
-
-    console.log("🎯 Survey Date Map final:", Array.from(map.entries()))
 
     return map
   }, [allQuestionsData])
@@ -681,6 +681,11 @@ export default function Dashboard() {
       .filter((serie) => serie.data && serie.data.length > 0)
   }, [selectedChartData, surveyDateMap, formatChartXAxis])
 
+  const pageTitle = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get("pageTitle")
+  }, [location.search])
+
   // NOVA FUNÇÃO ATUALIZADA: Para formatar o período nos cards
   const getCardPeriodLabel = useCallback(
     (rodada) => {
@@ -747,6 +752,8 @@ export default function Dashboard() {
   )
   const chartColorFunc = (d) => (useGroupingForChart ? groupedResponseColorMap[d.id] : getResponseColor(d.id))
 
+  
+
   return (
     <Box className="dashboard-page" ref={pageRef}>
       <OffcanvasNavigation
@@ -759,7 +766,7 @@ export default function Dashboard() {
       />
 
       <DashboardHeader
-        questionInfo={questionInfo}
+        questionInfo={{ ...questionInfo, label: pageTitle || questionInfo?.label || questionInfo?.questionText }}
         allHistoricalData={allHistoricalData}
         pageRef={pageRef}
         onMenuClick={() => setShowOffcanvas(true)}
