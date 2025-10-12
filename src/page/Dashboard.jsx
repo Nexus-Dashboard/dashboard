@@ -31,7 +31,6 @@ import {
   isStateInSelectedRegions 
 } from "../utils/regionMapping"
 
-// Mapeamento de meses completos para abreviados
 const FULL_MONTH_TO_SHORT = {
   "Janeiro": "jan",
   "Fevereiro": "fev",
@@ -47,13 +46,9 @@ const FULL_MONTH_TO_SHORT = {
   "Dezembro": "dez"
 }
 
-
-
-// Função para converter formato de data para abreviado com ponto
 const convertToShortFormat = (dateLabel) => {
   if (!dateLabel) return ""
   
-  // Se já está no formato "Maio/25" ou similar
   if (dateLabel.includes('/')) {
     const [month, year] = dateLabel.split('/')
     const shortMonth = FULL_MONTH_TO_SHORT[month] || month.substring(0, 3).toLowerCase()
@@ -63,7 +58,6 @@ const convertToShortFormat = (dateLabel) => {
   return dateLabel
 }
 
-// Função para buscar dados agrupados
 export const fetchGroupedQuestionData = async ({ queryKey }) => {
   const [, theme, questionText, surveyType] = queryKey
 
@@ -88,7 +82,6 @@ export const fetchGroupedQuestionData = async ({ queryKey }) => {
   }
 }
 
-// Função para buscar todas as questões
 export const fetchAllQuestions = async ({ queryKey }) => {
   const [, surveyType] = queryKey
 
@@ -135,7 +128,6 @@ export const fetchAllQuestions = async ({ queryKey }) => {
   }
 }
 
-// UF demographic key
 const UF_DEMOGRAPHIC_KEY = "UF"
 
 export default function Dashboard() {
@@ -252,7 +244,6 @@ export default function Dashboard() {
     return map
   }, [allQuestionsData])
 
-  // FUNÇÃO ATUALIZADA: formatChartXAxis com novo formato
   const formatChartXAxis = useCallback(
     (period, dateLabel) => {
       const roundNumber = period ? period.split("-R")[1] : ""
@@ -262,7 +253,6 @@ export default function Dashboard() {
         return `R${roundNumber.padStart(2, "0")} - ${shortDate}`
       }
 
-      // Fallback se não houver data
       if (period) {
         const parts = period.split("-R")
         if (parts.length === 2) {
@@ -284,9 +274,9 @@ export default function Dashboard() {
     [surveyDateMap],
   )
 
-  const { questionInfo, allHistoricalData, availableDemographics, mapRoundsWithData } = useMemo(() => {
+  const { questionInfo, allHistoricalData, availableDemographics } = useMemo(() => {
     if (!data) {
-      return { questionInfo: null, allHistoricalData: [], availableDemographics: [], mapRoundsWithData: [] }
+      return { questionInfo: null, allHistoricalData: [], availableDemographics: [] }
     }
 
     const questionInfo = {
@@ -305,12 +295,6 @@ export default function Dashboard() {
       if (yearA !== yearB) return yearB - yearA
       return roundB - roundA
     })
-
-    const roundsWithMapData = sortedRounds.filter((round) =>
-      round.distribution.some(
-        (dist) => dist.demographics?.[UF_DEMOGRAPHIC_KEY]?.length > 0 || dist.demographics?.["PF10"]?.length > 0,
-      ),
-    )
 
     const demographicsMap = new Map()
     const normalizeRegion = (region) => {
@@ -371,7 +355,6 @@ export default function Dashboard() {
       questionInfo: questionInfo,
       allHistoricalData: sortedRounds,
       availableDemographics: demographics,
-      mapRoundsWithData: roundsWithMapData,
     }
   }, [data, questionText])
 
@@ -520,6 +503,14 @@ export default function Dashboard() {
     })
   }, [allHistoricalData, filters, selectedPeriod])
 
+  const mapRoundsWithData = useMemo(() => {
+    return filteredHistoricalData.filter((round) =>
+      round.distribution.some(
+        (dist) => dist.demographics?.[UF_DEMOGRAPHIC_KEY]?.length > 0 || dist.demographics?.["PF10"]?.length > 0,
+      ),
+    )
+  }, [filteredHistoricalData])
+
   useEffect(() => {
     if (mapRoundsWithData.length > 0) {
       setSelectedMapRoundIndex(0)
@@ -542,44 +533,70 @@ export default function Dashboard() {
 
     selectedRound.distribution.forEach((dist) => {
       const responseValue = dist.response
-
       const normalizedResponse = normalizeAnswer(responseValue)
-      if (normalizedResponse === null) return
+      if (normalizedResponse === null || dist.weightedCount === 0) return
 
       const ufDemographics = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
+      if (!ufDemographics) return
 
-      if (ufDemographics) {
-        ufDemographics.forEach((ufDemo) => {
-          const regionFilters = filters["REGIAO_VIRTUAL"]
-          if (regionFilters && regionFilters.length > 0) {
-            if (!isStateInSelectedRegions(ufDemo.response, regionFilters)) {
-              return
-            }
+      // Calcular o total de peso para estados que passam pelos filtros
+      let totalFilteredWeight = 0
+      const filteredUfData = []
+
+      ufDemographics.forEach((ufDemo) => {
+        let shouldInclude = true
+
+        // Verificar filtro de região
+        if (filters["REGIAO_VIRTUAL"] && filters["REGIAO_VIRTUAL"].length > 0) {
+          if (!isStateInSelectedRegions(ufDemo.response, filters["REGIAO_VIRTUAL"])) {
+            shouldInclude = false
           }
+        }
 
-          let shouldInclude = true
+        // Verificar outros filtros demográficos
+        if (shouldInclude && Object.keys(filters).length > 0) {
           Object.entries(filters).forEach(([filterKey, filterValues]) => {
             if (filterKey !== "REGIAO_VIRTUAL" && filterValues && filterValues.length > 0) {
-              const relevantDemo = selectedRound.distribution.find(d => d.response === responseValue)
-              const demoGroup = relevantDemo?.demographics?.[filterKey]
+              // Para cada estado, verificar se tem dados demográficos que correspondem ao filtro
+              const demoGroup = dist.demographics?.[filterKey]
               if (demoGroup) {
-                const hasMatchingDemo = demoGroup.some(demoValue => 
-                  filterValues.includes(demoValue.response)
-                )
-                if (!hasMatchingDemo) {
+                const totalWeightForDemo = demoGroup.reduce((sum, d) => sum + d.weightedCount, 0)
+                const matchingWeight = demoGroup
+                  .filter(d => filterValues.includes(d.response))
+                  .reduce((sum, d) => sum + d.weightedCount, 0)
+                
+                // Se não há correspondência neste filtro, excluir este estado
+                if (matchingWeight === 0) {
                   shouldInclude = false
                 }
+              } else {
+                shouldInclude = false
               }
             }
           })
+        }
 
-          if (shouldInclude) {
-            for (let i = 0; i < ufDemo.count; i++) {
-              mapResponses.push({
-                [questionInfo.variable]: responseValue,
-                UF: ufDemo.response,
-              })
-            }
+        if (shouldInclude) {
+          filteredUfData.push({
+            state: ufDemo.response,
+            originalWeight: ufDemo.weightedCount
+          })
+          totalFilteredWeight += ufDemo.weightedCount
+        }
+      })
+
+      // Se há estados que passaram pelos filtros, distribuir o weightedCount filtrado proporcionalmente
+      if (filteredUfData.length > 0 && totalFilteredWeight > 0) {
+        filteredUfData.forEach((ufData) => {
+          // Calcular quantas respostas este estado deve ter baseado na proporção
+          const proportion = ufData.originalWeight / totalFilteredWeight
+          const responsesForState = Math.round(dist.weightedCount * proportion)
+
+          for (let i = 0; i < responsesForState; i++) {
+            mapResponses.push({
+              [questionInfo.variable]: responseValue,
+              UF: ufData.state,
+            })
           }
         })
       }
@@ -686,7 +703,6 @@ export default function Dashboard() {
     return params.get("pageTitle")
   }, [location.search])
 
-  // NOVA FUNÇÃO ATUALIZADA: Para formatar o período nos cards
   const getCardPeriodLabel = useCallback(
     (rodada) => {
       if (!rodada || !surveyDateMap) return "N/A"
@@ -717,7 +733,6 @@ export default function Dashboard() {
     const dateLabel = surveyDateMap.get(roundNumber)
     return formatChartXAxis(rodada.period, dateLabel)
   }
-
 
   if (isLoadingAllQuestions) {
     return <LoadingWithProgress loadingProgress={30} loadingStage="Carregando informações de datas..." />
@@ -751,8 +766,6 @@ export default function Dashboard() {
     selectedChartData.flatMap((h) => h.distribution.map((d) => normalizeAndGroupNSNR(d.response))),
   )
   const chartColorFunc = (d) => (useGroupingForChart ? groupedResponseColorMap[d.id] : getResponseColor(d.id))
-
-  
 
   return (
     <Box className="dashboard-page" ref={pageRef}>
