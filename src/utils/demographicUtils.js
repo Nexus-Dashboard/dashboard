@@ -7,10 +7,12 @@ export const DEMOGRAPHIC_LABELS = {
   PF3: "Escolaridade",
   PF4: "Renda Familiar",
   PF5: "Religião",
+  PF6: "Tipo de trabalho",
   PF7: "Trabalho Remunerado",
   PF8: "Classificação do Trabalho",
   PF9: "Vínculo Formal",
   PF10: "Possui CNPJ",
+  PF13: "Faixa de Renda",
   "Faixa de idade": "Faixa de idade",
 }
 

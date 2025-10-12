@@ -349,8 +349,47 @@ export default function Dashboard() {
 
     if (demographicsMap.has("PF2_FAIXAS")) {
       demographics = demographics.filter((d) => d.key !== "PF2" && d.key !== "Faixa de idade")
+    }  
+
+    // ... dentro do seu useMemo, depois da criação do array 'demographics'
+
+  // Início do NOVO trecho de tratamento para PF13
+  const pf13Index = demographics.findIndex((d) => d.key === "PF13");
+
+  if (pf13Index > -1) {
+    const pf13Data = demographics[pf13Index];
+    const processedValues = new Set();
+    let hasNonStandardValues = false;
+
+    pf13Data.values.forEach((value) => {
+      // A expressão regular /\((.*?)\)/ captura o texto dentro dos parênteses.
+      const match = value.match(/\((.*?)\)/);
+
+      if (match && match[1]) {
+        // Se encontrou, adiciona o conteúdo capturado (match[1]) ao Set.
+        processedValues.add(match[1]);
+      } else {
+        // Se não encontrou, marca que existe um valor não padrão.
+        hasNonStandardValues = true;
+      }
+    });
+
+    // Se encontramos valores não padrão (como #NULL!, Sim, Não), adicionamos a categoria NS/NR.
+    if (hasNonStandardValues) {
+      processedValues.add("NS/NR");
     }
 
+    // Atualiza o array 'values' do PF13 com os valores processados e ordenados.
+    demographics[pf13Index] = {
+      ...pf13Data,
+      values: Array.from(processedValues).sort((a, b) => {
+        if (a === 'NS/NR') return 1; // Coloca NS/NR no final
+        if (b === 'NS/NR') return -1;
+        return a.localeCompare(b);
+      }),
+    };
+  }
+  // Fim do NOVO trecho
     return {
       questionInfo: questionInfo,
       allHistoricalData: sortedRounds,
