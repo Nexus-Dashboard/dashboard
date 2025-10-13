@@ -82,7 +82,7 @@ ResponseSelectorMenu.displayName = "ResponseSelectorMenu"
 
 const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterToggle }) => {
   const [isOpen, setIsOpen] = useState(false)
-  const filterGroups = ["Sexo", "Região", "Faixa de Renda"] // <-- ALTERAÇÃO AQUI
+  const filterGroups = ["Sexo", "Região", "Faixa de Renda"] 
   const relevantFilters = availableDemographics.filter((group) => filterGroups.includes(group.label))
 
   const ICONS = {
@@ -174,55 +174,63 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
                 {group.label}
               </Typography>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                {group.values.map((value) => {
-                  const isActive = activeFilters[group.key]?.[0] === value
-                  return (
-                    <Button
-                      key={value}
-                      variant={isActive ? "contained" : "outlined"}
-                      size="small"
-                      onClick={() => onFilterToggle(group.key, value)}
-                      startIcon={ICONS[value] || <div style={{ width: 16 }} />}
-                      sx={{
-                        minWidth: "auto",
-                        px: 1,
-                        py: 0.25,
-                        fontSize: "10px",
-                        fontWeight: "500",
-                        borderRadius: "16px",
-                        textTransform: "none",
-                        transition: "all 0.2s ease",
-                        ...(isActive
-                          ? {
-                              backgroundColor: "#0d6efd",
-                              borderColor: "#0d6efd",
-                              color: "#ffffff",
-                              boxShadow: "0 2px 4px rgba(13, 110, 253, 0.3)",
-                            }
-                          : {
-                              backgroundColor: "#ffffff",
-                              borderColor: "#dee2e6",
-                              color: "#6c757d",
-                              "&:hover": {
-                                backgroundColor: "#e3f2fd",
+                {group.values
+                  .filter(value => {
+                    if (group.label === "Faixa de Renda") {
+                      const upperCaseValue = value.toUpperCase();
+                      return upperCaseValue !== "NÃO LER" && upperCaseValue !== "NS/NR";
+                    }
+                    return true;
+                  })
+                  .map((value) => {
+                    const isActive = activeFilters[group.key]?.[0] === value;
+                    return (
+                      <Button
+                        key={value}
+                        variant={isActive ? "contained" : "outlined"}
+                        size="small"
+                        onClick={() => onFilterToggle(group.key, value)}
+                        startIcon={ICONS[value] || <div style={{ width: 16 }} />}
+                        sx={{
+                          minWidth: "auto",
+                          px: 1,
+                          py: 0.25,
+                          fontSize: "10px",
+                          fontWeight: "500",
+                          borderRadius: "16px",
+                          textTransform: "none",
+                          transition: "all 0.2s ease",
+                          ...(isActive
+                            ? {
+                                backgroundColor: "#0d6efd",
                                 borderColor: "#0d6efd",
-                                color: "#0d6efd",
-                              },
-                            }),
-                      }}
-                    >
-                      {value}
-                    </Button>
-                  )
-                })}
+                                color: "#ffffff",
+                                boxShadow: "0 2px 4px rgba(13, 110, 253, 0.3)",
+                              }
+                            : {
+                                backgroundColor: "#ffffff",
+                                borderColor: "#dee2e6",
+                                color: "#6c757d",
+                                "&:hover": {
+                                  backgroundColor: "#e3f2fd",
+                                  borderColor: "#0d6efd",
+                                  color: "#0d6efd",
+                                },
+                              }),
+                        }}
+                      >
+                        {value}
+                      </Button>
+                    );
+                  })}
               </Box>
             </Box>
           ))}
         </Box>
       </Collapse>
     </Box>
-  )
-}
+  );
+};
 
 export default function MapCard({
   mapRoundsWithData = [],
