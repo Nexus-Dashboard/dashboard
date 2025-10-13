@@ -141,6 +141,9 @@ export default function Dashboard() {
   const [selectedMapRoundIndex, setSelectedMapRoundIndex] = useState(0)
   const [selectedPeriod, setSelectedPeriod] = useState(null)
   const [selectedMapResponse, setSelectedMapResponse] = useState(null)
+  
+  // NOVO: Estado para mapeamento PF13
+  const [pf13ValueMapping, setPf13ValueMapping] = useState({})
 
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [loadingStage, setLoadingStage] = useState("")
@@ -349,47 +352,79 @@ export default function Dashboard() {
 
     if (demographicsMap.has("PF2_FAIXAS")) {
       demographics = demographics.filter((d) => d.key !== "PF2" && d.key !== "Faixa de idade")
-    }  
-
-    // ... dentro do seu useMemo, depois da criação do array 'demographics'
-
-  // Início do NOVO trecho de tratamento para PF13
-  const pf13Index = demographics.findIndex((d) => d.key === "PF13");
-
-  if (pf13Index > -1) {
-    const pf13Data = demographics[pf13Index];
-    const processedValues = new Set();
-    let hasNonStandardValues = false;
-
-    pf13Data.values.forEach((value) => {
-      // A expressão regular /\((.*?)\)/ captura o texto dentro dos parênteses.
-      const match = value.match(/\((.*?)\)/);
-
-      if (match && match[1]) {
-        // Se encontrou, adiciona o conteúdo capturado (match[1]) ao Set.
-        processedValues.add(match[1]);
-      } else {
-        // Se não encontrou, marca que existe um valor não padrão.
-        hasNonStandardValues = true;
-      }
-    });
-
-    // Se encontramos valores não padrão (como #NULL!, Sim, Não), adicionamos a categoria NS/NR.
-    if (hasNonStandardValues) {
-      processedValues.add("NS/NR");
     }
 
-    // Atualiza o array 'values' do PF13 com os valores processados e ordenados.
-    demographics[pf13Index] = {
-      ...pf13Data,
-      values: Array.from(processedValues).sort((a, b) => {
-        if (a === 'NS/NR') return 1; // Coloca NS/NR no final
-        if (b === 'NS/NR') return -1;
-        return a.localeCompare(b);
-      }),
-    };
-  }
-  // Fim do NOVO trecho
+    // INÍCIO DO TRATAMENTO MELHORADO PARA PF13
+    const pf13Index = demographics.findIndex((d) => d.key === "PF13");
+    let localPf13Mapping = {};
+
+    if (pf13Index > -1) {
+      const pf13Data = demographics[pf13Index];
+      const processedValues = new Set();
+      const valueMapping = {}; // Mapeamento: processado -> original
+      const reverseMapping = {}; // Mapeamento reverso: original -> processado
+      const nonStandardValues = [];
+
+      pf13Data.values.forEach((value) => {
+        const match = value.match(/\((.*?)\)/);
+        
+        if (match && match[1]) {
+          // Valor padrão com formato esperado
+          const processed = match[1];
+          processedValues.add(processed);
+          valueMapping[processed] = value;
+          reverseMapping[value] = processed;
+        } else {
+          // Valores não padrão (como #NULL!, Sim, Não, etc.)
+          nonStandardValues.push(value);
+        }
+      });
+
+      // Se há valores não padrão, mapeá-los para NS/NR
+      if (nonStandardValues.length > 0) {
+        processedValues.add("NS/NR");
+        // Mapear todos os valores não padrão para NS/NR
+        valueMapping["NS/NR"] = nonStandardValues;
+        nonStandardValues.forEach(val => {
+          reverseMapping[val] = "NS/NR";
+        });
+      }
+
+      // Atualizar demographics com valores processados
+      demographics[pf13Index] = {
+        ...pf13Data,
+        values: Array.from(processedValues).sort((a, b) => {
+          // Ordenação personalizada para NS/NR no final
+          if (a === 'NS/NR') return 1;
+          if (b === 'NS/NR') return -1;
+          
+          // Tentar ordenar por salários mínimos numericamente
+          const getNumSM = (str) => {
+            const match = str.match(/(\d+)/);
+            return match ? parseInt(match[1]) : 0;
+          };
+          
+          const numA = getNumSM(a);
+          const numB = getNumSM(b);
+          
+          if (numA !== numB) return numA - numB;
+          return a.localeCompare(b);
+        }),
+      };
+
+      // Salvar o mapeamento para uso posterior
+      localPf13Mapping = {
+        toOriginal: valueMapping,
+        toProcessed: reverseMapping
+      };
+    }
+    // FIM DO TRATAMENTO MELHORADO PARA PF13
+
+    // Atualizar o estado do mapeamento
+    if (Object.keys(localPf13Mapping).length > 0) {
+      setPf13ValueMapping(localPf13Mapping);
+    }
+
     return {
       questionInfo: questionInfo,
       allHistoricalData: sortedRounds,
@@ -435,41 +470,91 @@ export default function Dashboard() {
     }
   }, [availableMapResponses, selectedMapResponse])
 
+  // FUNÇÃO handleFilterChange MODIFICADA PARA PF13
   const handleFilterChange = (demographicKey, value, checked) => {
     setFilters((prevFilters) => {
-      const newFilters = {}
+      const newFilters = {};
       const currentValues =
         prevFilters[demographicKey] && Object.keys(prevFilters)[0] === demographicKey
           ? [...prevFilters[demographicKey]]
-          : []
+          : [];
+
+      // Para PF13, precisamos converter o valor processado de volta para o original
+      let actualValue = value;
+      if (demographicKey === "PF13" && pf13ValueMapping.toOriginal) {
+        const originalValue = pf13ValueMapping.toOriginal[value];
+        if (originalValue) {
+          // Se é NS/NR, é um array de valores
+          if (Array.isArray(originalValue)) {
+            // Tratamento especial para NS/NR - adiciona todos os valores mapeados
+            if (checked) {
+              originalValue.forEach(val => {
+                if (!currentValues.includes(val)) {
+                  currentValues.push(val);
+                }
+              });
+            } else {
+              originalValue.forEach(val => {
+                const index = currentValues.indexOf(val);
+                if (index > -1) {
+                  currentValues.splice(index, 1);
+                }
+              });
+            }
+            
+            if (currentValues.length > 0) {
+              newFilters[demographicKey] = currentValues;
+            }
+            
+            return newFilters;
+          } else {
+            actualValue = originalValue;
+          }
+        }
+      }
 
       if (checked) {
-        if (!currentValues.includes(value)) {
-          currentValues.push(value)
+        if (!currentValues.includes(actualValue)) {
+          currentValues.push(actualValue);
         }
       } else {
-        const index = currentValues.indexOf(value)
+        const index = currentValues.indexOf(actualValue);
         if (index > -1) {
-          currentValues.splice(index, 1)
+          currentValues.splice(index, 1);
         }
       }
 
       if (currentValues.length > 0) {
-        newFilters[demographicKey] = currentValues
+        newFilters[demographicKey] = currentValues;
       }
 
-      return newFilters
-    })
-  }
+      return newFilters;
+    });
+  };
 
+  // FUNÇÃO handleQuickFilterToggle MODIFICADA PARA PF13
   const handleQuickFilterToggle = (demographicKey, value) => {
     setFilters((prevFilters) => {
-      if (prevFilters[demographicKey] && prevFilters[demographicKey][0] === value) {
-        return {}
+      // Para PF13, converter o valor processado para original
+      let actualValue = value;
+      if (demographicKey === "PF13" && pf13ValueMapping.toOriginal) {
+        const originalValue = pf13ValueMapping.toOriginal[value];
+        if (originalValue) {
+          // Se é NS/NR (array), usar todos os valores
+          if (Array.isArray(originalValue)) {
+            return { [demographicKey]: originalValue };
+          } else {
+            actualValue = originalValue;
+          }
+        }
       }
-      return { [demographicKey]: [value] }
-    })
-  }
+      
+      if (prevFilters[demographicKey] && prevFilters[demographicKey][0] === actualValue) {
+        return {};
+      }
+      return { [demographicKey]: [actualValue] };
+    });
+  };
 
   const handleClearFilters = () => {
     setFilters({})
@@ -815,6 +900,7 @@ export default function Dashboard() {
         filters={filters}
         onFilterChange={handleFilterChange}
         onClearFilters={handleClearFilters}
+        pf13ValueMapping={pf13ValueMapping} // PASSAR O MAPEAMENTO
       />
 
       <DashboardHeader

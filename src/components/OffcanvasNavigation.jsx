@@ -12,6 +12,7 @@ const OffcanvasNavigation = ({
   filters = {},
   onFilterChange,
   onClearFilters,
+  pf13ValueMapping = {} // NOVA PROP ADICIONADA
 }) => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -31,6 +32,27 @@ const OffcanvasNavigation = ({
     if (onClearFilters) {
       onClearFilters()
     }
+  }
+
+  // NOVA FUNÇÃO: Verificar se valor está selecionado (com suporte para PF13)
+  const isValueChecked = (demographicKey, value) => {
+    if (demographicKey !== "PF13") {
+      return (filters[demographicKey] || []).includes(value);
+    }
+    
+    // Para PF13, verificar usando o mapeamento
+    if (pf13ValueMapping && pf13ValueMapping.toOriginal) {
+      const originalValue = pf13ValueMapping.toOriginal[value];
+      if (Array.isArray(originalValue)) {
+        // NS/NR - verificar se algum dos valores originais está selecionado
+        return originalValue.some(val => (filters[demographicKey] || []).includes(val));
+      } else if (originalValue) {
+        return (filters[demographicKey] || []).includes(originalValue);
+      }
+    }
+    
+    // Fallback para comportamento padrão
+    return (filters[demographicKey] || []).includes(value);
   }
 
   const activeFiltersCount = Object.values(filters).reduce((count, values) => count + values.length, 0)
@@ -388,6 +410,28 @@ const OffcanvasNavigation = ({
                 );
               }
 
+              // Contagem especial para PF13 considerando o mapeamento
+              const getActiveFilterCount = (demographicKey) => {
+                if (demographicKey !== "PF13") {
+                  return filters[demographicKey]?.length || 0;
+                }
+                
+                // Para PF13, contar quantos valores processados estão selecionados
+                if (pf13ValueMapping && pf13ValueMapping.toOriginal) {
+                  let count = 0;
+                  demographic.values.forEach(value => {
+                    if (isValueChecked(demographicKey, value)) {
+                      count++;
+                    }
+                  });
+                  return count;
+                }
+                
+                return filters[demographicKey]?.length || 0;
+              };
+
+              const activeCount = getActiveFilterCount(demographic.key);
+
               // Tratamento normal para outros filtros demográficos
               return (
                 <Accordion.Item key={demographic.key} eventKey={index.toString()} style={customStyles.accordionItem}>
@@ -396,7 +440,7 @@ const OffcanvasNavigation = ({
                       <span style={{ fontSize: "14px", fontWeight: "500", color: "#495057" }}>
                         {demographic.label}
                       </span>
-                      {filters[demographic.key]?.length > 0 && (
+                      {activeCount > 0 && (
                         <Badge style={{
                           ...customStyles.badge,
                           borderRadius: "50%",
@@ -407,7 +451,7 @@ const OffcanvasNavigation = ({
                           justifyContent: "center",
                           fontSize: "10px"
                         }}>
-                          {filters[demographic.key].length}
+                          {activeCount}
                         </Badge>
                       )}
                     </div>
@@ -419,7 +463,7 @@ const OffcanvasNavigation = ({
                         type="checkbox"
                         id={`${demographic.key}-${value}`}
                         label={value}
-                        checked={(filters[demographic.key] || []).includes(value)}
+                        checked={isValueChecked(demographic.key, value)} // USAR A NOVA FUNÇÃO
                         onChange={(e) => handleFilterChange(demographic.key, value, e.target.checked)}
                         style={customStyles.checkbox}
                         className="custom-checkbox"
