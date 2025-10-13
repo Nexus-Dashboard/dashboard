@@ -20,7 +20,7 @@ export const PresentationModeManager = () => {
       const fixedQuestions = [
         "Como você avalia o desempenho do Governo Federal? Você diria que ele está sendo ótimo, bom, regular, ruim ou péssimo? (ESTIMULADA E ÚNICA)",
         "E você aprova ou desaprova o desempenho do Governo Federal? (ESTIMULADA E ÚNICA)",
-        "E, pensando nos próximos seis meses, você acredita que o desempenho do governo federal vai: (ESTIMULADA E ÚNICA)",
+        "E como você avalia o desempenho do Presidente da República? Você diria que ele está sendo ótimo, bom, regular, ruim ou péssimo?(ESTIMULADA E ÚNICA)",
         "E você aprova ou desaprova o trabalho do Presidente da República? (ESTIMULADA E ÚNICA)"
       ]
 

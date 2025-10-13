@@ -16,6 +16,7 @@ import { ApiMethods } from "../service/ApiBase"
 
 const fetchThemeNameBySlug = async (themeSlug, surveyType) => {
   const { data } = await ApiBase.get("/api/data/themes", { params: { type: surveyType } })
+  console.log("fetchThemeNameBySlug", data)
   if (!data.success) throw new Error("Erro ao buscar temas")
   const theme = data.themes.find((t) => t.slug === themeSlug)
   if (!theme) throw new Error(`Tema não encontrado para slug: ${themeSlug}`)
@@ -26,6 +27,7 @@ const fetchGroupedQuestions = async (themeName, surveyType) => {
   const { data } = await ApiBase.get(`/api/data/themes/${encodeURIComponent(themeName)}/questions-grouped`, {
     params: { type: surveyType },
   })
+  console.log("fetchGroupedQuestions", data)
   if (!data.success) throw new Error("Erro ao buscar perguntas agrupadas")
   return data
 }
