@@ -4,7 +4,7 @@ import { Box, Typography, Button, Collapse, IconButton } from "@mui/material"
 import InteractiveBrazilMap from "../../components/InteractiveBrazilMap"
 import React, { useState } from "react"
 import { Dropdown } from "react-bootstrap"
-import { ChevronDown, ChevronUp, BarChart2, User, MapPin, Filter } from "lucide-react"
+import { ChevronDown, ChevronUp, BarChart2, User, MapPin, Filter, CircleDollarSign } from "lucide-react"
 
 // Custom Toggle for the response selector dropdown
 const ResponseSelectorToggle = React.forwardRef(({ children, onClick }, ref) => (
@@ -82,7 +82,7 @@ ResponseSelectorMenu.displayName = "ResponseSelectorMenu"
 
 const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterToggle }) => {
   const [isOpen, setIsOpen] = useState(false)
-  const filterGroups = ["Sexo", "Região"]
+  const filterGroups = ["Sexo", "Região", "Faixa de Renda"] // <-- ALTERAÇÃO AQUI
   const relevantFilters = availableDemographics.filter((group) => filterGroups.includes(group.label))
 
   const ICONS = {
@@ -93,6 +93,13 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
     Norte: <MapPin size={16} />,
     Sudeste: <MapPin size={16} />,
     Sul: <MapPin size={16} />,
+
+    "até 1 SM": <CircleDollarSign size={16} />,
+    "mais de 1 até 2 SM": <CircleDollarSign size={16} />,
+    "mais de 2 até 3 SM": <CircleDollarSign size={16} />,
+    "mais de 3 até 5 SM": <CircleDollarSign size={16} />,
+    "mais de 5 até 10 SM": <CircleDollarSign size={16} />,
+    "mais de 10 SM": <CircleDollarSign size={16} />,
   }
 
   if (relevantFilters.length === 0) return null
