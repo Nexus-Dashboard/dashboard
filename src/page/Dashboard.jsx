@@ -24,7 +24,7 @@ import ErrorState from "./dashboard/error-state"
 import ChartCard from "./dashboard/chart-card"
 import MapCard from "./dashboard/map-card"
 import "./Dashboard.css"
-import { formatApiDateForDisplay } from "../hooks/dateUtils"
+// formatApiDateForDisplay não é mais necessário - as datas já vêm formatadas da API
 import { 
   STATES_BY_REGION, 
   getStatesFromRegion, 
@@ -82,10 +82,15 @@ export const fetchGroupedQuestionData = async ({ queryKey }) => {
   }
 }
 
+// ❌ DEPRECATED: fetchAllQuestions não é mais necessário!
+// A API agora retorna as datas das rodadas diretamente no historicalData
+// Mantido comentado para referência histórica
+/*
 export const fetchAllQuestions = async ({ queryKey }) => {
   const [, surveyType] = queryKey
 
   try {
+    console.log("📥 Iniciando carregamento de todas as questões...")
     const firstResponse = await ApiBase.get(`/api/data/questions/all?page=1&limit=50`)
 
     if (!firstResponse.data?.success) {
@@ -93,27 +98,33 @@ export const fetchAllQuestions = async ({ queryKey }) => {
     }
 
     const { totalPages } = firstResponse.data.data.pagination
+    console.log(`📊 Total de páginas a carregar: ${totalPages}`)
 
     let allQuestions = [...firstResponse.data.data.questions]
 
-    const promises = []
-    for (let page = 2; page <= totalPages; page++) {
-      promises.push(
-        ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
-          .then((response) => {
-            return response.data?.success ? response.data.data.questions : []
-          })
-          .catch((error) => {
-            console.error(`❌ Erro na página ${page}:`, error.message)
-            return []
-          }),
-      )
+    if (totalPages > 1) {
+      const promises = []
+      for (let page = 2; page <= totalPages; page++) {
+        promises.push(
+          ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
+            .then((response) => {
+              console.log(`✅ Página ${page}/${totalPages} carregada`)
+              return response.data?.success ? response.data.data.questions : []
+            })
+            .catch((error) => {
+              console.error(`❌ Erro na página ${page}:`, error.message)
+              return []
+            }),
+        )
+      }
+
+      const additionalPages = await Promise.all(promises)
+      additionalPages.forEach((pageQuestions) => {
+        allQuestions = [...allQuestions, ...pageQuestions]
+      })
     }
 
-    const additionalPages = await Promise.all(promises)
-    additionalPages.forEach((pageQuestions) => {
-      allQuestions = [...allQuestions, ...pageQuestions]
-    })
+    console.log(`✅ Total de questões carregadas: ${allQuestions.length}`)
 
     return {
       success: true,
@@ -127,6 +138,7 @@ export const fetchAllQuestions = async ({ queryKey }) => {
     throw error
   }
 }
+*/
 
 const UF_DEMOGRAPHIC_KEY = "UF"
 
@@ -169,19 +181,6 @@ export default function Dashboard() {
     return params.get("type")
   }, [location.search])
 
-  const {
-    data: allQuestionsData,
-    isLoading: isLoadingAllQuestions,
-    error: allQuestionsError,
-  } = useQuery({
-    queryKey: ["allQuestions", surveyType],
-    queryFn: fetchAllQuestions,
-    staleTime: 1000 * 60 * 60,
-    cacheTime: 1000 * 60 * 60,
-    refetchOnWindowFocus: false,
-    retry: 1,
-  })
-
   const { data, error, status } = useQuery({
     queryKey: ["groupedQuestionData", theme, questionText, surveyType],
     queryFn: async (queryKey) => {
@@ -218,9 +217,8 @@ export default function Dashboard() {
         throw error
       }
     },
-    // CRÍTICO: Só buscar dados DEPOIS que allQuestionsData estiver carregado
-    // Isso garante que surveyDateMap estará disponível quando os dados forem processados
-    enabled: !!theme && !!questionText && !!allQuestionsData && !isLoadingAllQuestions,
+    // OTIMIZADO: Não depende mais de allQuestionsData!
+    enabled: !!theme && !!questionText,
     staleTime: 1000 * 60 * 10,
     cacheTime: 1000 * 60 * 15,
     refetchOnWindowFocus: false,
@@ -228,30 +226,27 @@ export default function Dashboard() {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   })
 
-  // CRÍTICO: surveyDateMap DEVE ser criado ANTES de qualquer processamento
-  // Esta é a PRIMEIRA coisa que deve estar disponível para evitar race conditions
+  // OTIMIZADO: surveyDateMap agora é criado a partir do historicalData da API
+  // Isso elimina a necessidade de fazer múltiplas requisições para /api/data/questions/all
   const surveyDateMap = useMemo(() => {
-    if (!allQuestionsData?.data?.questions) {
-      console.warn("⚠️ surveyDateMap: allQuestionsData não está disponível ainda")
+    if (!data?.historicalData) {
+      console.warn("⚠️ surveyDateMap: historicalData não está disponível ainda")
       return new Map()
     }
 
     const map = new Map()
-    const questions = allQuestionsData.data.questions
 
-    questions.forEach((q) => {
-      if (q.surveyNumber && q.date) {
-        const key = q.surveyNumber.toString()
-        if (!map.has(key)) {
-          const formattedDate = formatApiDateForDisplay(q.date)
-          map.set(key, formattedDate)
-        }
+    // Extrair rodadas e datas do historicalData que já vem na resposta da API
+    data.historicalData.forEach((round) => {
+      if (round.rodada && round.date) {
+        const key = round.rodada.toString()
+        map.set(key, round.date) // A data já vem formatada (ex: "jul./25")
       }
     })
 
-    console.log(`✅ surveyDateMap criado com ${map.size} rodadas mapeadas`)
+    console.log(`✅ surveyDateMap criado com ${map.size} rodadas mapeadas a partir do historicalData`)
     return map
-  }, [allQuestionsData])
+  }, [data])
 
   const formatChartXAxis = useCallback(
     (period, dateLabel) => {
@@ -984,18 +979,6 @@ export default function Dashboard() {
     return formatChartXAxis(rodada.period, dateLabel)
   }
 
-  // CRÍTICO: Verificar se allQuestionsData está carregado PRIMEIRO
-  // Isso garante que surveyDateMap estará disponível antes de renderizar qualquer componente
-  if (isLoadingAllQuestions) {
-    return <LoadingWithProgress loadingProgress={30} loadingStage="Carregando informações de datas das rodadas..." />
-  }
-
-  // CRÍTICO: Se allQuestionsData está carregado mas surveyDateMap está vazio, aguardar
-  if (allQuestionsData && surveyDateMap.size === 0 && allQuestionsData.data?.questions?.length > 0) {
-    console.warn("⚠️ allQuestionsData carregado mas surveyDateMap vazio - aguardando...")
-    return <LoadingWithProgress loadingProgress={50} loadingStage="Processando metadados de rodadas..." />
-  }
-
   if (status === "loading" || !data) {
     return <LoadingWithProgress loadingProgress={loadingProgress} loadingStage={loadingStage} />
   }
@@ -1005,16 +988,6 @@ export default function Dashboard() {
       <ErrorState
         title="Erro ao carregar dados agrupados"
         message={`Erro: ${error.message}`}
-        onRetry={() => window.location.reload()}
-      />
-    )
-  }
-
-  if (allQuestionsError) {
-    return (
-      <ErrorState
-        title="Erro ao carregar informações de datas"
-        message={`Erro: ${allQuestionsError.message}`}
         onRetry={() => window.location.reload()}
       />
     )
