@@ -1,11 +1,18 @@
 "use client"
 
 import { IconButton, Button, Box } from "@mui/material"
-import { Download, PictureAsPdf, Menu as MenuIcon } from "@mui/icons-material"
+import { Download, PictureAsPdf, Menu as MenuIcon, ArrowBack } from "@mui/icons-material"
+import { useNavigate } from "react-router-dom"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
 
 const DashboardHeader = ({ questionInfo, allHistoricalData, pageRef, onMenuClick }) => {
+  const navigate = useNavigate()
+
+  const handleBack = () => {
+    navigate(-1)
+  }
+
   const downloadPDF = async () => {
     const element = pageRef.current
     if (!element) return
@@ -68,6 +75,9 @@ const DashboardHeader = ({ questionInfo, allHistoricalData, pageRef, onMenuClick
         <h2>{questionInfo?.label || questionInfo?.questionText || "Dashboard"}</h2>
       </Box>
       <Box sx={{ display: "flex", gap: 1 }}>
+        <Button variant="outlined" color="inherit" startIcon={<ArrowBack />} onClick={handleBack}>
+          Voltar
+        </Button>
         <Button variant="outlined" color="inherit" startIcon={<Download />} onClick={downloadCSV}>
           Exportar CSV
         </Button>

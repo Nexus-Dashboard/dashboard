@@ -18,7 +18,8 @@ export default function ChartCard({
   surveyDateMap = new Map(),
   selectedPeriod = null,
   onPeriodChange,
-  formatChartXAxis
+  formatChartXAxis,
+  surveyType  // Nova prop para tipo de coleta
 }) {
   // Componente de tooltip customizado que usa o sistema nativo do Nivo
   const CustomTooltip = ({ point }) => {
@@ -79,10 +80,34 @@ export default function ChartCard({
     )
   }
 
+  // Formatar o tipo de coleta para exibição
+  const getCollectionType = () => {
+    if (!surveyType) return null
+    return surveyType === 'telephonic' ? 'Telefônica' : 'Face a Face'
+  }
+
   return (
     <div className="chart-card">
       <div className="chart-card-content">
-        <Typography className="card-title-custom">{title || "Análise Temporal"}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 1 }}>
+          <Typography className="card-title-custom">{title || "Análise Temporal"}</Typography>
+          {getCollectionType() && (
+            <Typography
+              variant="caption"
+              sx={{
+                fontSize: '0.85rem',
+                fontWeight: 500,
+                color: 'text.secondary',
+                backgroundColor: '#f5f5f5',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                border: '1px solid #e0e0e0'
+              }}
+            >
+              Tipo de Coleta: {getCollectionType()}
+            </Typography>
+          )}
+        </Box>
 
         {allHistoricalData.length > 1 && (
           <Box sx={{ px: 1 }}>

@@ -74,7 +74,7 @@ export const PresentationModeManager = () => {
     currentQuestionIndexRef.current = 0
     const firstQuestion = topQuestions[0]
     navigate(
-      `/dashboard?theme=${encodeURIComponent(firstQuestion.theme)}&questionText=${encodeURIComponent(firstQuestion.questionText)}&type=telephonic`,
+      `/dashboard?theme=${encodeURIComponent(firstQuestion.theme)}&questionText=${encodeURIComponent(firstQuestion.questionText)}&type=telephonic&pageTitle=${encodeURIComponent("Avaliação e Aprovação do Governo")}`,
     )
 
     if (presentationIntervalRef.current) clearInterval(presentationIntervalRef.current)
@@ -83,7 +83,7 @@ export const PresentationModeManager = () => {
       currentQuestionIndexRef.current = (currentQuestionIndexRef.current + 1) % topQuestions.length
       const nextQuestion = topQuestions[currentQuestionIndexRef.current]
       navigate(
-        `/dashboard?theme=${encodeURIComponent(nextQuestion.theme)}&questionText=${encodeURIComponent(nextQuestion.questionText)}&type=telephonic`,
+        `/dashboard?theme=${encodeURIComponent(nextQuestion.theme)}&questionText=${encodeURIComponent(nextQuestion.questionText)}&type=telephonic&pageTitle=${encodeURIComponent("Avaliação e Aprovação do Governo")}`,
       )
     }, PRESENTATION_INTERVAL)
   }, [navigate, topQuestions, isPresentationMode])

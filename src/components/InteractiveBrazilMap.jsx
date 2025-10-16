@@ -157,14 +157,36 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
     }
 
     const baseColor = MAP_RESPONSE_BASE_COLORS[processedResponse] || MAP_RESPONSE_BASE_COLORS[selectedMapResponse] || "#9e9e9e"
-    const lightColor = d3.color(baseColor).brighter(2.5).formatHex()
 
+    // Coletar os percentuais REAIS de todas as regiões para esta resposta
     const percentages = Array.from(mapData.regionResults.values())
-      .map((region) => region.percentages[processedResponse] || 0)
-      .filter((p) => p > 0)
+      .map((region) => region.percentages[processedResponse])
+      .filter((p) => typeof p === 'number' && p > 0)
 
-    const maxPercentage = percentages.length > 0 ? Math.max(...percentages) : 100
-    const scale = d3.scaleLinear().domain([0, maxPercentage]).range([lightColor, baseColor]).clamp(true)
+    // Se não houver dados, usar escala padrão cinza
+    if (percentages.length === 0) {
+      const defaultScale = d3.scaleLinear()
+        .domain([0, 100])
+        .range(["#e9ecef", "#e9ecef"])
+        .clamp(true)
+      setColorScale(() => defaultScale)
+      return
+    }
+
+    // Encontrar o MENOR e MAIOR valor REAL entre as regiões
+    const minPercentage = Math.min(...percentages)
+    const maxPercentage = Math.max(...percentages)
+
+    // Cores para alto contraste
+    const lightColor = d3.color(baseColor).brighter(2.5).formatHex()
+    const darkColor = d3.color(baseColor).darker(1).formatHex()
+
+    // Criar escala usando os valores REAIS (mín e máx) entre as regiões
+    // A região com MENOR % recebe lightColor, a com MAIOR % recebe darkColor
+    const scale = d3.scaleLinear()
+      .domain([minPercentage, maxPercentage])
+      .range([lightColor, darkColor])
+      .clamp(true)
 
     setColorScale(() => scale)
   }, [selectedMapResponse, mapData])

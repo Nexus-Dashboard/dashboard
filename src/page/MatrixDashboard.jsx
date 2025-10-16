@@ -48,6 +48,10 @@ export default function MatrixDashboard() {
   const [demographicFilters, setDemographicFilters] = useState({})
   const [dateRange, setDateRange] = useState({ start: null, end: null })
 
+  const handleDemographicFilterChange = useCallback((newFilters) => {
+    setDemographicFilters(newFilters)
+  }, [])
+
   const requestParams = useMemo(() => {
     if (!theme || !baseCode) return null
     return {
@@ -76,6 +80,7 @@ export default function MatrixDashboard() {
   const processedData = useMemo(() => {
     if (!data?.historicalData) return null
 
+    const originalData = data.historicalData
     let filteredData = data.historicalData
 
     // Apply demographic filters
@@ -126,11 +131,31 @@ export default function MatrixDashboard() {
       return variableData
     })
 
+    // Calcular tamanho da amostra
+    const originalSampleSize = originalData.reduce((sum, item) => {
+      const totalResponses = item.distribution.reduce((acc, dist) => acc + (dist.weightedCount || 0), 0)
+      return sum + totalResponses
+    }, 0)
+
+    const filteredSampleSize = filteredData.reduce((sum, item) => {
+      const totalResponses = item.distribution.reduce((acc, dist) => acc + (dist.weightedCount || 0), 0)
+      return sum + totalResponses
+    }, 0)
+
+    // Calcular margem de erro (fórmula: 1.96 * sqrt(0.25 / n))
+    // Para 95% de confiança e proporção de 50% (pior caso)
+    const marginOfError = filteredSampleSize > 0
+      ? (1.96 * Math.sqrt(0.25 / filteredSampleSize)) * 100
+      : 0
+
     return {
       chartData,
       comparisonData,
       responseTypes,
       labels,
+      sampleSize: filteredSampleSize,
+      originalSampleSize,
+      marginOfError: Math.round(marginOfError * 100) / 100, // Arredondar para 2 casas decimais
     }
   }, [data, demographicFilters, dateRange, variables])
 
@@ -253,7 +278,7 @@ export default function MatrixDashboard() {
                 <Card.Body>
                   <DemographicFilters
                     availableDemographics={data?.demographicFields || []}
-                    onFilterChange={setDemographicFilters}
+                    onFilterChange={handleDemographicFilterChange}
                     activeFilters={demographicFilters}
                   />
                   <hr />
@@ -279,6 +304,34 @@ export default function MatrixDashboard() {
             <Col lg={9}>
               {processedData ? (
                 <Row className="g-4">
+                  {/* Alerta de Margem de Erro */}
+                  {processedData.marginOfError > 10 && (
+                    <Col xs={12}>
+                      <Alert variant="warning" className="d-flex align-items-center">
+                        <Info size={20} className="me-2" />
+                        <div>
+                          <strong>Atenção: Margem de erro elevada!</strong>
+                          <br />
+                          A margem de erro atual é de <strong>{processedData.marginOfError}%</strong> (tamanho da amostra: {processedData.sampleSize} de {processedData.originalSampleSize} respostas).
+                          Isso pode afetar a precisão dos resultados. Considere remover alguns filtros para aumentar a amostra.
+                        </div>
+                      </Alert>
+                    </Col>
+                  )}
+
+                  {/* Info de Amostra quando margem <= 10% */}
+                  {processedData.marginOfError <= 10 && Object.keys(demographicFilters).length > 0 && (
+                    <Col xs={12}>
+                      <Alert variant="info" className="d-flex align-items-center">
+                        <Info size={20} className="me-2" />
+                        <div>
+                          Amostra filtrada: <strong>{processedData.sampleSize}</strong> de {processedData.originalSampleSize} respostas
+                          | Margem de erro: <strong>{processedData.marginOfError}%</strong>
+                        </div>
+                      </Alert>
+                    </Col>
+                  )}
+
                   <Col xs={12}>
                     <Card className="matrix-chart-card">
                       <Card.Header>

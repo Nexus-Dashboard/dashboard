@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { useLocation } from "react-router-dom"
 import ApiBase from "../service/ApiBase"
 import { useQuery } from "@tanstack/react-query"
-import { Box } from "@mui/material"
+import { Box, Alert, AlertTitle } from "@mui/material"
 import OffcanvasNavigation from "../components/OffcanvasNavigation"
 import DashboardHeader from "../components/DashboardHeader"
 import {
@@ -473,11 +473,11 @@ export default function Dashboard() {
   // FUNÇÃO handleFilterChange MODIFICADA PARA PF13
   const handleFilterChange = (demographicKey, value, checked) => {
     setFilters((prevFilters) => {
-      const newFilters = {};
-      const currentValues =
-        prevFilters[demographicKey] && Object.keys(prevFilters)[0] === demographicKey
-          ? [...prevFilters[demographicKey]]
-          : [];
+      // IMPORTANTE: Manter todos os filtros anteriores
+      const newFilters = { ...prevFilters };
+      const currentValues = prevFilters[demographicKey]
+        ? [...prevFilters[demographicKey]]
+        : [];
 
       // Para PF13, precisamos converter o valor processado de volta para o original
       let actualValue = value;
@@ -526,6 +526,9 @@ export default function Dashboard() {
 
       if (currentValues.length > 0) {
         newFilters[demographicKey] = currentValues;
+      } else {
+        // Se não há valores, remover a chave do filtro
+        delete newFilters[demographicKey];
       }
 
       return newFilters;
@@ -584,32 +587,81 @@ export default function Dashboard() {
       const distributionForFilter = {}
 
       round.distribution.forEach((dist) => {
-        Object.entries(filters).forEach(([filterKey, filterValues]) => {
-          if (filterValues && filterValues.length > 0) {
-            
+        // Para cada distribuição, precisamos verificar se passa por TODOS os filtros
+        // Vamos acumular os weightedCounts que passam por todos os filtros simultaneamente
+
+        if (!dist.demographics) return
+
+        // Coletar todos os registros demográficos que precisam passar pelos filtros
+        const filterKeys = Object.keys(filters)
+
+        // Map para armazenar registros por combinação de demographics
+        // Chave: JSON stringify das demographics, Valor: weightedCount
+        const demographicCombinations = new Map()
+
+        // Para cada registro demográfico, verificar se passa por TODOS os filtros
+        const firstFilterKey = filterKeys[0]
+        const firstFilterValues = filters[firstFilterKey]
+
+        if (!firstFilterValues || firstFilterValues.length === 0) return
+
+        // Começar com o primeiro filtro
+        let candidateRecords = []
+
+        if (firstFilterKey === "REGIAO_VIRTUAL") {
+          const ufDemoGroup = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
+          if (ufDemoGroup) {
+            candidateRecords = ufDemoGroup.filter(ufValue =>
+              isStateInSelectedRegions(ufValue.response, firstFilterValues)
+            )
+          }
+        } else {
+          const demoGroup = dist.demographics?.[firstFilterKey]
+          if (demoGroup) {
+            candidateRecords = demoGroup.filter(demoValue =>
+              firstFilterValues.includes(demoValue.response)
+            )
+          }
+        }
+
+        // Agora verificar se os candidatos também passam pelos outros filtros
+        candidateRecords.forEach((candidate) => {
+          let passesAllFilters = true
+
+          // Verificar os outros filtros (a partir do segundo)
+          for (let i = 1; i < filterKeys.length; i++) {
+            const filterKey = filterKeys[i]
+            const filterValues = filters[filterKey]
+
+            if (!filterValues || filterValues.length === 0) continue
+
+            // Para cada candidato, verificar se há overlap com este filtro
+            let passesThisFilter = false
+
             if (filterKey === "REGIAO_VIRTUAL") {
-              const ufDemoGroup = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
-              if (ufDemoGroup) {
-                ufDemoGroup.forEach((ufValue) => {
-                  if (isStateInSelectedRegions(ufValue.response, filterValues)) {
-                    totalForFilter += ufValue.weightedCount
-                    distributionForFilter[dist.response] =
-                      (distributionForFilter[dist.response] || 0) + ufValue.weightedCount
-                  }
-                })
-              }
+              // Se o candidato já passou pelo filtro de região no primeiro passo,
+              // não precisamos verificar novamente
+              passesThisFilter = true
             } else {
               const demoGroup = dist.demographics?.[filterKey]
               if (demoGroup) {
-                demoGroup.forEach((demoValue) => {
-                  if (filterValues.includes(demoValue.response)) {
-                    totalForFilter += demoValue.weightedCount
-                    distributionForFilter[dist.response] =
-                      (distributionForFilter[dist.response] || 0) + demoValue.weightedCount
-                  }
-                })
+                // Verificar se algum valor deste grupo demográfico corresponde ao filtro
+                passesThisFilter = demoGroup.some(demoValue =>
+                  filterValues.includes(demoValue.response)
+                )
               }
             }
+
+            if (!passesThisFilter) {
+              passesAllFilters = false
+              break
+            }
+          }
+
+          if (passesAllFilters) {
+            totalForFilter += candidate.weightedCount
+            distributionForFilter[dist.response] =
+              (distributionForFilter[dist.response] || 0) + candidate.weightedCount
           }
         })
       })
@@ -626,6 +678,37 @@ export default function Dashboard() {
       }
     })
   }, [allHistoricalData, filters, selectedPeriod])
+
+  // Calcular margem de erro baseado no total de respostas filtradas
+  const marginOfErrorData = useMemo(() => {
+    // Calcular total original (sem filtros)
+    const originalTotal = allHistoricalData.reduce((sum, round) => {
+      return sum + round.totalWeightedResponses
+    }, 0)
+
+    // Calcular total filtrado
+    const filteredTotal = filteredHistoricalData.reduce((sum, round) => {
+      return sum + (round.totalWeightedResponses || 0)
+    }, 0)
+
+    // Calcular margem de erro usando a mesma fórmula do InteractiveMap
+    // Fórmula: sqrt(1 / n) * 100
+    const calculateMarginOfError = (n) => {
+      if (!n || n === 0) return 0
+      return Math.sqrt(1 / n) * 100
+    }
+
+    const marginOfError = calculateMarginOfError(filteredTotal)
+    const hasFilters = Object.keys(filters).length > 0
+
+    return {
+      originalTotal,
+      filteredTotal,
+      marginOfError: marginOfError.toFixed(1),
+      hasFilters,
+      isHighMargin: marginOfError > 10
+    }
+  }, [allHistoricalData, filteredHistoricalData, filters])
 
   const mapRoundsWithData = useMemo(() => {
     return filteredHistoricalData.filter((round) =>
@@ -910,6 +993,27 @@ export default function Dashboard() {
         onMenuClick={() => setShowOffcanvas(true)}
       />
 
+      {/* Alerta de margem de erro */}
+      {marginOfErrorData.hasFilters && marginOfErrorData.isHighMargin && (
+        <Box sx={{ px: 3, pt: 2 }}>
+          <Alert severity="warning">
+            <AlertTitle>Atenção: Margem de erro elevada</AlertTitle>
+            A margem de erro atual é de <strong>±{marginOfErrorData.marginOfError}pp</strong> (amostra: {marginOfErrorData.filteredTotal.toLocaleString()} de {marginOfErrorData.originalTotal.toLocaleString()} respostas).
+            <br />
+            Isso pode afetar a precisão dos resultados. Considere remover alguns filtros para aumentar a amostra.
+          </Alert>
+        </Box>
+      )}
+
+      {/* Info de amostra quando margem <= 10% e há filtros */}
+      {marginOfErrorData.hasFilters && !marginOfErrorData.isHighMargin && marginOfErrorData.filteredTotal > 0 && (
+        <Box sx={{ px: 3, pt: 2 }}>
+          <Alert severity="info">
+            Amostra filtrada: <strong>{marginOfErrorData.filteredTotal.toLocaleString()}</strong> de {marginOfErrorData.originalTotal.toLocaleString()} respostas | Margem de erro: <strong>±{marginOfErrorData.marginOfError}pp</strong>
+          </Alert>
+        </Box>
+      )}
+
       <div className="dashboard-content">
         <div className="dashboard-grid">
           <ChartCard
@@ -926,6 +1030,7 @@ export default function Dashboard() {
             selectedPeriod={selectedPeriod}
             onPeriodChange={handlePeriodChange}
             formatChartXAxis={formatChartXAxis}
+            surveyType={surveyType}
           />
 
           <MapCard
