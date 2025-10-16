@@ -839,14 +839,15 @@ export default function Dashboard() {
         filteredUfData.forEach((ufData) => {
           // Calcular quantas respostas este estado deve ter baseado na proporção
           const proportion = ufData.originalWeight / totalFilteredWeight
-          const responsesForState = Math.round(dist.weightedCount * proportion)
+          const weightForState = dist.weightedCount * proportion
 
-          for (let i = 0; i < responsesForState; i++) {
-            mapResponses.push({
-              [questionInfo.variable]: responseValue,
-              UF: ufData.state,
-            })
-          }
+          // IMPORTANTE: Adicionar UMA entrada por estado com _weight, não múltiplas entradas
+          // Isso permite que o mapa calcule corretamente o total de entrevistas
+          mapResponses.push({
+            [questionInfo.variable]: responseValue,
+            UF: ufData.state,
+            _weight: weightForState, // Peso REAL (não arredondado)
+          })
         })
       }
     })

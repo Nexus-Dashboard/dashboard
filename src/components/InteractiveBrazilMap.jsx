@@ -111,8 +111,10 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
       }
 
       const regionData = regionResults.get(region)
-      regionData.counts[finalAnswer] = (regionData.counts[finalAnswer] || 0) + 1
-      regionData.total += 1
+      // CORREÇÃO: Usar _weight se disponível (dados ponderados), senão contar como 1
+      const weight = response._weight !== undefined ? response._weight : 1
+      regionData.counts[finalAnswer] = (regionData.counts[finalAnswer] || 0) + weight
+      regionData.total += weight
       regionData.rawResponses.add(normalizedAnswer)
     })
 
@@ -285,7 +287,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
             </span>
             <br />
             <span style={{ color: "rgba(255,255,255,0.9)", fontSize: "12px" }}>
-              {regionData.counts[processedSelectedResponse] || 0} respostas
+              {Math.round(regionData.counts[processedSelectedResponse] || 0)} respostas
             </span>
           </div>
         )}
@@ -304,7 +306,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
               }}
             >
               {index + 1}. {response}: {percentage.toFixed(1)}%
-              <span style={{ color: "rgba(255,255,255,0.7)", marginLeft: "5px" }}>({regionData.counts[response]})</span>
+              <span style={{ color: "rgba(255,255,255,0.7)", marginLeft: "5px" }}>({Math.round(regionData.counts[response])})</span>
             </div>
           ))}
         </div>
@@ -316,7 +318,7 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
           }}
         >
           <span style={{ color: "rgba(255,255,255,0.9)", fontSize: "12px" }}>
-            <strong>Total de respostas:</strong> {regionData.total}
+            <strong>Total de entrevistas:</strong> {Math.round(regionData.total)}
           </span>
           <br />
           <span style={{ color: "rgba(255,255,255,0.8)", fontSize: "11px" }}>

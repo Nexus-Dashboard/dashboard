@@ -83,7 +83,8 @@ export default function ChartCard({
   // Formatar o tipo de coleta para exibição
   const getCollectionType = () => {
     if (!surveyType) return null
-    return surveyType === 'telephonic' ? 'Telefônica' : 'Face a Face'
+    // Verificar o tipo correto da URL: type=f2f ou type=telephonic
+    return surveyType === 'f2f' ? 'Face a Face' : 'Telefônica'
   }
 
   return (
