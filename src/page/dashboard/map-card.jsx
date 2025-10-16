@@ -80,7 +80,7 @@ const ResponseSelectorMenu = React.forwardRef(({ children, style, className, "ar
 ))
 ResponseSelectorMenu.displayName = "ResponseSelectorMenu"
 
-const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterToggle }) => {
+const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterToggle, pf13ValueMapping = {} }) => {
   const [isOpen, setIsOpen] = useState(false)
   const filterGroups = ["Sexo", "Região", "Faixa de Renda"] 
   const relevantFilters = availableDemographics.filter((group) => filterGroups.includes(group.label))
@@ -94,12 +94,10 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
     Sudeste: <MapPin size={16} />,
     Sul: <MapPin size={16} />,
 
-    "até 1 SM": <CircleDollarSign size={16} />,
-    "mais de 1 até 2 SM": <CircleDollarSign size={16} />,
-    "mais de 2 até 3 SM": <CircleDollarSign size={16} />,
-    "mais de 3 até 5 SM": <CircleDollarSign size={16} />,
-    "mais de 5 até 10 SM": <CircleDollarSign size={16} />,
-    "mais de 10 SM": <CircleDollarSign size={16} />,
+    "Até 1 S.M.": <CircleDollarSign size={16} />,
+    "De 1 até 2 S.M.": <CircleDollarSign size={16} />,
+    "De 2 até 5 S.M.": <CircleDollarSign size={16} />,
+    "Mais de 5 S.M.": <CircleDollarSign size={16} />,
   }
 
   if (relevantFilters.length === 0) return null
@@ -183,7 +181,26 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
                     return true;
                   })
                   .map((value) => {
-                    const isActive = activeFilters[group.key]?.[0] === value;
+                    // Verificar se o filtro está ativo (suporta seleção múltipla)
+                    let isActive = false;
+
+                    if (group.key === "PF13" && pf13ValueMapping.toOriginal) {
+                      // Para PF13, verificar se algum dos valores originais mapeados está nos filtros ativos
+                      const originalValues = pf13ValueMapping.toOriginal[value];
+                      if (originalValues && activeFilters[group.key]) {
+                        if (Array.isArray(originalValues)) {
+                          // Se é um array (grupo de valores), verificar se algum está ativo
+                          isActive = originalValues.some(origVal => activeFilters[group.key].includes(origVal));
+                        } else {
+                          // Se é um valor único, verificar diretamente
+                          isActive = activeFilters[group.key].includes(originalValues);
+                        }
+                      }
+                    } else {
+                      // Para outros filtros, verificação simples
+                      isActive = activeFilters[group.key]?.includes(value) || false;
+                    }
+
                     return (
                       <Button
                         key={value}
@@ -245,6 +262,7 @@ export default function MapCard({
   availableMapResponses = [],
   selectedMapResponse,
   onMapResponseChange,
+  pf13ValueMapping = {},
 }) {
   const hasRounds = mapRoundsWithData?.length > 0
   const maxIndex = Math.max(0, (mapRoundsWithData?.length || 1) - 1)
@@ -443,6 +461,7 @@ export default function MapCard({
             availableDemographics={availableDemographics}
             activeFilters={activeFilters}
             onFilterToggle={onFilterToggle}
+            pf13ValueMapping={pf13ValueMapping}
           />
         </Box>
       </div>

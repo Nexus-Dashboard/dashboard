@@ -218,7 +218,9 @@ export default function Dashboard() {
         throw error
       }
     },
-    enabled: !!theme && !!questionText && !!allQuestionsData,
+    // CRÍTICO: Só buscar dados DEPOIS que allQuestionsData estiver carregado
+    // Isso garante que surveyDateMap estará disponível quando os dados forem processados
+    enabled: !!theme && !!questionText && !!allQuestionsData && !isLoadingAllQuestions,
     staleTime: 1000 * 60 * 10,
     cacheTime: 1000 * 60 * 15,
     refetchOnWindowFocus: false,
@@ -226,8 +228,11 @@ export default function Dashboard() {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   })
 
+  // CRÍTICO: surveyDateMap DEVE ser criado ANTES de qualquer processamento
+  // Esta é a PRIMEIRA coisa que deve estar disponível para evitar race conditions
   const surveyDateMap = useMemo(() => {
     if (!allQuestionsData?.data?.questions) {
+      console.warn("⚠️ surveyDateMap: allQuestionsData não está disponível ainda")
       return new Map()
     }
 
@@ -244,6 +249,7 @@ export default function Dashboard() {
       }
     })
 
+    console.log(`✅ surveyDateMap criado com ${map.size} rodadas mapeadas`)
     return map
   }, [allQuestionsData])
 
@@ -268,6 +274,8 @@ export default function Dashboard() {
             return `R${round.padStart(2, "0")} - ${shortDate}`
           }
 
+          // ⚠️ FALLBACK: Se não encontrou a data no mapa, é um problema!
+          console.warn(`⚠️ Data não encontrada para rodada ${round}. surveyDateMap tem ${surveyDateMap.size} entradas.`)
           return `R${round.padStart(2, "0")}/${year.slice(-2)}`
         }
       }
@@ -360,56 +368,69 @@ export default function Dashboard() {
 
     if (pf13Index > -1) {
       const pf13Data = demographics[pf13Index];
-      const processedValues = new Set();
       const valueMapping = {}; // Mapeamento: processado -> original
       const reverseMapping = {}; // Mapeamento reverso: original -> processado
       const nonStandardValues = [];
 
+      // Grupos de valores permitidos
+      const allowedGroups = {
+        "Até 1 S.M.": [],
+        "De 1 até 2 S.M.": [],
+        "De 2 até 5 S.M.": [],
+        "Mais de 5 S.M.": []
+      };
+
       pf13Data.values.forEach((value) => {
         const match = value.match(/\((.*?)\)/);
-        
-        if (match && match[1]) {
-          // Valor padrão com formato esperado
-          const processed = match[1];
-          processedValues.add(processed);
-          valueMapping[processed] = value;
-          reverseMapping[value] = processed;
+        const processed = match && match[1] ? match[1] : value;
+
+        // Mapear cada valor original para um dos 4 grupos permitidos
+        if (processed.toLowerCase().includes("até 1 sm") ||
+            processed.toLowerCase().includes("ate 1 sm")) {
+          allowedGroups["Até 1 S.M."].push(value);
+          reverseMapping[value] = "Até 1 S.M.";
+        } else if (processed.toLowerCase().includes("mais de 1 até 2 sm") ||
+                   processed.toLowerCase().includes("mais de 1 ate 2 sm") ||
+                   (processed.toLowerCase().includes("1") && processed.toLowerCase().includes("2"))) {
+          allowedGroups["De 1 até 2 S.M."].push(value);
+          reverseMapping[value] = "De 1 até 2 S.M.";
+        } else if (processed.toLowerCase().includes("mais de 2 até 5 sm") ||
+                   processed.toLowerCase().includes("mais de 2 ate 5 sm") ||
+                   processed.toLowerCase().includes("mais de 2 até 3 sm") ||
+                   processed.toLowerCase().includes("mais de 3 até 5 sm") ||
+                   (processed.toLowerCase().includes("2") && processed.toLowerCase().includes("5")) ||
+                   (processed.toLowerCase().includes("2") && processed.toLowerCase().includes("3")) ||
+                   (processed.toLowerCase().includes("3") && processed.toLowerCase().includes("5"))) {
+          allowedGroups["De 2 até 5 S.M."].push(value);
+          reverseMapping[value] = "De 2 até 5 S.M.";
+        } else if (processed.toLowerCase().includes("mais de 5") ||
+                   processed.toLowerCase().includes("mais de 10")) {
+          allowedGroups["Mais de 5 S.M."].push(value);
+          reverseMapping[value] = "Mais de 5 S.M.";
         } else {
-          // Valores não padrão (como #NULL!, Sim, Não, etc.)
+          // Valores não padrão
           nonStandardValues.push(value);
         }
       });
 
-      // Se há valores não padrão, mapeá-los para NS/NR
+      // Criar o mapeamento de processado para original
+      Object.entries(allowedGroups).forEach(([groupName, originalValues]) => {
+        if (originalValues.length > 0) {
+          valueMapping[groupName] = originalValues;
+        }
+      });
+
+      // Se há valores não padrão, mapeá-los para NS/NR (mas não mostrar no filtro)
       if (nonStandardValues.length > 0) {
-        processedValues.add("NS/NR");
-        // Mapear todos os valores não padrão para NS/NR
-        valueMapping["NS/NR"] = nonStandardValues;
         nonStandardValues.forEach(val => {
           reverseMapping[val] = "NS/NR";
         });
       }
 
-      // Atualizar demographics com valores processados
+      // Atualizar demographics com apenas os 4 valores permitidos
       demographics[pf13Index] = {
         ...pf13Data,
-        values: Array.from(processedValues).sort((a, b) => {
-          // Ordenação personalizada para NS/NR no final
-          if (a === 'NS/NR') return 1;
-          if (b === 'NS/NR') return -1;
-          
-          // Tentar ordenar por salários mínimos numericamente
-          const getNumSM = (str) => {
-            const match = str.match(/(\d+)/);
-            return match ? parseInt(match[1]) : 0;
-          };
-          
-          const numA = getNumSM(a);
-          const numB = getNumSM(b);
-          
-          if (numA !== numB) return numA - numB;
-          return a.localeCompare(b);
-        }),
+        values: ["Até 1 S.M.", "De 1 até 2 S.M.", "De 2 até 5 S.M.", "Mais de 5 S.M."]
       };
 
       // Salvar o mapeamento para uso posterior
@@ -535,27 +556,48 @@ export default function Dashboard() {
     });
   };
 
-  // FUNÇÃO handleQuickFilterToggle MODIFICADA PARA PF13
+  // FUNÇÃO handleQuickFilterToggle MODIFICADA PARA SELEÇÃO MÚLTIPLA
   const handleQuickFilterToggle = (demographicKey, value) => {
     setFilters((prevFilters) => {
-      // Para PF13, converter o valor processado para original
-      let actualValue = value;
+      const newFilters = { ...prevFilters };
+      const currentValues = prevFilters[demographicKey] ? [...prevFilters[demographicKey]] : [];
+
+      // Para PF13, converter o valor processado para original(is)
+      let actualValues = [value];
       if (demographicKey === "PF13" && pf13ValueMapping.toOriginal) {
         const originalValue = pf13ValueMapping.toOriginal[value];
         if (originalValue) {
-          // Se é NS/NR (array), usar todos os valores
-          if (Array.isArray(originalValue)) {
-            return { [demographicKey]: originalValue };
-          } else {
-            actualValue = originalValue;
-          }
+          actualValues = Array.isArray(originalValue) ? originalValue : [originalValue];
         }
       }
-      
-      if (prevFilters[demographicKey] && prevFilters[demographicKey][0] === actualValue) {
-        return {};
+
+      // Verificar se algum dos valores já está selecionado
+      const isAlreadySelected = actualValues.some(val => currentValues.includes(val));
+
+      if (isAlreadySelected) {
+        // Remover todos os valores correspondentes
+        actualValues.forEach(val => {
+          const index = currentValues.indexOf(val);
+          if (index > -1) {
+            currentValues.splice(index, 1);
+          }
+        });
+      } else {
+        // Adicionar todos os valores
+        actualValues.forEach(val => {
+          if (!currentValues.includes(val)) {
+            currentValues.push(val);
+          }
+        });
       }
-      return { [demographicKey]: [actualValue] };
+
+      if (currentValues.length > 0) {
+        newFilters[demographicKey] = currentValues;
+      } else {
+        delete newFilters[demographicKey];
+      }
+
+      return newFilters;
     });
   };
 
@@ -941,8 +983,16 @@ export default function Dashboard() {
     return formatChartXAxis(rodada.period, dateLabel)
   }
 
+  // CRÍTICO: Verificar se allQuestionsData está carregado PRIMEIRO
+  // Isso garante que surveyDateMap estará disponível antes de renderizar qualquer componente
   if (isLoadingAllQuestions) {
-    return <LoadingWithProgress loadingProgress={30} loadingStage="Carregando informações de datas..." />
+    return <LoadingWithProgress loadingProgress={30} loadingStage="Carregando informações de datas das rodadas..." />
+  }
+
+  // CRÍTICO: Se allQuestionsData está carregado mas surveyDateMap está vazio, aguardar
+  if (allQuestionsData && surveyDateMap.size === 0 && allQuestionsData.data?.questions?.length > 0) {
+    console.warn("⚠️ allQuestionsData carregado mas surveyDateMap vazio - aguardando...")
+    return <LoadingWithProgress loadingProgress={50} loadingStage="Processando metadados de rodadas..." />
   }
 
   if (status === "loading" || !data) {
@@ -1046,6 +1096,7 @@ export default function Dashboard() {
             availableMapResponses={availableMapResponses}
             selectedMapResponse={selectedMapResponse}
             onMapResponseChange={setSelectedMapResponse}
+            pf13ValueMapping={pf13ValueMapping}
           />
         </div>
       </div>
