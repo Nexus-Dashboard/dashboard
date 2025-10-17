@@ -80,10 +80,13 @@ const ResponseSelectorMenu = React.forwardRef(({ children, style, className, "ar
 ))
 ResponseSelectorMenu.displayName = "ResponseSelectorMenu"
 
-const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterToggle, pf13ValueMapping = {} }) => {
+const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterToggle, pf13ValueMapping = {}, marginOfErrorData = {} }) => {
   const [isOpen, setIsOpen] = useState(false)
-  const filterGroups = ["Sexo", "Região", "Faixa de Renda"] 
+  const filterGroups = ["Sexo", "Região", "Faixa de Renda"]
   const relevantFilters = availableDemographics.filter((group) => filterGroups.includes(group.label))
+
+  // Bloquear novos filtros se a margem de erro está alta
+  const isFilterBlocked = marginOfErrorData.isHighMargin || false
 
   const ICONS = {
     Feminino: <User size={16} />,
@@ -201,12 +204,20 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
                       isActive = activeFilters[group.key]?.includes(value) || false;
                     }
 
+                    // Verificar se deve bloquear este botão
+                    const shouldBlock = isFilterBlocked && !isActive
+
                     return (
                       <Button
                         key={value}
                         variant={isActive ? "contained" : "outlined"}
                         size="small"
-                        onClick={() => onFilterToggle(group.key, value)}
+                        onClick={() => {
+                          if (!shouldBlock) {
+                            onFilterToggle(group.key, value)
+                          }
+                        }}
+                        disabled={shouldBlock}
                         startIcon={ICONS[value] || <div style={{ width: 16 }} />}
                         sx={{
                           minWidth: "auto",
@@ -217,7 +228,15 @@ const CollapsibleMapFilters = ({ availableDemographics, activeFilters, onFilterT
                           borderRadius: "16px",
                           textTransform: "none",
                           transition: "all 0.2s ease",
-                          ...(isActive
+                          ...(shouldBlock
+                            ? {
+                                backgroundColor: "#f8f9fa",
+                                borderColor: "#dee2e6",
+                                color: "#adb5bd",
+                                cursor: "not-allowed",
+                                opacity: 0.5,
+                              }
+                            : isActive
                             ? {
                                 backgroundColor: "#0d6efd",
                                 borderColor: "#0d6efd",
@@ -263,6 +282,7 @@ export default function MapCard({
   selectedMapResponse,
   onMapResponseChange,
   pf13ValueMapping = {},
+  marginOfErrorData = {},
 }) {
   const hasRounds = mapRoundsWithData?.length > 0
   const maxIndex = Math.max(0, (mapRoundsWithData?.length || 1) - 1)
@@ -462,6 +482,7 @@ export default function MapCard({
             activeFilters={activeFilters}
             onFilterToggle={onFilterToggle}
             pf13ValueMapping={pf13ValueMapping}
+            marginOfErrorData={marginOfErrorData}
           />
         </Box>
       </div>

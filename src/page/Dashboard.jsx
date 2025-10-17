@@ -624,83 +624,74 @@ export default function Dashboard() {
       const distributionForFilter = {}
 
       round.distribution.forEach((dist) => {
-        // Para cada distribuição, precisamos verificar se passa por TODOS os filtros
-        // Vamos acumular os weightedCounts que passam por todos os filtros simultaneamente
-
         if (!dist.demographics) return
 
-        // Coletar todos os registros demográficos que precisam passar pelos filtros
         const filterKeys = Object.keys(filters)
+        if (filterKeys.length === 0) return
 
-        // Map para armazenar registros por combinação de demographics
-        // Chave: JSON stringify das demographics, Valor: weightedCount
-        const demographicCombinations = new Map()
+        // Para cada chave de filtro, coletar todos os registros demográficos que correspondem
+        // Precisamos encontrar a INTERSECÇÃO de weightedCounts entre TODOS os filtros
 
-        // Para cada registro demográfico, verificar se passa por TODOS os filtros
-        const firstFilterKey = filterKeys[0]
-        const firstFilterValues = filters[firstFilterKey]
+        // Criar um mapa de registros por filtro
+        const recordsByFilter = {}
 
-        if (!firstFilterValues || firstFilterValues.length === 0) return
+        filterKeys.forEach((filterKey) => {
+          const filterValues = filters[filterKey]
+          if (!filterValues || filterValues.length === 0) return
 
-        // Começar com o primeiro filtro
-        let candidateRecords = []
-
-        if (firstFilterKey === "REGIAO_VIRTUAL") {
-          const ufDemoGroup = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
-          if (ufDemoGroup) {
-            candidateRecords = ufDemoGroup.filter(ufValue =>
-              isStateInSelectedRegions(ufValue.response, firstFilterValues)
-            )
-          }
-        } else {
-          const demoGroup = dist.demographics?.[firstFilterKey]
-          if (demoGroup) {
-            candidateRecords = demoGroup.filter(demoValue =>
-              firstFilterValues.includes(demoValue.response)
-            )
-          }
-        }
-
-        // Agora verificar se os candidatos também passam pelos outros filtros
-        candidateRecords.forEach((candidate) => {
-          let passesAllFilters = true
-
-          // Verificar os outros filtros (a partir do segundo)
-          for (let i = 1; i < filterKeys.length; i++) {
-            const filterKey = filterKeys[i]
-            const filterValues = filters[filterKey]
-
-            if (!filterValues || filterValues.length === 0) continue
-
-            // Para cada candidato, verificar se há overlap com este filtro
-            let passesThisFilter = false
-
-            if (filterKey === "REGIAO_VIRTUAL") {
-              // Se o candidato já passou pelo filtro de região no primeiro passo,
-              // não precisamos verificar novamente
-              passesThisFilter = true
+          if (filterKey === "REGIAO_VIRTUAL") {
+            const ufDemoGroup = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
+            if (ufDemoGroup) {
+              recordsByFilter[filterKey] = ufDemoGroup.filter(ufValue =>
+                isStateInSelectedRegions(ufValue.response, filterValues)
+              )
             } else {
-              const demoGroup = dist.demographics?.[filterKey]
-              if (demoGroup) {
-                // Verificar se algum valor deste grupo demográfico corresponde ao filtro
-                passesThisFilter = demoGroup.some(demoValue =>
-                  filterValues.includes(demoValue.response)
-                )
-              }
+              recordsByFilter[filterKey] = []
             }
-
-            if (!passesThisFilter) {
-              passesAllFilters = false
-              break
+          } else {
+            const demoGroup = dist.demographics?.[filterKey]
+            if (demoGroup) {
+              recordsByFilter[filterKey] = demoGroup.filter(demoValue =>
+                filterValues.includes(demoValue.response)
+              )
+            } else {
+              recordsByFilter[filterKey] = []
             }
-          }
-
-          if (passesAllFilters) {
-            totalForFilter += candidate.weightedCount
-            distributionForFilter[dist.response] =
-              (distributionForFilter[dist.response] || 0) + candidate.weightedCount
           }
         })
+
+        // Verificar se temos registros para TODOS os filtros
+        const hasRecordsForAllFilters = filterKeys.every(key =>
+          recordsByFilter[key] && recordsByFilter[key].length > 0
+        )
+
+        if (!hasRecordsForAllFilters) {
+          // Se não há registros que correspondem a todos os filtros, não incluir nada
+          return
+        }
+
+        // Calcular a intersecção usando proporções probabilísticas
+        // Fórmula: P(A ∩ B) ≈ P(A) * P(B) * Total
+        // Isso assume independência, que é uma aproximação razoável sem dados de crosstab
+
+        const totalWeightsByFilter = filterKeys.map(key => {
+          return recordsByFilter[key].reduce((sum, record) => sum + record.weightedCount, 0)
+        })
+
+        // Calcular a proporção de cada filtro em relação ao total da distribuição
+        const totalDistWeight = dist.weightedCount || 1
+        const proportions = totalWeightsByFilter.map(weight => Math.min(weight / totalDistWeight, 1))
+
+        // A intersecção é o produto das proporções multiplicado pelo total
+        // Se temos 50% Feminino e 30% Nordeste do total de 1000:
+        // Intersecção ≈ 0.5 * 0.3 * 1000 = 150
+        const intersectionWeight = proportions.reduce((acc, prop) => acc * prop, 1) * totalDistWeight
+
+        if (intersectionWeight > 0) {
+          totalForFilter += intersectionWeight
+          distributionForFilter[dist.response] =
+            (distributionForFilter[dist.response] || 0) + intersectionWeight
+        }
       })
 
       const newDistribution = round.distribution.map((dist) => ({
@@ -716,24 +707,21 @@ export default function Dashboard() {
     })
   }, [allHistoricalData, filters, selectedPeriod])
 
-  // Calcular margem de erro baseado no total de respostas filtradas
+  // Calcular margem de erro baseado APENAS na última rodada
   const marginOfErrorData = useMemo(() => {
-    // Calcular total original (sem filtros)
-    const originalTotal = allHistoricalData.reduce((sum, round) => {
-      return sum + round.totalWeightedResponses
-    }, 0)
-
-    // Calcular total filtrado
-    const filteredTotal = filteredHistoricalData.reduce((sum, round) => {
-      return sum + (round.totalWeightedResponses || 0)
-    }, 0)
-
     // Calcular margem de erro usando a mesma fórmula do InteractiveMap
     // Fórmula: sqrt(1 / n) * 100
     const calculateMarginOfError = (n) => {
       if (!n || n === 0) return 0
       return Math.sqrt(1 / n) * 100
     }
+
+    // Pegar APENAS a última rodada (mais recente)
+    const lastRound = filteredHistoricalData[0] // Já está ordenado do mais recente para o mais antigo
+    const lastRoundOriginal = allHistoricalData[0]
+
+    const originalTotal = lastRoundOriginal?.totalWeightedResponses || 0
+    const filteredTotal = lastRound?.totalWeightedResponses || 0
 
     const marginOfError = calculateMarginOfError(filteredTotal)
     const hasFilters = Object.keys(filters).length > 0
@@ -742,6 +730,7 @@ export default function Dashboard() {
       originalTotal,
       filteredTotal,
       marginOfError: marginOfError.toFixed(1),
+      marginOfErrorNumeric: marginOfError, // Valor numérico para comparações
       hasFilters,
       isHighMargin: marginOfError > 10
     }
@@ -783,70 +772,89 @@ export default function Dashboard() {
       const ufDemographics = dist.demographics?.[UF_DEMOGRAPHIC_KEY] || dist.demographics?.["PF10"]
       if (!ufDemographics) return
 
-      // Calcular o total de peso para estados que passam pelos filtros
-      let totalFilteredWeight = 0
-      const filteredUfData = []
+      // Se não há filtros, incluir todos os estados
+      if (Object.keys(filters).length === 0) {
+        ufDemographics.forEach((ufDemo) => {
+          mapResponses.push({
+            [questionInfo.variable]: responseValue,
+            UF: ufDemo.response,
+            _weight: ufDemo.weightedCount,
+          })
+        })
+        return
+      }
 
+      // Com filtros: aplicar a mesma lógica de intersecção
+      const filterKeys = Object.keys(filters)
+
+      // Para cada estado, verificar se passa por TODOS os filtros
       ufDemographics.forEach((ufDemo) => {
-        let shouldInclude = true
+        const recordsByFilter = {}
 
-        // Verificar filtro de região
-        if (filters["REGIAO_VIRTUAL"] && filters["REGIAO_VIRTUAL"].length > 0) {
-          if (!isStateInSelectedRegions(ufDemo.response, filters["REGIAO_VIRTUAL"])) {
-            shouldInclude = false
+        // Verificar cada filtro
+        let passesAllFilters = true
+
+        for (const filterKey of filterKeys) {
+          const filterValues = filters[filterKey]
+          if (!filterValues || filterValues.length === 0) continue
+
+          if (filterKey === "REGIAO_VIRTUAL") {
+            // Verificar se o estado está nas regiões selecionadas
+            if (!isStateInSelectedRegions(ufDemo.response, filterValues)) {
+              passesAllFilters = false
+              break
+            }
+            recordsByFilter[filterKey] = [ufDemo]
+          } else {
+            // Para outros filtros demográficos, verificar se há registros correspondentes
+            const demoGroup = dist.demographics?.[filterKey]
+            if (demoGroup) {
+              const matchingRecords = demoGroup.filter(demoValue =>
+                filterValues.includes(demoValue.response)
+              )
+
+              if (matchingRecords.length === 0) {
+                passesAllFilters = false
+                break
+              }
+
+              recordsByFilter[filterKey] = matchingRecords
+            } else {
+              passesAllFilters = false
+              break
+            }
           }
         }
 
-        // Verificar outros filtros demográficos
-        if (shouldInclude && Object.keys(filters).length > 0) {
-          Object.entries(filters).forEach(([filterKey, filterValues]) => {
-            if (filterKey !== "REGIAO_VIRTUAL" && filterValues && filterValues.length > 0) {
-              // Para cada estado, verificar se tem dados demográficos que correspondem ao filtro
-              const demoGroup = dist.demographics?.[filterKey]
-              if (demoGroup) {
-                const totalWeightForDemo = demoGroup.reduce((sum, d) => sum + d.weightedCount, 0)
-                const matchingWeight = demoGroup
-                  .filter(d => filterValues.includes(d.response))
-                  .reduce((sum, d) => sum + d.weightedCount, 0)
-                
-                // Se não há correspondência neste filtro, excluir este estado
-                if (matchingWeight === 0) {
-                  shouldInclude = false
-                }
-              } else {
-                shouldInclude = false
-              }
+        // Se passa por todos os filtros, calcular o peso da intersecção
+        if (passesAllFilters) {
+          // Calcular a intersecção usando proporções probabilísticas
+          const totalWeightsByFilter = filterKeys.map(key => {
+            if (key === "REGIAO_VIRTUAL") {
+              return ufDemo.weightedCount
+            } else {
+              return recordsByFilter[key].reduce((sum, record) => sum + record.weightedCount, 0)
             }
           })
-        }
 
-        if (shouldInclude) {
-          filteredUfData.push({
-            state: ufDemo.response,
-            originalWeight: ufDemo.weightedCount
-          })
-          totalFilteredWeight += ufDemo.weightedCount
+          // Calcular proporções em relação ao total do estado
+          const totalStateWeight = ufDemo.weightedCount || 1
+          const proportions = totalWeightsByFilter.map(weight => Math.min(weight / totalStateWeight, 1))
+
+          // A intersecção é o produto das proporções multiplicado pelo total
+          const intersectionWeight = proportions.reduce((acc, prop) => acc * prop, 1) * totalStateWeight
+
+          if (intersectionWeight > 0) {
+            mapResponses.push({
+              [questionInfo.variable]: responseValue,
+              UF: ufDemo.response,
+              _weight: intersectionWeight,
+            })
+          }
         }
       })
-
-      // Se há estados que passaram pelos filtros, distribuir o weightedCount filtrado proporcionalmente
-      if (filteredUfData.length > 0 && totalFilteredWeight > 0) {
-        filteredUfData.forEach((ufData) => {
-          // Calcular quantas respostas este estado deve ter baseado na proporção
-          const proportion = ufData.originalWeight / totalFilteredWeight
-          const weightForState = dist.weightedCount * proportion
-
-          // IMPORTANTE: Adicionar UMA entrada por estado com _weight, não múltiplas entradas
-          // Isso permite que o mapa calcule corretamente o total de entrevistas
-          mapResponses.push({
-            [questionInfo.variable]: responseValue,
-            UF: ufData.state,
-            _weight: weightForState, // Peso REAL (não arredondado)
-          })
-        })
-      }
     })
-    
+
     return mapResponses
   }, [mapRoundsWithData, selectedMapRoundIndex, questionInfo, filters])
 
@@ -1017,23 +1025,14 @@ export default function Dashboard() {
         onMenuClick={() => setShowOffcanvas(true)}
       />
 
-      {/* Alerta de margem de erro */}
+      {/* Alerta de margem de erro - SOMENTE quando ultrapassar 10pp */}
       {marginOfErrorData.hasFilters && marginOfErrorData.isHighMargin && (
         <Box sx={{ px: 3, pt: 2 }}>
-          <Alert severity="warning">
-            <AlertTitle>Atenção: Margem de erro elevada</AlertTitle>
-            A margem de erro atual é de <strong>±{marginOfErrorData.marginOfError}pp</strong> (amostra: {marginOfErrorData.filteredTotal.toLocaleString()} de {marginOfErrorData.originalTotal.toLocaleString()} respostas).
+          <Alert severity="error">
+            <AlertTitle>Atenção: Margem de erro acima do limite (10pp)</AlertTitle>
+            A margem de erro da última rodada é de <strong>±{marginOfErrorData.marginOfError}pp</strong> (amostra filtrada: {Math.round(marginOfErrorData.filteredTotal).toLocaleString()} de {Math.round(marginOfErrorData.originalTotal).toLocaleString()} respostas).
             <br />
-            Isso pode afetar a precisão dos resultados. Considere remover alguns filtros para aumentar a amostra.
-          </Alert>
-        </Box>
-      )}
-
-      {/* Info de amostra quando margem <= 10% e há filtros */}
-      {marginOfErrorData.hasFilters && !marginOfErrorData.isHighMargin && marginOfErrorData.filteredTotal > 0 && (
-        <Box sx={{ px: 3, pt: 2 }}>
-          <Alert severity="info">
-            Amostra filtrada: <strong>{marginOfErrorData.filteredTotal.toLocaleString()}</strong> de {marginOfErrorData.originalTotal.toLocaleString()} respostas | Margem de erro: <strong>±{marginOfErrorData.marginOfError}pp</strong>
+            <strong>Novos filtros estão bloqueados.</strong> Para adicionar mais filtros, remova alguns dos filtros atuais para aumentar a amostra.
           </Alert>
         </Box>
       )}
@@ -1071,6 +1070,7 @@ export default function Dashboard() {
             selectedMapResponse={selectedMapResponse}
             onMapResponseChange={setSelectedMapResponse}
             pf13ValueMapping={pf13ValueMapping}
+            marginOfErrorData={marginOfErrorData}
           />
         </div>
       </div>
