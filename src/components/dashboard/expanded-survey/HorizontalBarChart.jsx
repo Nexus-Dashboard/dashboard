@@ -2,25 +2,24 @@
 
 import { useMemo } from "react"
 import { Card } from "react-bootstrap"
-import { ResponsiveBar } from "@nivo/bar"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts"
 import { getResponseColor, RESPONSE_ORDER } from "../../../utils/chartUtils"
 
 export default function HorizontalBarChart({
   data,
-  title,
   questionText,
-  variableName
+  variableName,
+  sampleSize,
+  originalSampleSize,
+  marginOfError
 }) {
   // Processar e ordenar dados usando RESPONSE_ORDER
   const processedData = useMemo(() => {
-    console.log('HorizontalBarChart - Dados recebidos:', data)
-
     if (!data || data.length === 0) {
-      console.log('HorizontalBarChart - Sem dados para exibir')
       return []
     }
 
-    // Ordenar usando RESPONSE_ORDER
+    // Ordenar usando RESPONSE_ORDER e adicionar cor
     const sorted = [...data].sort((a, b) => {
       const indexA = RESPONSE_ORDER.indexOf(a.response)
       const indexB = RESPONSE_ORDER.indexOf(b.response)
@@ -38,9 +37,11 @@ export default function HorizontalBarChart({
 
       // Se nenhum está na lista, ordenar alfabeticamente
       return a.response.localeCompare(b.response)
-    })
+    }).map(item => ({
+      ...item,
+      color: getResponseColor(item.response)
+    }))
 
-    console.log('HorizontalBarChart - Dados processados:', sorted)
     return sorted
   }, [data])
 
@@ -75,39 +76,37 @@ export default function HorizontalBarChart({
     },
     title: {
       color: '#ffffff',
-      fontSize: '18px',
-      fontWeight: '600',
+      fontSize: '16px',
+      fontWeight: '500',
       margin: 0,
-      marginBottom: '8px',
+      lineHeight: '1.4',
       textShadow: '0 1px 3px rgba(0,0,0,0.2)'
-    },
-    subtitle: {
-      color: 'rgba(255,255,255,0.8)',
-      fontSize: '13px',
-      margin: 0,
-      fontWeight: '400'
     },
     variableBadge: {
       display: 'inline-block',
-      background: 'rgba(255,255,255,0.2)',
+      background: 'rgba(255,255,255,0.25)',
       color: '#ffffff',
-      padding: '4px 10px',
-      borderRadius: '6px',
-      fontSize: '11px',
-      fontWeight: '600',
-      marginTop: '8px',
-      border: '1px solid rgba(255,255,255,0.3)'
+      padding: '6px 12px',
+      borderRadius: '8px',
+      fontSize: '13px',
+      fontWeight: '800',
+      border: '1px solid rgba(255,255,255,0.4)',
+      letterSpacing: '0.8px'
     },
     cardBody: {
       padding: '24px',
       background: '#ffffff'
     },
     chartContainer: {
-      height: '500px',
+      height: 'calc(100vh - 320px)',
+      minHeight: '500px',
+      maxHeight: '750px',
+      width: '100%',
       borderRadius: '12px',
       background: 'linear-gradient(145deg, #f8f9fa 0%, #ffffff 100%)',
       padding: '20px',
-      border: '1px solid rgba(0,0,0,0.05)'
+      border: '1px solid rgba(0,0,0,0.05)',
+      position: 'relative'
     },
     emptyState: {
       textAlign: 'center',
@@ -132,7 +131,8 @@ export default function HorizontalBarChart({
         <Card.Header style={customStyles.cardHeader}>
           <div style={customStyles.cardHeaderOverlay}></div>
           <div style={customStyles.headerContent}>
-            <h6 style={customStyles.title}>{title}</h6>
+            <span style={customStyles.variableBadge}>{variableName}</span>
+            <h6 style={{...customStyles.title, marginTop: '8px'}}>Nenhum dado disponível</h6>
           </div>
         </Card.Header>
         <Card.Body style={customStyles.cardBody}>
@@ -150,147 +150,128 @@ export default function HorizontalBarChart({
       <Card.Header style={customStyles.cardHeader}>
         <div style={customStyles.cardHeaderOverlay}></div>
         <div style={customStyles.headerContent}>
-          <h6 style={customStyles.title}>{title}</h6>
-          {questionText && (
-            <p style={customStyles.subtitle}>{questionText}</p>
-          )}
           {variableName && (
             <span style={customStyles.variableBadge}>{variableName}</span>
+          )}
+          {questionText && (
+            <h6 style={{...customStyles.title, marginTop: '8px', marginBottom: 0}}>{questionText}</h6>
           )}
         </div>
       </Card.Header>
       <Card.Body style={customStyles.cardBody}>
         <div style={customStyles.chartContainer}>
-          {processedData.length > 0 ? (
-            <ResponsiveBar
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
               data={processedData}
-              keys={['percentage']}
-              indexBy="response"
-            margin={{ top: 20, right: 40, bottom: 60, left: 180 }}
-            padding={0.3}
-            layout="horizontal"
-            valueScale={{ type: 'linear', min: 0, max: 100 }}
-            indexScale={{ type: 'band', round: true }}
-            colors={(bar) => getResponseColor(bar.indexValue)}
-            borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-            borderWidth={1}
-            borderRadius={6}
-            axisTop={null}
-            axisRight={null}
-            axisBottom={{
-              tickSize: 5,
-              tickPadding: 8,
-              tickRotation: 0,
-              legend: 'Porcentagem (%)',
-              legendPosition: 'middle',
-              legendOffset: 45,
-              format: (value) => `${value}%`
-            }}
-            axisLeft={{
-              tickSize: 5,
-              tickPadding: 8,
-              tickRotation: 0,
-              legend: null,
-              legendPosition: 'middle',
-              legendOffset: -40
-            }}
-            enableLabel={true}
-            label={(d) => `${d.value.toFixed(1)}%`}
-            labelSkipWidth={12}
-            labelSkipHeight={12}
-            labelTextColor="#ffffff"
-            animate={true}
-            motionStiffness={120}
-            motionDamping={18}
-            theme={{
-              background: 'transparent',
-              textColor: '#495057',
-              fontSize: 13,
-              axis: {
-                domain: {
-                  line: {
-                    stroke: '#dee2e6',
-                    strokeWidth: 1
+              margin={{ top: 30, right: 30, bottom: 80, left: 50 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f3f4" />
+              <XAxis
+                dataKey="response"
+                angle={-45}
+                textAnchor="end"
+                height={120}
+                interval={0}
+                tick={{ fontSize: 11, fill: '#495057', fontWeight: 500 }}
+              />
+              <YAxis
+                domain={[0, 100]}
+                tickFormatter={(value) => `${value}%`}
+                tick={{ fontSize: 12, fill: '#495057' }}
+                label={{ value: 'Porcentagem (%)', angle: -90, position: 'insideLeft', style: { fontSize: 14, fontWeight: 600, fill: '#495057' } }}
+              />
+              <Tooltip
+                cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0]
+                    return (
+                      <div
+                        style={{
+                          background: 'rgba(0, 0, 0, 0.92)',
+                          color: '#ffffff',
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)'
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          marginBottom: '8px',
+                          paddingBottom: '8px',
+                          borderBottom: '1px solid rgba(255,255,255,0.2)'
+                        }}>
+                          <div
+                            style={{
+                              width: '12px',
+                              height: '12px',
+                              backgroundColor: data.payload.color,
+                              borderRadius: '50%',
+                              marginRight: '8px'
+                            }}
+                          />
+                          <strong>{data.payload.response}</strong>
+                        </div>
+                        <div style={{ color: data.payload.color, fontWeight: 'bold', fontSize: '14px' }}>
+                          {data.value.toFixed(1)}%
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>
+                          Contagem: {data.payload.count.toFixed(0)}
+                        </div>
+                      </div>
+                    )
                   }
-                },
-                legend: {
-                  text: {
-                    fontSize: 14,
-                    fontWeight: 600,
-                    fill: '#495057'
-                  }
-                },
-                ticks: {
-                  line: {
-                    stroke: '#dee2e6',
-                    strokeWidth: 1
-                  },
-                  text: {
-                    fontSize: 12,
-                    fill: '#495057',
-                    fontWeight: 500
-                  }
-                }
-              },
-              grid: {
-                line: {
-                  stroke: '#f1f3f4',
-                  strokeWidth: 1
-                }
-              },
-              labels: {
-                text: {
-                  fontSize: 13,
-                  fontWeight: 600,
-                  fill: '#ffffff'
-                }
-              }
-            }}
-            tooltip={({ indexValue, value, color }) => (
-              <div
-                style={{
-                  background: 'rgba(0, 0, 0, 0.92)',
-                  color: '#ffffff',
-                  padding: '12px 16px',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)'
+                  return null
+                }}
+              />
+              <Bar
+                dataKey="percentage"
+                radius={[6, 6, 0, 0]}
+                barSize={80}
+                label={{
+                  position: 'top',
+                  formatter: (value) => `${value.toFixed(1)}%`,
+                  style: { fontSize: 12, fontWeight: 600, fill: '#495057' }
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginBottom: '8px',
-                  paddingBottom: '8px',
-                  borderBottom: '1px solid rgba(255,255,255,0.2)'
-                }}>
-                  <div
-                    style={{
-                      width: '12px',
-                      height: '12px',
-                      backgroundColor: color,
-                      borderRadius: '50%',
-                      marginRight: '8px'
-                    }}
-                  />
-                  <strong>{indexValue}</strong>
-                </div>
-                <div style={{ color: color, fontWeight: 'bold', fontSize: '14px' }}>
-                  {value.toFixed(1)}%
-                </div>
-              </div>
-            )}
-          />
+                {processedData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Informação de Amostra e Margem de Erro */}
+        <div style={{ marginTop: '16px' }}>
+          {marginOfError > 10 ? (
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%)',
+                border: '1px solid #ffc107',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                fontSize: '13px',
+                color: '#856404'
+              }}
+            >
+              <strong>⚠️ Atenção:</strong> A margem de erro atual é de <strong>{marginOfError}%</strong> (tamanho da amostra: {sampleSize} de {originalSampleSize} respostas). Isso pode afetar a precisão dos resultados. Considere remover alguns filtros para aumentar a amostra.
+            </div>
           ) : (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              height: '100%',
-              color: '#6c757d'
-            }}>
-              <p>Processando dados do gráfico...</p>
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                border: '1px solid #90caf9',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                fontSize: '13px',
+                color: '#1565c0'
+              }}
+            >
+              <strong>Amostra:</strong> {sampleSize} de {originalSampleSize} respostas | <strong>Margem de erro:</strong> ±{marginOfError}%
             </div>
           )}
         </div>

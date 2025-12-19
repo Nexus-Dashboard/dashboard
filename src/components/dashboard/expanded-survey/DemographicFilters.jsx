@@ -44,7 +44,10 @@ export default function DemographicFilters({
       borderRadius: '16px',
       padding: '20px',
       boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
-      border: '1px solid rgba(0,0,0,0.05)'
+      border: '1px solid rgba(0,0,0,0.05)',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column'
     },
     header: {
       display: 'flex',
@@ -153,59 +156,63 @@ export default function DemographicFilters({
         )}
       </div>
 
-      <Accordion flush>
-        {demographicVariables.map((demographic, index) => {
-          const activeCount = filters[demographic.key]?.length || 0
+      <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px' }}>
+          <Accordion flush>
+          {demographicVariables.map((demographic, index) => {
+            const activeCount = filters[demographic.key]?.length || 0
 
-          return (
-            <Accordion.Item
-              key={demographic.key}
-              eventKey={index.toString()}
-              style={customStyles.accordionItem}
-            >
-              <Accordion.Header style={customStyles.accordionHeader}>
-                <div className="d-flex justify-content-between align-items-center w-100 me-3">
-                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#495057' }}>
-                    {demographic.label}
-                  </span>
-                  {activeCount > 0 && (
-                    <Badge
-                      style={{
-                        background: 'linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%)',
-                        borderRadius: '50%',
-                        width: '24px',
-                        height: '24px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '10px',
-                        fontWeight: '600'
-                      }}
-                    >
-                      {activeCount}
-                    </Badge>
-                  )}
-                </div>
-              </Accordion.Header>
-              <Accordion.Body style={customStyles.accordionBody}>
-                {demographic.values.map((value) => (
-                  <Form.Check
-                    key={value}
-                    type="checkbox"
-                    id={`${demographic.key}-${value}`}
-                    label={value}
-                    checked={(filters[demographic.key] || []).includes(value)}
-                    onChange={(e) =>
-                      handleFilterToggle(demographic.key, value, e.target.checked)
-                    }
-                    style={customStyles.checkbox}
-                  />
-                ))}
-              </Accordion.Body>
-            </Accordion.Item>
-          )
-        })}
-      </Accordion>
+            return (
+              <Accordion.Item
+                key={demographic.key}
+                eventKey={index.toString()}
+                style={customStyles.accordionItem}
+              >
+                <Accordion.Header style={customStyles.accordionHeader}>
+                  <div className="d-flex justify-content-between align-items-center w-100 me-3">
+                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#495057' }}>
+                      {demographic.label}
+                    </span>
+                    {activeCount > 0 && (
+                      <Badge
+                        style={{
+                          background: 'linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%)',
+                          borderRadius: '50%',
+                          width: '24px',
+                          height: '24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          fontWeight: '600'
+                        }}
+                      >
+                        {activeCount}
+                      </Badge>
+                    )}
+                  </div>
+                </Accordion.Header>
+                <Accordion.Body style={customStyles.accordionBody}>
+                  {demographic.values.map((value) => (
+                    <Form.Check
+                      key={value}
+                      type="checkbox"
+                      id={`${demographic.key}-${value}`}
+                      label={value}
+                      checked={(filters[demographic.key] || []).includes(value)}
+                      onChange={(e) =>
+                        handleFilterToggle(demographic.key, value, e.target.checked)
+                      }
+                      style={customStyles.checkbox}
+                    />
+                  ))}
+                </Accordion.Body>
+              </Accordion.Item>
+            )
+          })}
+          </Accordion>
+        </div>
+      </div>
     </div>
   )
 }

@@ -55,12 +55,23 @@ export default function ExpandedSurveyDashboard() {
     const results = variables.map(variable => {
       console.log(`Processando variável: ${variable}`)
       const stats = calculateVariableStats(variable, filters)
+      const statsWithoutFilters = calculateVariableStats(variable, {})
+
+      // Calcular margem de erro (fórmula: 1.96 * sqrt(0.25 / n))
+      // Para 95% de confiança e proporção de 50% (pior caso)
+      const sampleSize = stats?.totalResponses || 0
+      const originalSampleSize = statsWithoutFilters?.totalResponses || 0
+      const marginOfError = sampleSize > 0
+        ? (1.96 * Math.sqrt(0.25 / sampleSize)) * 100
+        : 0
 
       return {
         variable,
         stats: stats?.data || [],
         totalWeight: stats?.totalWeight || 0,
-        totalResponses: stats?.totalResponses || 0
+        totalResponses: sampleSize,
+        originalSampleSize,
+        marginOfError: Math.round(marginOfError * 100) / 100
       }
     })
 
@@ -86,29 +97,9 @@ export default function ExpandedSurveyDashboard() {
         <Container fluid>
           <div className="page-title-section">
             <div className="d-flex align-items-center justify-content-between mb-4">
-              <div>
-                <h1 className="main-title">{pageTitle}</h1>
-                <p className="main-description">{questionText}</p>
-                {variables.length > 0 && (
-                  <div className="d-flex gap-2 mt-2">
-                    {variables.map((v, idx) => (
-                      <span
-                        key={idx}
-                        style={{
-                          background: '#212529',
-                          color: '#fff',
-                          padding: '4px 12px',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          fontWeight: '500'
-                        }}
-                      >
-                        {v}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <h1 className="main-title" style={{ margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {pageTitle}
+              </h1>
               <Button variant="outline-secondary" onClick={handleBack} className="back-button">
                 <ArrowLeft size={16} className="me-2" />
                 Voltar
@@ -137,7 +128,7 @@ export default function ExpandedSurveyDashboard() {
             <Row>
               {/* Coluna de Filtros - 25% */}
               <Col lg={3}>
-                <div style={{ position: 'sticky', top: '20px' }}>
+                <div style={{ position: 'sticky', top: '20px', height: 'calc(100vh - 200px)' }}>
                   <DemographicFilters
                     demographicVariables={demographicVariables}
                     filters={filters}
@@ -184,9 +175,11 @@ export default function ExpandedSurveyDashboard() {
                     <HorizontalBarChart
                       key={idx}
                       data={data.stats}
-                      title={`${pageTitle} - ${data.variable}`}
                       questionText={questionText}
                       variableName={data.variable}
+                      sampleSize={data.totalResponses}
+                      originalSampleSize={data.originalSampleSize}
+                      marginOfError={data.marginOfError}
                     />
                   ))}
 

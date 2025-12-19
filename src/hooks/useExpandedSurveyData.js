@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { DEMOGRAPHIC_LABELS } from "../utils/demographicUtils"
+import { DEMOGRAPHIC_R16 } from "../utils/demographicUtils"
 
 /**
  * Hook para processar dados da pesquisa ampliada
@@ -147,14 +147,15 @@ export const useExpandedSurveyData = (rawData) => {
 
       rows.forEach(row => {
         const value = row[header]
-        if (value && value.trim() !== '') {
+        // Filtrar valores vazios e #NULL!
+        if (value && value.trim() !== '' && value.trim() !== '#NULL!') {
           uniqueValues.add(value.trim())
         }
       })
 
       return {
         key: header,
-        label: DEMOGRAPHIC_LABELS[header] || header, // Usar mapeamento de labels
+        label: DEMOGRAPHIC_R16[header] || header, // Usar mapeamento de labels da Rodada 16
         values: Array.from(uniqueValues).sort()
       }
     }).filter(demo => demo.values.length > 0)
