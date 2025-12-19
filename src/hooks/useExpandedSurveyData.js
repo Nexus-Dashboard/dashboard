@@ -92,8 +92,11 @@ export const useExpandedSurveyData = (rawData) => {
       filteredRows.forEach(row => {
         const response = row[variableName]
 
-        // Ignorar respostas vazias ou nulas
+        // Ignorar respostas vazias, nulas ou #NULL!
         if (!response || response.trim() === '') return
+
+        const trimmedResponse = response.trim()
+        if (trimmedResponse === '#NULL!' || trimmedResponse === '#NULL' || trimmedResponse === '#null') return
 
         // Obter peso (assumindo que existe uma coluna 'weights' ou 'weight')
         const weightKey = Object.keys(row).find(key =>
@@ -102,7 +105,6 @@ export const useExpandedSurveyData = (rawData) => {
         const weight = weightKey ? parseFloat(row[weightKey]) || 1 : 1
 
         // Acumular contagens
-        const trimmedResponse = response.trim()
         const currentCount = responseCounts.get(trimmedResponse) || 0
         responseCounts.set(trimmedResponse, currentCount + weight)
         totalWeight += weight

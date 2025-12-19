@@ -19,30 +19,81 @@ export default function HorizontalBarChart({
       return []
     }
 
-    // Ordenar usando RESPONSE_ORDER e adicionar cor
-    const sorted = [...data].sort((a, b) => {
-      const indexA = RESPONSE_ORDER.indexOf(a.response)
-      const indexB = RESPONSE_ORDER.indexOf(b.response)
+    // Filtrar #NULL! das respostas
+    const filteredData = data.filter(item => {
+      const response = item.response?.trim()
+      return response && response !== '#NULL!' && response !== '#NULL' && response !== '#null'
+    })
 
-      // Se ambos estão na lista de ordem, ordenar por posição
-      if (indexA >= 0 && indexB >= 0) {
-        return indexA - indexB
+    // Verificar se alguma resposta tem cor definida no sistema
+    const hasDefinedColors = filteredData.some(item => {
+      const color = getResponseColor(item.response)
+      return color !== "#999999" // Cor padrão para respostas não definidas
+    })
+
+    // Verificar se alguma resposta tem ordem definida no sistema
+    const hasDefinedOrder = filteredData.some(item =>
+      RESPONSE_ORDER.indexOf(item.response) >= 0
+    )
+
+    let sorted
+
+    if (hasDefinedOrder) {
+      // Ordenar usando RESPONSE_ORDER quando houver ordem definida
+      sorted = [...filteredData].sort((a, b) => {
+        const indexA = RESPONSE_ORDER.indexOf(a.response)
+        const indexB = RESPONSE_ORDER.indexOf(b.response)
+
+        // Se ambos estão na lista de ordem, ordenar por posição
+        if (indexA >= 0 && indexB >= 0) {
+          return indexA - indexB
+        }
+
+        // Se apenas A está na lista, A vem primeiro
+        if (indexA >= 0) return -1
+
+        // Se apenas B está na lista, B vem primeiro
+        if (indexB >= 0) return 1
+
+        // Se nenhum está na lista, ordenar alfabeticamente
+        return a.response.localeCompare(b.response)
+      })
+    } else {
+      // Ordenar por porcentagem (maior para menor) quando não houver ordem definida
+      sorted = [...filteredData].sort((a, b) => b.percentage - a.percentage)
+    }
+
+    // Adicionar cores
+    const withColors = sorted.map((item, index) => {
+      let color
+
+      if (hasDefinedColors) {
+        // Usar cores definidas no sistema
+        color = getResponseColor(item.response)
+      } else {
+        // Aplicar gradiente de azul (do escuro ao claro)
+        // Azul escuro: #1e3a8a -> Azul claro: #93c5fd
+        const totalItems = sorted.length
+        const ratio = totalItems > 1 ? index / (totalItems - 1) : 0
+
+        // Interpolação de cores RGB
+        const darkBlue = { r: 30, g: 58, b: 138 }   // #1e3a8a
+        const lightBlue = { r: 147, g: 197, b: 253 } // #93c5fd
+
+        const r = Math.round(darkBlue.r + (lightBlue.r - darkBlue.r) * ratio)
+        const g = Math.round(darkBlue.g + (lightBlue.g - darkBlue.g) * ratio)
+        const b = Math.round(darkBlue.b + (lightBlue.b - darkBlue.b) * ratio)
+
+        color = `rgb(${r}, ${g}, ${b})`
       }
 
-      // Se apenas A está na lista, A vem primeiro
-      if (indexA >= 0) return -1
+      return {
+        ...item,
+        color
+      }
+    })
 
-      // Se apenas B está na lista, B vem primeiro
-      if (indexB >= 0) return 1
-
-      // Se nenhum está na lista, ordenar alfabeticamente
-      return a.response.localeCompare(b.response)
-    }).map(item => ({
-      ...item,
-      color: getResponseColor(item.response)
-    }))
-
-    return sorted
+    return withColors
   }, [data])
 
   const customStyles = {
