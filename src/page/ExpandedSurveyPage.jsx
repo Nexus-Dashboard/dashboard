@@ -230,12 +230,7 @@ export default function ExpandedSurveyPage() {
           <div className="page-title-section">
             <div className="d-flex align-items-center justify-content-between">
               <div>
-                <h1 className="main-title">F2F Brasil - Pesquisa Ampliada - Onda 2 - Rodada 16</h1>
-                <p className="main-description">
-                  {isLoading
-                    ? "Carregando perguntas disponíveis..."
-                    : `Explore ${filteredQuestions.length} pergunta${filteredQuestions.length !== 1 ? 's' : ''} disponível${filteredQuestions.length !== 1 ? 'is' : ''} desta pesquisa especial`}
-                </p>
+                <h1 className="main-title">F2F Brasil - Pesquisa Ampliada - Onda 2 - Rodada 16</h1>                
               </div>
               <Button variant="outline-secondary" onClick={handleBack} className="back-button">
                 <ArrowLeft size={16} className="me-2" />
