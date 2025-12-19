@@ -77,7 +77,6 @@ export const ApiMethods = {
   getAllQuestionsComplete: async () => {
     console.log("Iniciando busca completa de todas as questões...")
     let allQuestions = []
-    const currentPage = 1
     let totalPages = 1
 
     try {
@@ -157,6 +156,76 @@ export const ApiMethods = {
 
   // Buscar perguntas de um tema (método POST)
   getThemeQuestionsPost: (theme, type) => ApiBase.post("/api/data/themes/questions", { theme }, { params: { type } }),
+
+  // NOVO: Buscar índice de perguntas da Pesquisa Ampliada (Rodada 16)
+  getExpandedSurveyIndex: async () => {
+    try {
+      const response = await axios.get(
+        "https://nmbcoamazonia-api.vercel.app/google/sheets/1pcJqXSzEzqNYWMdThadgmt3FDib5V5gzZz2DSeXg1AU/data"
+      )
+
+      if (!response.data?.success) {
+        throw new Error("Erro ao buscar índice da pesquisa ampliada")
+      }
+
+      // Filtrar apenas rodada 16
+      const values = response.data.data.values
+
+      // Filtrar linhas da rodada 16
+      const round16Questions = values.slice(1).filter(row => {
+        const roundNumber = row[0] // "Número da Pesquisa" está na primeira coluna
+        return roundNumber === "16"
+      })
+
+      // Mapear para objetos estruturados
+      const questions = round16Questions.map(row => ({
+        surveyNumber: row[0],
+        fileName: row[1],
+        variable: row[2],
+        questionText: row[3],
+        label: row[5],
+        index: row[6],
+        methodology: row[7],
+        map: row[8],
+        sample: row[9],
+        date: row[10],
+      }))
+
+      return {
+        success: true,
+        data: questions
+      }
+    } catch (error) {
+      console.error("Erro ao buscar índice da pesquisa ampliada:", error)
+      throw error
+    }
+  },
+
+  // NOVO: Buscar dados brutos da Pesquisa Ampliada (Rodada 16)
+  getExpandedSurveyData: async () => {
+    try {
+      const response = await axios.get(
+        "https://nmbcoamazonia-api.vercel.app/google/sheets/1jveDEOr6-GBlh4-vOfjUfs6D-1am3trZunJ7BQR3WIg/data",
+        {
+          params: {
+            range: "BD - F2F Brasil - Pesquisa Pred"
+          }
+        }
+      )
+
+      if (!response.data?.success) {
+        throw new Error("Erro ao buscar dados da pesquisa ampliada")
+      }
+
+      return {
+        success: true,
+        data: response.data.data
+      }
+    } catch (error) {
+      console.error("Erro ao buscar dados da pesquisa ampliada:", error)
+      throw error
+    }
+  },
 }
 
 export default ApiBase

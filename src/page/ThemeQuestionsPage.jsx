@@ -175,9 +175,9 @@ export default function ThemeQuestionsPage() {
       } else {
         pageTitle = themeName;
       }
-      
-      const params = new URLSearchParams({ 
-        theme: themeName, 
+
+      const params = new URLSearchParams({
+        theme: themeName,
         type: surveyType,
         pageTitle: pageTitle // Usar a variável calculada
       })
@@ -197,8 +197,12 @@ export default function ThemeQuestionsPage() {
         }
       }
     },
-    [navigate, themeName, surveyType],
+    [navigate, themeName, surveyType, themeSlug],
   )
+
+  const handleSpecialSurveyClick = useCallback(() => {
+    navigate(`/pesquisa-ampliada/f2f/rodada-16`)
+  }, [navigate])
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
   const handleSearchChange = useCallback((e) => setSearchTerm(e.target.value), [])
@@ -329,6 +333,64 @@ export default function ThemeQuestionsPage() {
                 </div>
               ) : (
                 <>
+                  {/* Card Especial para Pesquisa Ampliada - Rodada 16 */}
+                  {themeSlug === 'popularidade-face-a-face' && (
+                    <section className="mb-4">
+                      <div className="question-group-header" style={{ marginBottom: '1rem' }}>
+                        <FileText />
+                        <h4>Pesquisa Ampliada - Rodada 16</h4>
+                      </div>
+                      <Card
+                        className="special-survey-card"
+                        onClick={handleSpecialSurveyClick}
+                        style={{
+                          cursor: 'pointer',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '8px',
+                          transition: 'all 0.2s ease',
+                          backgroundColor: '#fff'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#0d6efd'
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#dee2e6'
+                          e.currentTarget.style.boxShadow = 'none'
+                        }}
+                      >
+                        <Card.Body className="py-3">
+                          <div className="d-flex align-items-center justify-content-between">
+                            <div style={{ flex: 1 }}>
+                              <h6 className="mb-1" style={{
+                                fontSize: '1rem',
+                                fontWeight: '600',
+                                color: '#212529'
+                              }}>
+                                F2F Brasil - Pesquisa Ampliada - Onda 2 - Rodada 16
+                              </h6>
+                              <p className="mb-0" style={{
+                                fontSize: '0.875rem',
+                                color: '#6c757d'
+                              }}>
+                                Pesquisa especial com mais de 9 mil entrevistados
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              style={{
+                                minWidth: '100px',
+                                marginLeft: '16px'
+                              }}
+                            >
+                              Acessar
+                            </Button>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </section>
+                  )}
 
                   {filteredTextGrouped.length > 0 && (
                     <section>

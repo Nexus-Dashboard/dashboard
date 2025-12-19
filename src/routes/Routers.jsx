@@ -11,6 +11,8 @@ import ThemeQuestionsPage from "../page/ThemeQuestionsPage"
 import SurveyTypePage from "../page/SurveyTypePage"
 import UserManagementPage from "../page/UserManagementPage"
 import Upload from "../page/upload"
+import ExpandedSurveyPage from "../page/ExpandedSurveyPage"
+import ExpandedSurveyDashboard from "../page/ExpandedSurveyDashboard"
 
 
 // Componente de Rota Protegida
@@ -111,6 +113,22 @@ const Routers = () => (
       element={
         <ProtectedRoute>
           <ThemeQuestionsPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/pesquisa-ampliada/f2f/rodada-16"
+      element={
+        <ProtectedRoute>
+          <ExpandedSurveyPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/pesquisa-ampliada/f2f/rodada-16/dashboard"
+      element={
+        <ProtectedRoute>
+          <ExpandedSurveyDashboard />
         </ProtectedRoute>
       }
     />
