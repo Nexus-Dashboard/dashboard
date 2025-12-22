@@ -89,45 +89,73 @@ export const useExpandedSurveyData = (rawData) => {
       const responseCounts = new Map()
       let totalWeight = 0
 
+      // Buscar a coluna de peso (weights) - procurar por várias variações
+      const allKeys = Object.keys(filteredRows[0] || {})
+      const weightKey = allKeys.find(key => {
+        const lowerKey = key.toLowerCase()
+        return lowerKey === 'weights' ||
+               lowerKey === 'weight' ||
+               lowerKey === 'peso' ||
+               lowerKey === 'pesos' ||
+               lowerKey.includes('weight') ||
+               lowerKey.includes('peso')
+      })
+
+      if (!weightKey && filteredRows.length > 0) {
+        console.warn('⚠️ Coluna de pesos não encontrada!')
+        console.warn('Todas as colunas disponíveis:', allKeys)
+        console.warn('Primeira linha de exemplo:', filteredRows[0])
+      } else if (weightKey) {
+        console.log(`✅ Usando coluna de pesos: "${weightKey}"`)
+        console.log(`Exemplo de peso da primeira linha: ${filteredRows[0][weightKey]}`)
+      }
+
       filteredRows.forEach(row => {
         const response = row[variableName]
 
         // Ignorar respostas vazias, nulas ou #NULL!
         if (!response || response.trim() === '') return
 
-        const trimmedResponse = response.trim()
+        let trimmedResponse = response.trim()
         if (trimmedResponse === '#NULL!' || trimmedResponse === '#NULL' || trimmedResponse === '#null') return
 
-        // Obter peso (assumindo que existe uma coluna 'weights' ou 'weight')
-        const weightKey = Object.keys(row).find(key =>
-          key.toLowerCase().includes('weight')
-        )
-        const weight = weightKey ? parseFloat(row[weightKey]) || 1 : 1
+        // Normalizar respostas "Não sabe" e "Não respondeu" para "NS/NR"
+        const lowerResponse = trimmedResponse.toLowerCase()
+        if (lowerResponse.includes('não sabe') || lowerResponse.includes('não respondeu')) {
+          trimmedResponse = 'NS/NR'
+        }
 
-        // Acumular contagens
+        // Obter peso - converter vírgula em ponto e parsear
+        let weight = 1
+        if (weightKey && row[weightKey]) {
+          const weightStr = String(row[weightKey]).replace(',', '.')
+          weight = parseFloat(weightStr) || 1
+        }
+
+        // Acumular contagens usando pesos
         const currentCount = responseCounts.get(trimmedResponse) || 0
         responseCounts.set(trimmedResponse, currentCount + weight)
         totalWeight += weight
       })
 
-      // Converter para array com porcentagens
-      const stats = Array.from(responseCounts.entries()).map(([response, count]) => ({
+      // Converter para array com porcentagens baseadas em WEIGHTS
+      const stats = Array.from(responseCounts.entries()).map(([response, weightSum]) => ({
         response,
-        count,
-        percentage: totalWeight > 0 ? (count / totalWeight) * 100 : 0
+        count: weightSum, // count é na verdade a soma dos weights
+        percentage: totalWeight > 0 ? (weightSum / totalWeight) * 100 : 0
       }))
 
       console.log(`Estatísticas para ${variableName}:`, {
-        totalResponses: filteredRows.length,
-        totalWeight,
+        totalRowsFiltered: filteredRows.length,
+        totalWeight, // Soma total dos weights
         uniqueResponses: stats.length,
         stats: stats.slice(0, 3)
       })
 
       return {
         data: stats,
-        totalWeight,
-        totalResponses: filteredRows.length
+        totalWeight, // Soma total dos weights
+        totalResponses: totalWeight // MUDANÇA: retornar totalWeight em vez de filteredRows.length
       }
     }
   }, [processedData])
