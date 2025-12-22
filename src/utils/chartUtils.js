@@ -1,7 +1,9 @@
 // Ordem correta para as respostas (do melhor para o pior) - PARA LEGENDAS
 export const RESPONSE_ORDER = [
   "Ótimo",
+  "Ótima",
   "Bom",
+  "Boa",
   "Ótimo/Bom",
   "Aprova",
   "Melhorar muito",
@@ -15,6 +17,7 @@ export const RESPONSE_ORDER = [
   "Ruim/Péssimo",  
   "Ruim",
   "Péssimo",
+  "Péssima",
   "Desaprova",
   "Vai melhorar",
   "Vai continuar na mesma",
@@ -47,12 +50,13 @@ export const RESPONSE_ORDER = [
 export const responseColorMap = {
   // Respostas positivas - azul
   Ótimo: "#334D99",
+  Ótima: "#334D99",
   Bom: "#4D66CC",
   "Regular mais para positivo": "#334D99",
   "Melhorar muito": "#334D99",
   "Melhorar um pouco": "#4D66CC",
   "Ótimo/Bom": "#334D99", // Azul
-
+  "Boa": "#334D99",
   // Respostas neutras - laranja
   Regular: "#CC804D",
   "Ficar igual": "#CC804D",
@@ -61,6 +65,7 @@ export const responseColorMap = {
   "Regular mais para negativo": "#B33333",
   Ruim: "#B33333",
   Péssimo: "#801A1A",
+  Péssima: "#801A1A",
   "Piorar um pouco": "#B33333",
   "Piorar muito": "#801A1A",
   "Ruim/Péssimo": "#B33333", // Vermelho

@@ -9,6 +9,7 @@ export default function HorizontalBarChart({
   data,
   questionText,
   variableName,
+  variableLabel,
   sampleSize,
   originalSampleSize,
   marginOfError
@@ -184,6 +185,18 @@ export default function HorizontalBarChart({
           <div style={customStyles.headerContent}>
             <span style={customStyles.variableBadge}>{variableName}</span>
             <h6 style={{...customStyles.title, marginTop: '8px'}}>Nenhum dado disponível</h6>
+            {variableLabel && (
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.85)',
+                fontSize: '14px',
+                fontWeight: '400',
+                fontStyle: 'italic',
+                margin: '8px 0 0 0',
+                lineHeight: '1.4'
+              }}>
+                {variableLabel}
+              </p>
+            )}
           </div>
         </Card.Header>
         <Card.Body style={customStyles.cardBody}>
@@ -206,6 +219,18 @@ export default function HorizontalBarChart({
           )}
           {questionText && (
             <h6 style={{...customStyles.title, marginTop: '8px', marginBottom: 0}}>{questionText}</h6>
+          )}
+          {variableLabel && (
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.85)',
+              fontSize: '14px',
+              fontWeight: '400',
+              fontStyle: 'italic',
+              margin: '8px 0 0 0',
+              lineHeight: '1.4'
+            }}>
+              {variableLabel}
+            </p>
           )}
         </div>
       </Card.Header>

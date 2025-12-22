@@ -6,6 +6,7 @@ import PeriodDropdown from "./PeriodFilter"
 
 export default function ChartCard({
   title,
+  labels = [],
   allHistoricalData = [],
   selectedChartData = [],
   numberOfRoundsToShow = 10,
@@ -91,7 +92,28 @@ export default function ChartCard({
     <div className="chart-card">
       <div className="chart-card-content">
         <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 1 }}>
-          <Typography className="card-title-custom">{title || "Análise Temporal"}</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography className="card-title-custom">{title || "Análise Temporal"}</Typography>
+            {labels && labels.length > 0 && (
+              <Typography
+                variant="subtitle2"
+                sx={{
+                  fontSize: '0.9rem',
+                  fontWeight: 400,
+                  color: 'text.secondary',
+                  fontStyle: 'italic',
+                  lineHeight: 1.3
+                }}
+              >
+                {labels.map((label, index) => (
+                  <span key={index}>
+                    {label}
+                    {index < labels.length - 1 && ' | '}
+                  </span>
+                ))}
+              </Typography>
+            )}
+          </Box>
           {getCollectionType() && (
             <Typography
               variant="caption"

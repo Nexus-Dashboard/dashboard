@@ -290,6 +290,7 @@ export default function Dashboard() {
       label: questionText,
       variable: data.questionInfo?.variables?.[0] || "GROUPED",
       variables: data.questionInfo?.variables || [],
+      labels: data.questionInfo?.labels || [],
       rounds: data.questionInfo?.rounds || [],
       totalVariations: data.questionInfo?.totalVariations || 0,
       variablesByRound: data.questionInfo?.variablesByRound || {},
@@ -1041,6 +1042,7 @@ export default function Dashboard() {
         <div className="dashboard-grid">
           <ChartCard
             title={questionInfo?.label || questionInfo?.questionText}
+            labels={questionInfo?.labels || []}
             allHistoricalData={allHistoricalData}
             selectedChartData={selectedChartData}
             numberOfRoundsToShow={numberOfRoundsToShow}

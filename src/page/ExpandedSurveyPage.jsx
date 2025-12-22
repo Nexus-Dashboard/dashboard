@@ -211,14 +211,22 @@ export default function ExpandedSurveyPage() {
   const handleBack = useCallback(() => navigate(-1), [navigate])
 
   const handleQuestionClick = useCallback((question) => {
-    // Navegar para o dashboard da pergunta
     const params = new URLSearchParams({
       variables: JSON.stringify(question.variables),
       questionText: question.questionText,
       pageTitle: "F2F Brasil - Pesquisa Ampliada - Rodada 16"
     })
 
-    navigate(`/pesquisa-ampliada/f2f/rodada-16/dashboard?${params.toString()}`)
+    // Verificar se é pergunta aberta (sem possibleResponses ou com muitas respostas)
+    const isOpenQuestion = !question.possibleResponses || question.possibleResponses.length === 0
+
+    if (isOpenQuestion) {
+      // Redirecionar para dashboard de perguntas abertas
+      navigate(`/pesquisa-ampliada/f2f/rodada-16/dashboard/open?${params.toString()}`)
+    } else {
+      // Redirecionar para dashboard normal
+      navigate(`/pesquisa-ampliada/f2f/rodada-16/dashboard?${params.toString()}`)
+    }
   }, [navigate])
 
   return (

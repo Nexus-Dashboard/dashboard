@@ -13,6 +13,7 @@ import UserManagementPage from "../page/UserManagementPage"
 import Upload from "../page/upload"
 import ExpandedSurveyPage from "../page/ExpandedSurveyPage"
 import ExpandedSurveyDashboard from "../page/ExpandedSurveyDashboard"
+import OpenQuestionDashboard from "../page/OpenQuestionDashboard"
 
 
 // Componente de Rota Protegida
@@ -129,6 +130,14 @@ const Routers = () => (
       element={
         <ProtectedRoute>
           <ExpandedSurveyDashboard />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/pesquisa-ampliada/f2f/rodada-16/dashboard/open"
+      element={
+        <ProtectedRoute>
+          <OpenQuestionDashboard />
         </ProtectedRoute>
       }
     />

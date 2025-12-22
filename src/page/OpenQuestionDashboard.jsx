@@ -6,13 +6,14 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
 import CommonHeader from "../components/CommonHeader"
-import HorizontalBarChart from "../components/dashboard/expanded-survey/HorizontalBarChart"
+import WordCloudChart from "../components/dashboard/expanded-survey/WordCloudChart"
+import ResponseList from "../components/dashboard/expanded-survey/ResponseList"
 import DemographicFilters from "../components/dashboard/expanded-survey/DemographicFilters"
 import { ApiMethods } from "../service/ApiBase"
 import { useExpandedSurveyData } from "../hooks/useExpandedSurveyData"
 import "./ThemeQuestionsPage.css"
 
-export default function ExpandedSurveyDashboard() {
+export default function OpenQuestionDashboard() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -23,12 +24,12 @@ export default function ExpandedSurveyDashboard() {
   }, [searchParams])
 
   const questionText = searchParams.get('questionText') || ''
-  const pageTitle = searchParams.get('pageTitle') || 'Análise de Pergunta'
+  const pageTitle = searchParams.get('pageTitle') || 'Análise de Pergunta Aberta'
 
   // Estado de filtros demográficos
   const [filters, setFilters] = useState({})
 
-  // Buscar índice de perguntas para obter labels (mesma fonte dos dados)
+  // Buscar índice de perguntas para obter labels
   const { data: indexData, isLoading: indexLoading } = useQuery({
     queryKey: ["expandedSurveyIndex"],
     queryFn: ApiMethods.getExpandedSurveyIndex,
@@ -36,20 +37,12 @@ export default function ExpandedSurveyDashboard() {
     refetchOnWindowFocus: false,
   })
 
-  // Buscar dados brutos (são os mesmos dados!)
+  // Buscar dados brutos
   const { data: rawData, isLoading, error } = useQuery({
     queryKey: ["expandedSurveyData"],
     queryFn: ApiMethods.getExpandedSurveyData,
-    staleTime: 1000 * 60 * 30, // 30 minutos
+    staleTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
-  })
-
-  // Log para debug
-  console.log('Estado das queries:', {
-    indexDataExists: !!indexData,
-    rawDataExists: !!rawData,
-    indexLoading,
-    isLoading
   })
 
   // Processar dados usando hook customizado
@@ -61,65 +54,44 @@ export default function ExpandedSurveyDashboard() {
 
   // Criar mapeamento de variável -> label
   const variableLabels = useMemo(() => {
-    // O getExpandedSurveyIndex retorna { success: true, data: [...] }
     if (!indexData?.data || !Array.isArray(indexData.data)) {
-      console.log('❌ Dados do índice ainda não disponíveis ou em formato incorreto')
-      console.log('indexData:', indexData)
       return {}
     }
 
-    console.log('✅ Dados do índice carregados:', indexData.data.length, 'perguntas')
-
-    // Criar mapa de variável -> label a partir dos objetos já processados
     const mapping = {}
     indexData.data.forEach(question => {
       if (question.variable && question.label) {
         mapping[question.variable] = question.label
-        console.log(`  Mapeando ${question.variable} → ${question.label}`)
       }
     })
 
-    console.log('✅ Mapeamento de labels criado:', Object.keys(mapping).length, 'variáveis mapeadas')
     return mapping
   }, [indexData])
 
-  // Calcular estatísticas para cada variável
+  // Calcular estatísticas para cada variável (para perguntas abertas)
   const chartData = useMemo(() => {
-    console.log('Calculando chartData:', { isReady, hasCalculateFunc: !!calculateVariableStats, variables })
-
     if (!isReady || !calculateVariableStats) {
-      console.log('Aguardando dados ficarem prontos...')
       return []
     }
 
     const results = variables.map(variable => {
-      console.log(`Processando variável: ${variable}`)
       const label = variableLabels[variable] || ''
-      console.log(`  → Label encontrado: "${label}"`)
-
       const stats = calculateVariableStats(variable, filters)
       const statsWithoutFilters = calculateVariableStats(variable, {})
 
-      // Calcular margem de erro (fórmula: 1.96 * sqrt(0.25 / n))
-      // Para 95% de confiança e proporção de 50% (pior caso)
       const sampleSize = stats?.totalResponses || 0
       const originalSampleSize = statsWithoutFilters?.totalResponses || 0
-      const marginOfError = sampleSize > 0
-        ? (1.96 * Math.sqrt(0.25 / sampleSize)) * 100
-        : 0
 
       return {
         variable,
-        label, // ← NOVO: adicionar label
+        label,
         stats: stats?.data || [],
         totalWeight: stats?.totalWeight || 0,
         totalResponses: sampleSize,
-        originalSampleSize,
-        marginOfError: Math.round(marginOfError * 100) / 100
+        originalSampleSize
       }
     })
 
-    console.log('ChartData calculado:', results)
     return results
   }, [variables, filters, isReady, calculateVariableStats, variableLabels])
 
@@ -170,8 +142,8 @@ export default function ExpandedSurveyDashboard() {
           {/* Dashboard */}
           {!isLoading && !error && isReady && (
             <Row>
-              {/* Coluna de Filtros - 25% */}
-              <Col lg={3}>
+              {/* Coluna de Filtros - 20% */}
+              <Col lg={2}>
                 <div style={{ position: 'sticky', top: '20px', height: 'calc(100vh - 200px)' }}>
                   <DemographicFilters
                     demographicVariables={demographicVariables}
@@ -212,25 +184,74 @@ export default function ExpandedSurveyDashboard() {
                 </div>
               </Col>
 
-              {/* Coluna de Gráficos - 75% */}
-              <Col lg={9}>
+              {/* Coluna de Visualizações - 80% */}
+              <Col lg={10}>
                 <div className="d-flex flex-column gap-4">
                   {chartData.map((data, idx) => (
-                    <HorizontalBarChart
-                      key={idx}
-                      data={data.stats}
-                      questionText={questionText}
-                      variableName={data.variable}
-                      variableLabel={data.label}
-                      sampleSize={data.totalResponses}
-                      originalSampleSize={data.originalSampleSize}
-                      marginOfError={data.marginOfError}
-                    />
+                    <div key={idx}>
+                      {/* Título da pergunta (apenas uma vez para cada variável) */}
+                      {idx === 0 && (
+                        <div style={{
+                          marginBottom: '20px',
+                          padding: '20px',
+                          background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(0,0,0,0.05)'
+                        }}>
+                          <h4 style={{
+                            fontSize: '18px',
+                            fontWeight: '600',
+                            color: '#212529',
+                            margin: 0,
+                            marginBottom: '8px'
+                          }}>
+                            {questionText}
+                          </h4>
+                          <p style={{
+                            fontSize: '14px',
+                            color: '#6c757d',
+                            margin: 0
+                          }}>
+                            Pergunta Aberta - Análise de Respostas
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Grid: Word Cloud (60%) + Response List (40%) */}
+                      <Row className="g-3">
+                        <Col lg={7}>
+                          <WordCloudChart
+                            data={data.stats}
+                            questionText={questionText}
+                            variableName={data.variable}
+                            variableLabel={data.label}
+                            sampleSize={data.totalResponses}
+                            originalSampleSize={data.originalSampleSize}
+                          />
+                        </Col>
+                        <Col lg={5}>
+                          <ResponseList
+                            data={data.stats}
+                            variableName={data.variable}
+                            variableLabel={data.label}
+                          />
+                        </Col>
+                      </Row>
+
+                      {/* Separador entre variáveis diferentes */}
+                      {idx < chartData.length - 1 && (
+                        <hr style={{
+                          margin: '40px 0',
+                          border: 'none',
+                          borderTop: '2px solid #dee2e6'
+                        }} />
+                      )}
+                    </div>
                   ))}
 
                   {chartData.length === 0 && (
                     <div className="empty-state">
-                      <h4>Nenhum gráfico disponível</h4>
+                      <h4>Nenhum dado disponível</h4>
                       <p>Não há dados para exibir com os filtros selecionados.</p>
                     </div>
                   )}
