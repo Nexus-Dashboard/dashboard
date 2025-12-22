@@ -160,19 +160,44 @@ export const useExpandedSurveyData = (rawData) => {
     }
   }, [processedData])
 
-  // Função para obter variáveis demográficas (PF...)
+  // Função para obter variáveis demográficas (regiões + PF...)
   const getDemographicVariables = useMemo(() => {
     if (!processedData) return []
 
     const { headers, rows } = processedData
 
-    // Filtrar apenas variáveis que começam com PF
-    const demographicHeaders = headers.filter(header =>
+    // Coletar variáveis demográficas: regiões + PF*
+    const demographicList = []
+
+    // 1. PRIMEIRO: Adicionar "regiões" se existir
+    const regioesHeader = headers.find(h =>
+      h && (h.toLowerCase() === 'regiões' || h.toLowerCase() === 'regiao' || h.toLowerCase() === 'região')
+    )
+
+    if (regioesHeader) {
+      const uniqueValues = new Set()
+      rows.forEach(row => {
+        const value = row[regioesHeader]
+        if (value && value.trim() !== '' && value.trim() !== '#NULL!') {
+          uniqueValues.add(value.trim())
+        }
+      })
+
+      if (uniqueValues.size > 0) {
+        demographicList.push({
+          key: regioesHeader,
+          label: 'Região',
+          values: Array.from(uniqueValues).sort()
+        })
+      }
+    }
+
+    // 2. DEPOIS: Adicionar variáveis que começam com PF
+    const pfHeaders = headers.filter(header =>
       header && header.startsWith('PF')
     )
 
-    // Para cada variável demográfica, extrair valores únicos
-    return demographicHeaders.map(header => {
+    pfHeaders.forEach(header => {
       const uniqueValues = new Set()
 
       rows.forEach(row => {
@@ -183,12 +208,16 @@ export const useExpandedSurveyData = (rawData) => {
         }
       })
 
-      return {
-        key: header,
-        label: DEMOGRAPHIC_R16[header] || header, // Usar mapeamento de labels da Rodada 16
-        values: Array.from(uniqueValues).sort()
+      if (uniqueValues.size > 0) {
+        demographicList.push({
+          key: header,
+          label: DEMOGRAPHIC_R16[header] || header,
+          values: Array.from(uniqueValues).sort()
+        })
       }
-    }).filter(demo => demo.values.length > 0)
+    })
+
+    return demographicList
   }, [processedData])
 
   return {
