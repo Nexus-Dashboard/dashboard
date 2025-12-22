@@ -347,7 +347,7 @@ export default function HorizontalBarChart({
                 color: '#1565c0'
               }}
             >
-              <strong>Amostra:</strong> {sampleSize} de {originalSampleSize} respostas | <strong>Margem de erro:</strong> ±{marginOfError}%
+              <strong>Margem de erro:</strong> ±{marginOfError}%
             </div>
           )}
         </div>
