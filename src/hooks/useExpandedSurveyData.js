@@ -119,6 +119,9 @@ export const useExpandedSurveyData = (rawData) => {
         let trimmedResponse = response.trim()
         if (trimmedResponse === '#NULL!' || trimmedResponse === '#NULL' || trimmedResponse === '#null') return
 
+        // Ignorar respostas com valor "-1"
+        if (trimmedResponse === '-1') return
+
         // Normalizar respostas "Não sabe" e "Não respondeu" para "NS/NR"
         const lowerResponse = trimmedResponse.toLowerCase()
         if (lowerResponse.includes('não sabe') || lowerResponse.includes('não respondeu')) {

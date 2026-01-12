@@ -19,10 +19,14 @@ export default function WordCloudChart({
       return []
     }
 
-    // Filtrar #NULL! e converter para formato { text, value }
+    // Filtrar #NULL! e respostas com valor "-1", depois converter para formato { text, value }
     const filtered = data.filter(item => {
       const response = item.response?.trim()
-      return response && response !== '#NULL!' && response !== '#NULL' && response !== '#null'
+      return response &&
+             response !== '#NULL!' &&
+             response !== '#NULL' &&
+             response !== '#null' &&
+             response !== '-1'
     })
 
     // Converter para formato da word cloud

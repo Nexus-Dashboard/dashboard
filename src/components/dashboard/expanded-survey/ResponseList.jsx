@@ -15,10 +15,14 @@ export default function ResponseList({
       return []
     }
 
-    // Filtrar #NULL! e ordenar por contagem
+    // Filtrar #NULL! e respostas com valor "-1", depois ordenar por contagem
     const filtered = data.filter(item => {
       const response = item.response?.trim()
-      return response && response !== '#NULL!' && response !== '#NULL' && response !== '#null'
+      return response &&
+             response !== '#NULL!' &&
+             response !== '#NULL' &&
+             response !== '#null' &&
+             response !== '-1'
     })
 
     return filtered.sort((a, b) => b.count - a.count)
