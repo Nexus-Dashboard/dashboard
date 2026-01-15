@@ -333,16 +333,74 @@ export default function ThemeQuestionsPage() {
                 </div>
               ) : (
                 <>
-                  {/* Card Especial para Pesquisa Ampliada - Rodada 16 */}
+                  {/* Cards de Pesquisa Ampliada - F2F */}
                   {themeSlug === 'popularidade-face-a-face' && (
                     <section className="mb-4">
                       <div className="question-group-header" style={{ marginBottom: '1rem' }}>
                         <FileText />
-                        <h4>Pesquisa Ampliada - Rodada 16</h4>
+                        <h4>Pesquisas Ampliadas</h4>
                       </div>
+
+                      {/* Card Rodada 16 - Onda 2 */}
+                      <Card
+                        className="special-survey-card mb-3"
+                        onClick={() => navigate('/pesquisa-ampliada/f2f/rodada-16')}
+                        style={{
+                          cursor: 'pointer',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '8px',
+                          transition: 'all 0.2s ease',
+                          backgroundColor: '#fff'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#0d6efd'
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#dee2e6'
+                          e.currentTarget.style.boxShadow = 'none'
+                        }}
+                      >
+                        <Card.Body className="py-3">
+                          <div className="d-flex align-items-center justify-content-between">
+                            <div style={{ flex: 1 }}>
+                              <div className="d-flex align-items-center gap-2 mb-1">
+                                <h6 className="mb-0" style={{
+                                  fontSize: '1rem',
+                                  fontWeight: '600',
+                                  color: '#212529'
+                                }}>
+                                  F2F Brasil - Pesquisa Ampliada - Onda 2 - Rodada 16
+                                </h6>
+                                <Badge bg="success" style={{ fontSize: '0.7rem' }}>
+                                  Comparativo disponível
+                                </Badge>
+                              </div>
+                              <p className="mb-0" style={{
+                                fontSize: '0.875rem',
+                                color: '#6c757d'
+                              }}>
+                                Pesquisa especial com mais de 9 mil entrevistados
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              style={{
+                                minWidth: '100px',
+                                marginLeft: '16px'
+                              }}
+                            >
+                              Acessar
+                            </Button>
+                          </div>
+                        </Card.Body>
+                      </Card>
+
+                      {/* Card Rodada 13 - Onda 1 */}
                       <Card
                         className="special-survey-card"
-                        onClick={handleSpecialSurveyClick}
+                        onClick={() => navigate('/pesquisa-ampliada/f2f/rodada-13')}
                         style={{
                           cursor: 'pointer',
                           border: '1px solid #dee2e6',
@@ -367,13 +425,13 @@ export default function ThemeQuestionsPage() {
                                 fontWeight: '600',
                                 color: '#212529'
                               }}>
-                                F2F Brasil - Pesquisa Ampliada - Onda 2 - Rodada 16
+                                F2F Brasil - Pesquisa Ampliada - Onda 1 - Rodada 13
                               </h6>
                               <p className="mb-0" style={{
                                 fontSize: '0.875rem',
                                 color: '#6c757d'
                               }}>
-                                Pesquisa especial com mais de 9 mil entrevistados
+                                Primeira onda da pesquisa ampliada
                               </p>
                             </div>
                             <Button
@@ -392,7 +450,8 @@ export default function ThemeQuestionsPage() {
                     </section>
                   )}
 
-                  {filteredTextGrouped.length > 0 && (
+                  {/* Perguntas Individuais - Ocultar para F2F */}
+                  {filteredTextGrouped.length > 0 && themeSlug !== 'popularidade-face-a-face' && (
                     <section>
                       <div className="question-group-header">
                         <FileText />
@@ -432,7 +491,8 @@ export default function ThemeQuestionsPage() {
                     </section>
                   )}
 
-                  {filteredMultiple.length > 0 && (
+                  {/* Perguntas de Matriz - Ocultar para F2F */}
+                  {filteredMultiple.length > 0 && themeSlug !== 'popularidade-face-a-face' && (
                     <section>
                       <div className="question-group-header">
                         <Layers />

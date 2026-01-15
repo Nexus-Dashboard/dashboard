@@ -1,0 +1,267 @@
+"use client"
+
+import { useState, useMemo, useCallback } from "react"
+import { Container, Row, Col, Button, Alert, Spinner } from "react-bootstrap"
+import { useNavigate, useSearchParams } from "react-router-dom"
+import { useQuery } from "@tanstack/react-query"
+import { ArrowLeft } from "lucide-react"
+import CommonHeader from "../components/CommonHeader"
+import HorizontalBarChart from "../components/dashboard/expanded-survey/HorizontalBarChart"
+import DemographicFilters from "../components/dashboard/expanded-survey/DemographicFilters"
+import { ApiMethods } from "../service/ApiBase"
+import { useExpandedSurveyData } from "../hooks/useExpandedSurveyData"
+import "./ThemeQuestionsPage.css"
+
+export default function ExpandedSurveyDashboardWave1() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  // Obter parâmetros da URL
+  const variables = useMemo(() => {
+    const varsParam = searchParams.get('variables')
+    return varsParam ? JSON.parse(varsParam) : []
+  }, [searchParams])
+
+  const questionText = searchParams.get('questionText') || ''
+  const pageTitle = searchParams.get('pageTitle') || 'Análise de Pergunta'
+
+  // Estado de filtros demográficos
+  const [filters, setFilters] = useState({})
+
+  // Buscar índice de perguntas da Onda 1 para obter labels
+  const { data: indexData, isLoading: indexLoading } = useQuery({
+    queryKey: ["wave1SurveyIndex"],
+    queryFn: ApiMethods.getWave1SurveyIndex,
+    staleTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+  })
+
+  // Buscar dados brutos da Rodada 13 (Onda 1)
+  const { data: rawData, isLoading, error } = useQuery({
+    queryKey: ["wave1SurveyData"],
+    queryFn: ApiMethods.getWave1SurveyData,
+    staleTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+  })
+
+  // Log para debug
+  console.log('Estado das queries Onda 1:', {
+    indexDataExists: !!indexData,
+    rawDataExists: !!rawData,
+    indexLoading,
+    isLoading
+  })
+
+  // Processar dados da Rodada 13 (Onda 1) usando hook customizado
+  const {
+    calculateVariableStats,
+    demographicVariables,
+    isReady
+  } = useExpandedSurveyData(rawData)
+
+  // Criar mapeamento de variável -> label
+  const variableLabels = useMemo(() => {
+    if (!indexData?.data || !Array.isArray(indexData.data)) {
+      console.log('❌ Dados do índice Onda 1 ainda não disponíveis')
+      return {}
+    }
+
+    console.log('✅ Dados do índice Onda 1 carregados:', indexData.data.length, 'perguntas')
+
+    const mapping = {}
+    indexData.data.forEach(question => {
+      if (question.variable && question.label) {
+        mapping[question.variable] = question.label
+      }
+    })
+
+    console.log('✅ Mapeamento de labels criado:', Object.keys(mapping).length, 'variáveis mapeadas')
+    return mapping
+  }, [indexData])
+
+  // Calcular estatísticas para cada variável
+  const chartData = useMemo(() => {
+    console.log('Calculando chartData Onda 1:', { isReady, hasCalculateFunc: !!calculateVariableStats, variables })
+
+    if (!isReady || !calculateVariableStats) {
+      console.log('Aguardando dados ficarem prontos...')
+      return []
+    }
+
+    const results = variables.map(variable => {
+      console.log(`Processando variável: ${variable}`)
+      const label = variableLabels[variable] || ''
+      console.log(`  → Label encontrado: "${label}"`)
+
+      const stats = calculateVariableStats(variable, filters)
+      const statsWithoutFilters = calculateVariableStats(variable, {})
+
+      // Calcular margem de erro
+      const sampleSize = stats?.totalResponses || 0
+      const originalSampleSize = statsWithoutFilters?.totalResponses || 0
+      const marginOfError = sampleSize > 0
+        ? (1.96 * Math.sqrt(0.25 / sampleSize)) * 100
+        : 0
+
+      return {
+        variable,
+        label,
+        stats: stats?.data || [],
+        totalWeight: stats?.totalWeight || 0,
+        totalResponses: sampleSize,
+        originalSampleSize,
+        marginOfError: Math.round(marginOfError * 100) / 100
+      }
+    })
+
+    console.log('ChartData Onda 1 calculado:', results)
+    return results
+  }, [variables, filters, isReady, calculateVariableStats, variableLabels])
+
+  const handleBack = useCallback(() => navigate(-1), [navigate])
+
+  const handleFilterChange = useCallback((newFilters) => {
+    setFilters(newFilters)
+  }, [])
+
+  const handleClearFilters = useCallback(() => {
+    setFilters({})
+  }, [])
+
+  return (
+    <div className="questions-page-wrapper">
+      <CommonHeader />
+
+      <main className="content-area">
+        <Container fluid>
+          <div className="page-title-section">
+            <div className="d-flex align-items-center justify-content-between mb-4">
+              <h1 className="main-title" style={{ margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {pageTitle}
+              </h1>
+              <Button variant="outline-secondary" onClick={handleBack} className="back-button">
+                <ArrowLeft size={16} className="me-2" />
+                Voltar
+              </Button>
+            </div>
+          </div>
+
+          {/* Estado de erro */}
+          {error && (
+            <Alert variant="danger">
+              <Alert.Heading>Erro ao carregar dados</Alert.Heading>
+              <p>{error?.message}</p>
+            </Alert>
+          )}
+
+          {/* Estado de carregamento */}
+          {isLoading && !error && (
+            <div className="loading-state">
+              <Spinner animation="border" variant="primary" />
+              <p className="mt-3 text-muted">Carregando dados da pesquisa...</p>
+            </div>
+          )}
+
+          {/* Dashboard */}
+          {!isLoading && !error && isReady && (
+            <Row>
+              {/* Coluna de Filtros - 25% */}
+              <Col lg={3}>
+                <div style={{ position: 'sticky', top: '20px', height: 'calc(100vh - 200px)' }}>
+                  <DemographicFilters
+                    demographicVariables={demographicVariables}
+                    filters={filters}
+                    onFilterChange={handleFilterChange}
+                    onClearFilters={handleClearFilters}
+                  />
+
+                  {/* Info de filtros ativos */}
+                  {Object.keys(filters).length > 0 && (
+                    <div
+                      style={{
+                        marginTop: '16px',
+                        padding: '16px',
+                        background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                        borderRadius: '12px',
+                        border: '1px solid #90caf9'
+                      }}
+                    >
+                      <p style={{
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: '#1565c0',
+                        margin: 0,
+                        marginBottom: '8px'
+                      }}>
+                        Filtros Ativos
+                      </p>
+                      <p style={{
+                        fontSize: '11px',
+                        color: '#1976d2',
+                        margin: 0
+                      }}>
+                        {Object.values(filters).reduce((sum, arr) => sum + arr.length, 0)} filtro(s) aplicado(s)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </Col>
+
+              {/* Coluna de Gráficos - 75% */}
+              <Col lg={9}>
+                <div className="d-flex flex-column gap-4">
+                  {/* Header informativo */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: '8px',
+                    padding: '16px 20px',
+                    background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+                    borderRadius: '12px',
+                    border: '1px solid #ffcc80'
+                  }}>
+                    <div>
+                      <h5 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#e65100' }}>
+                        Dados da Onda 1 (Rodada 13)
+                      </h5>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#f57c00' }}>
+                        Resultados da primeira onda da pesquisa ampliada
+                      </p>
+                    </div>
+                  </div>
+
+                  {chartData.map((data, idx) => (
+                    <HorizontalBarChart
+                      key={idx}
+                      data={data.stats}
+                      questionText={questionText}
+                      variableName={data.variable}
+                      variableLabel={data.label}
+                      sampleSize={data.totalResponses}
+                      originalSampleSize={data.originalSampleSize}
+                      marginOfError={data.marginOfError}
+                    />
+                  ))}
+
+                  {chartData.length === 0 && (
+                    <div className="empty-state">
+                      <h4>Nenhum gráfico disponível</h4>
+                      <p>Não há dados para exibir com os filtros selecionados.</p>
+                    </div>
+                  )}
+                </div>
+              </Col>
+            </Row>
+          )}
+        </Container>
+      </main>
+
+      <footer className="page-footer">
+        <Container>
+          <p className="mb-0">Dados atualizados em tempo real • Sistema de Monitoramento Secom/PR</p>
+        </Container>
+      </footer>
+    </div>
+  )
+}

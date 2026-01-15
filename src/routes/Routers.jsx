@@ -13,7 +13,10 @@ import UserManagementPage from "../page/UserManagementPage"
 import Upload from "../page/upload"
 import ExpandedSurveyPage from "../page/ExpandedSurveyPage"
 import ExpandedSurveyDashboard from "../page/ExpandedSurveyDashboard"
+import ExpandedSurveyPageWave1 from "../page/ExpandedSurveyPageWave1"
+import ExpandedSurveyDashboardWave1 from "../page/ExpandedSurveyDashboardWave1"
 import OpenQuestionDashboard from "../page/OpenQuestionDashboard"
+import OpenQuestionDashboardWave1 from "../page/OpenQuestionDashboardWave1"
 
 
 // Componente de Rota Protegida
@@ -138,6 +141,31 @@ const Routers = () => (
       element={
         <ProtectedRoute>
           <OpenQuestionDashboard />
+        </ProtectedRoute>
+      }
+    />
+    {/* Rotas para Rodada 13 (Onda 1) */}
+    <Route
+      path="/pesquisa-ampliada/f2f/rodada-13"
+      element={
+        <ProtectedRoute>
+          <ExpandedSurveyPageWave1 />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/pesquisa-ampliada/f2f/rodada-13/dashboard"
+      element={
+        <ProtectedRoute>
+          <ExpandedSurveyDashboardWave1 />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/pesquisa-ampliada/f2f/rodada-13/dashboard/open"
+      element={
+        <ProtectedRoute>
+          <OpenQuestionDashboardWave1 />
         </ProtectedRoute>
       }
     />
