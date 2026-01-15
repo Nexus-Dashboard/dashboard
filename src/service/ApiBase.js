@@ -226,6 +226,76 @@ export const ApiMethods = {
       throw error
     }
   },
+
+  // NOVO: Buscar índice de perguntas da Rodada 13 (Onda 1)
+  // O índice está na mesma planilha da Rodada 16, apenas filtrado por número da pesquisa
+  getWave1SurveyIndex: async () => {
+    try {
+      const response = await axios.get(
+        "https://nmbcoamazonia-api.vercel.app/google/sheets/1pcJqXSzEzqNYWMdThadgmt3FDib5V5gzZz2DSeXg1AU/data"
+      )
+
+      if (!response.data?.success) {
+        throw new Error("Erro ao buscar índice da Rodada 13 (Onda 1)")
+      }
+
+      const values = response.data.data.values
+
+      // Filtrar linhas da rodada 13 (mesmo índice que a Rodada 16)
+      const round13Questions = values.slice(1).filter(row => {
+        const roundNumber = row[0] // "Número da Pesquisa" está na primeira coluna
+        return roundNumber === "13"
+      })
+
+      // Mapear para objetos estruturados (mesma estrutura da Rodada 16)
+      const questions = round13Questions.map(row => ({
+        surveyNumber: row[0],
+        fileName: row[1],
+        variable: row[2],
+        questionText: row[3],
+        label: row[5],
+        index: row[6],
+        methodology: row[7],
+        map: row[8],
+        sample: row[9],
+        date: row[10],
+      }))
+
+      return {
+        success: true,
+        data: questions
+      }
+    } catch (error) {
+      console.error("Erro ao buscar índice da Rodada 13:", error)
+      throw error
+    }
+  },
+
+  // NOVO: Buscar dados brutos da Rodada 13 (Onda 1)
+  getWave1SurveyData: async () => {
+    try {
+      const response = await axios.get(
+        "https://nmbcoamazonia-api.vercel.app/google/sheets/1VkyGtH11Ghl6H9USVfWOrQUOCyy8tO-L65936Jz3BQA/data",
+        {
+          params: {
+            range: "BD SECOM - F2F - PESQUISA AMPLI"
+          }
+        }
+      )
+
+      if (!response.data?.success) {
+        throw new Error("Erro ao buscar dados da Rodada 13 (Onda 1)")
+      }
+
+      return {
+        success: true,
+        data: response.data.data
+      }
+    } catch (error) {
+      console.error("Erro ao buscar dados da Rodada 13:", error)
+      throw error
+    }
+  },
 }
 
 export default ApiBase

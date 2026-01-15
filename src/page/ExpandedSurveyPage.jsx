@@ -4,7 +4,7 @@ import { useMemo, useCallback } from "react"
 import { Container, Card, Button, Alert, Spinner, Badge } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, TrendingUp } from "lucide-react"
 import CommonHeader from "../components/CommonHeader"
 import { ApiMethods } from "../service/ApiBase"
 import { RESPONSE_ORDER } from "../utils/chartUtils"
@@ -13,7 +13,7 @@ import "./ThemeQuestionsPage.css"
 export default function ExpandedSurveyPage() {
   const navigate = useNavigate()
 
-  // Buscar índice de perguntas da Rodada 16
+  // Buscar índice de perguntas da Rodada 16 (Onda 2)
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["expandedSurveyIndex"],
     queryFn: ApiMethods.getExpandedSurveyIndex,
@@ -21,11 +21,27 @@ export default function ExpandedSurveyPage() {
     refetchOnWindowFocus: false,
   })
 
-  // Buscar dados brutos para extrair respostas possíveis
+  // Buscar índice de perguntas da Rodada 13 (Onda 1)
+  const { data: wave1Index, isLoading: isLoadingWave1Index } = useQuery({
+    queryKey: ["wave1SurveyIndex"],
+    queryFn: ApiMethods.getWave1SurveyIndex,
+    staleTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+  })
+
+  // Buscar dados brutos da Rodada 16 (Onda 2)
   const { data: rawData, isLoading: isLoadingRawData } = useQuery({
     queryKey: ["expandedSurveyData"],
     queryFn: ApiMethods.getExpandedSurveyData,
     staleTime: 1000 * 60 * 30, // 30 minutos
+    refetchOnWindowFocus: false,
+  })
+
+  // Buscar dados brutos da Rodada 13 (Onda 1)
+  const { data: wave1RawData, isLoading: isLoadingWave1Data } = useQuery({
+    queryKey: ["wave1SurveyData"],
+    queryFn: ApiMethods.getWave1SurveyData,
+    staleTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
   })
 
@@ -81,6 +97,26 @@ export default function ExpandedSurveyPage() {
 
     return map
   }, [rawData])
+
+  // Criar mapeamento de perguntas da Onda 1 por variável
+  const wave1QuestionsMap = useMemo(() => {
+    if (!wave1Index?.data) {
+      console.log('⚠️ wave1Index não disponível ainda')
+      return new Map()
+    }
+
+    const map = new Map()
+    wave1Index.data.forEach(q => {
+      if (q.variable) {
+        map.set(q.variable, q)
+      }
+    })
+
+    console.log('✅ Wave1 Questions Map criado:', map.size, 'variáveis')
+    console.log('   Primeiras 10 variáveis:', [...map.keys()].slice(0, 10))
+
+    return map
+  }, [wave1Index])
 
   // Agrupar perguntas idênticas com rótulos diferentes
   const filteredQuestions = useMemo(() => {
@@ -155,6 +191,8 @@ export default function ExpandedSurveyPage() {
           methodology: question.methodology,
           date: question.date,
           possibleResponses: [], // NOVO: respostas possíveis
+          hasWaveComparison: false, // NOVO: indica se tem comparação entre ondas
+          wave1Variables: [], // NOVO: variáveis da Onda 1 correspondentes
         })
       }
 
@@ -173,6 +211,17 @@ export default function ExpandedSurveyPage() {
               group.possibleResponses.push(resp)
             }
           })
+        }
+
+        // NOVO: Verificar se a variável existe na Onda 1
+        if (wave1QuestionsMap.has(question.variable)) {
+          if (!group.hasWaveComparison) {
+            console.log(`✅ Variável ${question.variable} existe em ambas as ondas`)
+          }
+          group.hasWaveComparison = true
+          if (!group.wave1Variables.includes(question.variable)) {
+            group.wave1Variables.push(question.variable)
+          }
         }
       }
 
@@ -205,8 +254,16 @@ export default function ExpandedSurveyPage() {
       return (a.variables[0] || "").localeCompare(b.variables[0] || "")
     })
 
+    // Log de resumo
+    const withComparison = questionsArray.filter(q => q.hasWaveComparison)
+    console.log(`📊 Total de perguntas: ${questionsArray.length}`)
+    console.log(`📊 Com comparação entre ondas: ${withComparison.length}`)
+    if (withComparison.length > 0) {
+      console.log('   Primeiras 5 com comparação:', withComparison.slice(0, 5).map(q => q.variables[0]))
+    }
+
     return questionsArray
-  }, [data, responsesMap])
+  }, [data, responsesMap, wave1QuestionsMap])
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
 
@@ -214,7 +271,9 @@ export default function ExpandedSurveyPage() {
     const params = new URLSearchParams({
       variables: JSON.stringify(question.variables),
       questionText: question.questionText,
-      pageTitle: "F2F Brasil - Pesquisa Ampliada - Rodada 16"
+      pageTitle: "F2F Brasil - Pesquisa Ampliada - Rodada 16",
+      hasWaveComparison: question.hasWaveComparison ? "true" : "false",
+      wave1Variables: JSON.stringify(question.wave1Variables || [])
     })
 
     // Verificar se é pergunta aberta (sem possibleResponses ou com muitas respostas)
@@ -260,21 +319,21 @@ export default function ExpandedSurveyPage() {
           )}
 
           {/* Estado de carregamento */}
-          {(isLoading || isLoadingRawData) && !error && (
+          {(isLoading || isLoadingRawData || isLoadingWave1Index || isLoadingWave1Data) && !error && (
             <div className="loading-state">
               <Spinner animation="border" variant="primary" />
               <p className="mt-3 text-muted">
-                {isLoading && isLoadingRawData
-                  ? "Carregando perguntas e processando respostas..."
-                  : isLoading
-                  ? "Carregando perguntas da pesquisa ampliada..."
-                  : "Processando respostas possíveis..."}
+                {isLoading || isLoadingWave1Index
+                  ? "Carregando perguntas das pesquisas (Onda 1 e 2)..."
+                  : isLoadingRawData || isLoadingWave1Data
+                  ? "Processando respostas possíveis..."
+                  : "Carregando dados..."}
               </p>
             </div>
           )}
 
           {/* Lista de perguntas */}
-          {!isLoading && !isLoadingRawData && !error && (
+          {!isLoading && !isLoadingRawData && !isLoadingWave1Index && !isLoadingWave1Data && !error && (
             <>
               {filteredQuestions.length === 0 ? (
                 <div className="empty-state">
@@ -327,6 +386,24 @@ export default function ExpandedSurveyPage() {
                                 {variable}
                               </Badge>
                             ))}
+                            {/* Badge de comparação entre ondas */}
+                            {question.hasWaveComparison && (
+                              <Badge
+                                bg="success"
+                                style={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: '500',
+                                  padding: '4px 10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  backgroundColor: '#198754'
+                                }}
+                              >
+                                <TrendingUp size={12} />
+                                Comparativo Onda 1 x 2
+                              </Badge>
+                            )}
                           </div>
 
                           {/* Texto da pergunta */}

@@ -4,9 +4,10 @@ import { useState, useMemo, useCallback } from "react"
 import { Container, Row, Col, Button, Alert, Spinner } from "react-bootstrap"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, TrendingUp } from "lucide-react"
 import CommonHeader from "../components/CommonHeader"
 import HorizontalBarChart from "../components/dashboard/expanded-survey/HorizontalBarChart"
+import WaveComparisonChart from "../components/dashboard/expanded-survey/WaveComparisonChart"
 import DemographicFilters from "../components/dashboard/expanded-survey/DemographicFilters"
 import { ApiMethods } from "../service/ApiBase"
 import { useExpandedSurveyData } from "../hooks/useExpandedSurveyData"
@@ -25,6 +26,21 @@ export default function ExpandedSurveyDashboard() {
   const questionText = searchParams.get('questionText') || ''
   const pageTitle = searchParams.get('pageTitle') || 'Análise de Pergunta'
 
+  // NOVO: Parâmetros de comparação entre ondas
+  const hasWaveComparison = searchParams.get('hasWaveComparison') === 'true'
+  const wave1Variables = useMemo(() => {
+    const varsParam = searchParams.get('wave1Variables')
+    return varsParam ? JSON.parse(varsParam) : []
+  }, [searchParams])
+
+  // Log dos parâmetros de comparação
+  console.log('🔍 Parâmetros de comparação:', {
+    hasWaveComparison,
+    wave1Variables,
+    rawHasWaveComparison: searchParams.get('hasWaveComparison'),
+    rawWave1Variables: searchParams.get('wave1Variables')
+  })
+
   // Estado de filtros demográficos
   const [filters, setFilters] = useState({})
 
@@ -36,12 +52,21 @@ export default function ExpandedSurveyDashboard() {
     refetchOnWindowFocus: false,
   })
 
-  // Buscar dados brutos (são os mesmos dados!)
+  // Buscar dados brutos da Rodada 16 (Onda 2)
   const { data: rawData, isLoading, error } = useQuery({
     queryKey: ["expandedSurveyData"],
     queryFn: ApiMethods.getExpandedSurveyData,
     staleTime: 1000 * 60 * 30, // 30 minutos
     refetchOnWindowFocus: false,
+  })
+
+  // NOVO: Buscar dados brutos da Rodada 13 (Onda 1) - apenas se tiver comparação
+  const { data: wave1RawData, isLoading: isLoadingWave1 } = useQuery({
+    queryKey: ["wave1SurveyData"],
+    queryFn: ApiMethods.getWave1SurveyData,
+    staleTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+    enabled: hasWaveComparison, // Só busca se tiver comparação
   })
 
   // Log para debug
@@ -52,12 +77,18 @@ export default function ExpandedSurveyDashboard() {
     isLoading
   })
 
-  // Processar dados usando hook customizado
+  // Processar dados da Rodada 16 (Onda 2) usando hook customizado
   const {
     calculateVariableStats,
     demographicVariables,
     isReady
   } = useExpandedSurveyData(rawData)
+
+  // NOVO: Processar dados da Rodada 13 (Onda 1)
+  const {
+    calculateVariableStats: calculateWave1Stats,
+    isReady: isWave1Ready
+  } = useExpandedSurveyData(wave1RawData)
 
   // Criar mapeamento de variável -> label
   const variableLabels = useMemo(() => {
@@ -75,7 +106,6 @@ export default function ExpandedSurveyDashboard() {
     indexData.data.forEach(question => {
       if (question.variable && question.label) {
         mapping[question.variable] = question.label
-        console.log(`  Mapeando ${question.variable} → ${question.label}`)
       }
     })
 
@@ -123,6 +153,49 @@ export default function ExpandedSurveyDashboard() {
     return results
   }, [variables, filters, isReady, calculateVariableStats, variableLabels])
 
+  // NOVO: Calcular estatísticas de comparação entre ondas
+  const waveComparisonData = useMemo(() => {
+    console.log('🔄 Calculando waveComparisonData:', {
+      hasWaveComparison,
+      wave1Variables,
+      isWave1Ready,
+      hasCalculateWave1Stats: !!calculateWave1Stats,
+      isReady,
+      hasCalculateVariableStats: !!calculateVariableStats
+    })
+
+    if (!hasWaveComparison || !isWave1Ready || !calculateWave1Stats || !isReady || !calculateVariableStats) {
+      console.log('❌ Condições não atendidas para calcular comparação')
+      return []
+    }
+
+    // Para cada variável que existe em ambas as ondas
+    const results = wave1Variables.map(variable => {
+      const label = variableLabels[variable] || ''
+
+      // Estatísticas da Onda 1 (sem filtros, para ter o total)
+      const wave1Stats = calculateWave1Stats(variable, {})
+
+      // Estatísticas da Onda 2 (sem filtros)
+      const wave2Stats = calculateVariableStats(variable, {})
+
+      console.log(`📈 Comparação para ${variable}:`, {
+        wave1Stats: wave1Stats?.data?.length || 0,
+        wave2Stats: wave2Stats?.data?.length || 0
+      })
+
+      return {
+        variable,
+        label,
+        wave1Stats: wave1Stats?.data || [],
+        wave2Stats: wave2Stats?.data || [],
+      }
+    })
+
+    console.log('✅ waveComparisonData calculado:', results.length, 'variáveis')
+    return results
+  }, [hasWaveComparison, wave1Variables, isWave1Ready, calculateWave1Stats, isReady, calculateVariableStats, variableLabels])
+
   const handleBack = useCallback(() => navigate(-1), [navigate])
 
   const handleFilterChange = useCallback((newFilters) => {
@@ -160,10 +233,14 @@ export default function ExpandedSurveyDashboard() {
           )}
 
           {/* Estado de carregamento */}
-          {isLoading && !error && (
+          {(isLoading || (hasWaveComparison && isLoadingWave1)) && !error && (
             <div className="loading-state">
               <Spinner animation="border" variant="primary" />
-              <p className="mt-3 text-muted">Carregando dados da pesquisa...</p>
+              <p className="mt-3 text-muted">
+                {hasWaveComparison
+                  ? "Carregando dados das pesquisas (Onda 1 e 2)..."
+                  : "Carregando dados da pesquisa..."}
+              </p>
             </div>
           )}
 
@@ -215,6 +292,65 @@ export default function ExpandedSurveyDashboard() {
               {/* Coluna de Gráficos - 75% */}
               <Col lg={9}>
                 <div className="d-flex flex-column gap-4">
+                  {/* NOVO: Gráficos de comparação entre ondas */}
+                  {hasWaveComparison && waveComparisonData.length > 0 && (
+                    <>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        marginBottom: '8px',
+                        padding: '16px 20px',
+                        background: 'linear-gradient(135deg, #d1e7dd 0%, #badbcc 100%)',
+                        borderRadius: '12px',
+                        border: '1px solid #a3cfbb'
+                      }}>
+                        <TrendingUp size={24} color="#198754" />
+                        <div>
+                          <h5 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#146c43' }}>
+                            Comparativo entre Ondas
+                          </h5>
+                          <p style={{ margin: 0, fontSize: '13px', color: '#198754' }}>
+                            Análise da variação das respostas entre a Onda 1 (Rodada 13) e Onda 2 (Rodada 16)
+                          </p>
+                        </div>
+                      </div>
+
+                      {waveComparisonData.map((data, idx) => (
+                        <WaveComparisonChart
+                          key={`wave-comparison-${idx}`}
+                          wave1Stats={data.wave1Stats}
+                          wave2Stats={data.wave2Stats}
+                          questionText={questionText}
+                          variableName={data.variable}
+                          variableLabel={data.label}
+                        />
+                      ))}
+
+                      <hr style={{ margin: '24px 0', borderColor: '#dee2e6' }} />
+
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        marginBottom: '8px',
+                        padding: '16px 20px',
+                        background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                        borderRadius: '12px',
+                        border: '1px solid #90caf9'
+                      }}>
+                        <div>
+                          <h5 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#1565c0' }}>
+                            Dados da Onda 2 (Rodada 16)
+                          </h5>
+                          <p style={{ margin: 0, fontSize: '13px', color: '#1976d2' }}>
+                            Resultados detalhados da pesquisa atual com filtros demográficos
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   {chartData.map((data, idx) => (
                     <HorizontalBarChart
                       key={idx}
