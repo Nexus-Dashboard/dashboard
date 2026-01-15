@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useCallback } from "react"
 import { DEMOGRAPHIC_R16 } from "../utils/demographicUtils"
 
 /**
@@ -223,10 +223,83 @@ export const useExpandedSurveyData = (rawData) => {
     return demographicList
   }, [processedData])
 
+  // NOVO: Função para calcular estatísticas com rows pré-filtradas
+  // Útil para filtros unificados entre ondas
+  const calculateVariableStatsWithRows = useCallback((variableName, filteredRows) => {
+    if (!processedData) return null
+
+    const { headerIndexMap } = processedData
+
+    if (!headerIndexMap.has(variableName)) {
+      console.warn(`Variável ${variableName} não encontrada nos dados`)
+      return null
+    }
+
+    // Calcular estatísticas com pesos
+    const responseCounts = new Map()
+    let totalWeight = 0
+
+    // Buscar a coluna de peso
+    const allKeys = Object.keys(filteredRows[0] || {})
+    const weightKey = allKeys.find(key => {
+      const lowerKey = key.toLowerCase()
+      return lowerKey === 'weights' ||
+             lowerKey === 'weight' ||
+             lowerKey === 'peso' ||
+             lowerKey === 'pesos' ||
+             lowerKey.includes('weight') ||
+             lowerKey.includes('peso')
+    })
+
+    filteredRows.forEach(row => {
+      const response = row[variableName]
+
+      if (!response || response.trim() === '') return
+
+      let trimmedResponse = response.trim()
+      if (trimmedResponse === '#NULL!' || trimmedResponse === '#NULL' || trimmedResponse === '#null') return
+      if (trimmedResponse === '-1') return
+
+      const lowerResponse = trimmedResponse.toLowerCase()
+      if (lowerResponse.includes('não sabe') || lowerResponse.includes('não respondeu')) {
+        trimmedResponse = 'NS/NR'
+      }
+
+      let weight = 1
+      if (weightKey && row[weightKey]) {
+        const weightStr = String(row[weightKey]).replace(',', '.')
+        weight = parseFloat(weightStr) || 1
+      }
+
+      const currentCount = responseCounts.get(trimmedResponse) || 0
+      responseCounts.set(trimmedResponse, currentCount + weight)
+      totalWeight += weight
+    })
+
+    const stats = Array.from(responseCounts.entries()).map(([response, weightSum]) => ({
+      response,
+      count: weightSum,
+      percentage: totalWeight > 0 ? (weightSum / totalWeight) * 100 : 0
+    }))
+
+    return {
+      data: stats,
+      totalWeight,
+      totalResponses: totalWeight
+    }
+  }, [processedData])
+
+  // NOVO: Retornar os rows processados para uso em filtros unificados
+  const getProcessedRows = useCallback(() => {
+    return processedData?.rows || []
+  }, [processedData])
+
   return {
     processedData,
     calculateVariableStats,
+    calculateVariableStatsWithRows,
     demographicVariables: getDemographicVariables,
+    getProcessedRows,
     isReady: !!processedData
   }
 }

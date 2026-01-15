@@ -20,6 +20,10 @@ export default function WaveComparisonChart({
   questionText,
   variableName,
   variableLabel,
+  wave1SampleSize,
+  wave2SampleSize,
+  wave1MarginOfError,
+  wave2MarginOfError,
 }) {
   // Processar dados para o gráfico de linhas
   const chartData = useMemo(() => {
@@ -248,6 +252,40 @@ export default function WaveComparisonChart({
             }}>
               {variableLabel}
             </p>
+          )}
+          {/* Informações de amostra */}
+          {(wave1SampleSize || wave2SampleSize) && (
+            <div style={{
+              display: 'flex',
+              gap: '16px',
+              marginTop: '12px',
+              flexWrap: 'wrap'
+            }}>
+              {wave1SampleSize > 0 && (
+                <div style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  color: 'rgba(255,255,255,0.9)'
+                }}>
+                  <strong>Onda 1:</strong> n={Math.round(wave1SampleSize).toLocaleString('pt-BR')}
+                  {wave1MarginOfError > 0 && ` (±${wave1MarginOfError.toFixed(1)}pp)`}
+                </div>
+              )}
+              {wave2SampleSize > 0 && (
+                <div style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  color: 'rgba(255,255,255,0.9)'
+                }}>
+                  <strong>Onda 2:</strong> n={Math.round(wave2SampleSize).toLocaleString('pt-BR')}
+                  {wave2MarginOfError > 0 && ` (±${wave2MarginOfError.toFixed(1)}pp)`}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </Card.Header>

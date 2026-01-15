@@ -11,6 +11,7 @@ import WaveComparisonChart from "../components/dashboard/expanded-survey/WaveCom
 import DemographicFilters from "../components/dashboard/expanded-survey/DemographicFilters"
 import { ApiMethods } from "../service/ApiBase"
 import { useExpandedSurveyData } from "../hooks/useExpandedSurveyData"
+import { applyUnifiedFilters } from "../utils/waveComparisonUtils"
 import "./ThemeQuestionsPage.css"
 
 export default function ExpandedSurveyDashboard() {
@@ -80,13 +81,16 @@ export default function ExpandedSurveyDashboard() {
   // Processar dados da Rodada 16 (Onda 2) usando hook customizado
   const {
     calculateVariableStats,
+    calculateVariableStatsWithRows,
     demographicVariables,
+    getProcessedRows: getWave2Rows,
     isReady
   } = useExpandedSurveyData(rawData)
 
   // NOVO: Processar dados da Rodada 13 (Onda 1)
   const {
-    calculateVariableStats: calculateWave1Stats,
+    calculateVariableStatsWithRows: calculateWave1StatsWithRows,
+    getProcessedRows: getWave1Rows,
     isReady: isWave1Ready
   } = useExpandedSurveyData(wave1RawData)
 
@@ -153,18 +157,43 @@ export default function ExpandedSurveyDashboard() {
     return results
   }, [variables, filters, isReady, calculateVariableStats, variableLabels])
 
-  // NOVO: Calcular estatísticas de comparação entre ondas
+  // NOVO: Aplicar filtros unificados em ambas as ondas
+  const unifiedFilteredData = useMemo(() => {
+    if (!isReady) return { wave1Rows: [], wave2Rows: [] }
+
+    const wave1Rows = hasWaveComparison && isWave1Ready ? getWave1Rows() : []
+    const wave2Rows = getWave2Rows()
+
+    // Aplicar filtros em ambas as ondas
+    const filtered = applyUnifiedFilters(
+      filters,
+      { rows: wave1Rows },
+      { rows: wave2Rows }
+    )
+
+    console.log('🔄 Filtros unificados aplicados:', {
+      wave1Total: wave1Rows.length,
+      wave1Filtered: filtered.wave1Rows.length,
+      wave2Total: wave2Rows.length,
+      wave2Filtered: filtered.wave2Rows.length,
+      filtersApplied: Object.keys(filters).length
+    })
+
+    return filtered
+  }, [filters, isReady, isWave1Ready, hasWaveComparison, getWave1Rows, getWave2Rows])
+
+  // NOVO: Calcular estatísticas de comparação entre ondas COM FILTROS UNIFICADOS
   const waveComparisonData = useMemo(() => {
     console.log('🔄 Calculando waveComparisonData:', {
       hasWaveComparison,
       wave1Variables,
       isWave1Ready,
-      hasCalculateWave1Stats: !!calculateWave1Stats,
+      hasCalculateWave1StatsWithRows: !!calculateWave1StatsWithRows,
       isReady,
-      hasCalculateVariableStats: !!calculateVariableStats
+      hasCalculateVariableStatsWithRows: !!calculateVariableStatsWithRows
     })
 
-    if (!hasWaveComparison || !isWave1Ready || !calculateWave1Stats || !isReady || !calculateVariableStats) {
+    if (!hasWaveComparison || !isWave1Ready || !calculateWave1StatsWithRows || !isReady || !calculateVariableStatsWithRows) {
       console.log('❌ Condições não atendidas para calcular comparação')
       return []
     }
@@ -173,15 +202,29 @@ export default function ExpandedSurveyDashboard() {
     const results = wave1Variables.map(variable => {
       const label = variableLabels[variable] || ''
 
-      // Estatísticas da Onda 1 (sem filtros, para ter o total)
-      const wave1Stats = calculateWave1Stats(variable, {})
+      // Estatísticas da Onda 1 COM FILTROS UNIFICADOS
+      const wave1Stats = calculateWave1StatsWithRows(variable, unifiedFilteredData.wave1Rows)
 
-      // Estatísticas da Onda 2 (sem filtros)
-      const wave2Stats = calculateVariableStats(variable, {})
+      // Estatísticas da Onda 2 COM FILTROS UNIFICADOS
+      const wave2Stats = calculateVariableStatsWithRows(variable, unifiedFilteredData.wave2Rows)
+
+      // Calcular margem de erro para cada onda
+      const wave1SampleSize = wave1Stats?.totalResponses || 0
+      const wave2SampleSize = wave2Stats?.totalResponses || 0
+
+      const wave1MarginOfError = wave1SampleSize > 0
+        ? (1.96 * Math.sqrt(0.25 / wave1SampleSize)) * 100
+        : 0
+
+      const wave2MarginOfError = wave2SampleSize > 0
+        ? (1.96 * Math.sqrt(0.25 / wave2SampleSize)) * 100
+        : 0
 
       console.log(`📈 Comparação para ${variable}:`, {
         wave1Stats: wave1Stats?.data?.length || 0,
-        wave2Stats: wave2Stats?.data?.length || 0
+        wave2Stats: wave2Stats?.data?.length || 0,
+        wave1SampleSize,
+        wave2SampleSize
       })
 
       return {
@@ -189,12 +232,16 @@ export default function ExpandedSurveyDashboard() {
         label,
         wave1Stats: wave1Stats?.data || [],
         wave2Stats: wave2Stats?.data || [],
+        wave1SampleSize,
+        wave2SampleSize,
+        wave1MarginOfError: Math.round(wave1MarginOfError * 100) / 100,
+        wave2MarginOfError: Math.round(wave2MarginOfError * 100) / 100,
       }
     })
 
     console.log('✅ waveComparisonData calculado:', results.length, 'variáveis')
     return results
-  }, [hasWaveComparison, wave1Variables, isWave1Ready, calculateWave1Stats, isReady, calculateVariableStats, variableLabels])
+  }, [hasWaveComparison, wave1Variables, isWave1Ready, calculateWave1StatsWithRows, isReady, calculateVariableStatsWithRows, variableLabels, unifiedFilteredData])
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
 
@@ -324,6 +371,10 @@ export default function ExpandedSurveyDashboard() {
                           questionText={questionText}
                           variableName={data.variable}
                           variableLabel={data.label}
+                          wave1SampleSize={data.wave1SampleSize}
+                          wave2SampleSize={data.wave2SampleSize}
+                          wave1MarginOfError={data.wave1MarginOfError}
+                          wave2MarginOfError={data.wave2MarginOfError}
                         />
                       ))}
 

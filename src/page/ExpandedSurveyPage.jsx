@@ -4,10 +4,11 @@ import { useMemo, useCallback } from "react"
 import { Container, Card, Button, Alert, Spinner, Badge } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, TrendingUp } from "lucide-react"
+import { ArrowLeft, TrendingUp, AlertCircle } from "lucide-react"
 import CommonHeader from "../components/CommonHeader"
 import { ApiMethods } from "../service/ApiBase"
 import { RESPONSE_ORDER } from "../utils/chartUtils"
+import { validateWaveCompatibility } from "../utils/waveComparisonUtils"
 import "./ThemeQuestionsPage.css"
 
 export default function ExpandedSurveyPage() {
@@ -97,6 +98,46 @@ export default function ExpandedSurveyPage() {
 
     return map
   }, [rawData])
+
+  // NOVO: Processar respostas possíveis dos dados brutos da Onda 1
+  const wave1ResponsesMap = useMemo(() => {
+    if (!wave1RawData?.data?.values) return new Map()
+
+    const map = new Map()
+    const values = wave1RawData.data.values
+    const headers = values[0]
+
+    headers.forEach((header, columnIndex) => {
+      if (!header) return
+
+      const uniqueResponses = new Set()
+
+      for (let i = 1; i < values.length; i++) {
+        const response = values[i][columnIndex]
+        if (response && response.trim() !== '' && response.trim() !== '#NULL!' && response.trim() !== '-1') {
+          uniqueResponses.add(response.trim())
+        }
+      }
+
+      const responsesArray = Array.from(uniqueResponses)
+
+      responsesArray.sort((a, b) => {
+        const indexA = RESPONSE_ORDER.indexOf(a)
+        const indexB = RESPONSE_ORDER.indexOf(b)
+        if (indexA >= 0 && indexB >= 0) return indexA - indexB
+        if (indexA >= 0) return -1
+        if (indexB >= 0) return 1
+        return a.localeCompare(b)
+      })
+
+      if (responsesArray.length > 0 && responsesArray.length <= 10) {
+        map.set(header, responsesArray)
+      }
+    })
+
+    console.log('✅ Wave1 Responses Map criado:', map.size, 'variáveis')
+    return map
+  }, [wave1RawData])
 
   // Criar mapeamento de perguntas da Onda 1 por variável
   const wave1QuestionsMap = useMemo(() => {
@@ -213,14 +254,53 @@ export default function ExpandedSurveyPage() {
           })
         }
 
-        // NOVO: Verificar se a variável existe na Onda 1
+        // NOVO: Validação completa de compatibilidade entre ondas
+        // Critérios: mesmo índice, mesma pergunta, mesmas respostas
         if (wave1QuestionsMap.has(question.variable)) {
-          if (!group.hasWaveComparison) {
-            console.log(`✅ Variável ${question.variable} existe em ambas as ondas`)
-          }
-          group.hasWaveComparison = true
-          if (!group.wave1Variables.includes(question.variable)) {
-            group.wave1Variables.push(question.variable)
+          const wave1Question = wave1QuestionsMap.get(question.variable)
+          const wave2Responses = responsesMap.get(question.variable) || []
+          const wave1Responses = wave1ResponsesMap.get(question.variable) || []
+
+          const validation = validateWaveCompatibility(
+            wave1Question,
+            question,
+            wave1Responses,
+            wave2Responses
+          )
+
+          if (validation.isCompatible) {
+            if (!group.hasWaveComparison) {
+              console.log(`✅ Variável ${question.variable} é compatível entre ondas:`, {
+                sameQuestion: validation.checks.sameQuestion,
+                sameResponses: validation.checks.sameResponses
+              })
+            }
+            group.hasWaveComparison = true
+            if (!group.wave1Variables.includes(question.variable)) {
+              group.wave1Variables.push(question.variable)
+            }
+            // Armazenar detalhes da validação para exibição
+            if (!group.waveValidationDetails) {
+              group.waveValidationDetails = []
+            }
+            group.waveValidationDetails.push({
+              variable: question.variable,
+              ...validation
+            })
+          } else {
+            console.log(`⚠️ Variável ${question.variable} NÃO é compatível:`, {
+              sameQuestion: validation.checks.sameQuestion,
+              sameResponses: validation.checks.sameResponses,
+              details: validation.details
+            })
+            // Armazenar incompatibilidade para possível exibição
+            if (!group.waveIncompatibilityDetails) {
+              group.waveIncompatibilityDetails = []
+            }
+            group.waveIncompatibilityDetails.push({
+              variable: question.variable,
+              ...validation
+            })
           }
         }
       }
@@ -263,7 +343,7 @@ export default function ExpandedSurveyPage() {
     }
 
     return questionsArray
-  }, [data, responsesMap, wave1QuestionsMap])
+  }, [data, responsesMap, wave1QuestionsMap, wave1ResponsesMap])
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
 
