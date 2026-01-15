@@ -3,32 +3,20 @@
  */
 
 /**
- * Valida se duas perguntas são comparáveis entre ondas
- * Critérios:
- * 1. Mesmo texto da pergunta (vindo do índice)
- * 2. Mesmas opções de resposta (vindas da base de dados)
+ * Valida se as respostas de duas ondas são compatíveis para comparação
+ * Critério: Mesmas opções de resposta (vindas da base de dados)
  *
- * @param {Object} wave1Question - Pergunta da Onda 1 (do índice)
- * @param {Object} wave2Question - Pergunta da Onda 2 (do índice)
  * @param {Array} wave1Responses - Respostas possíveis da Onda 1 (da base)
  * @param {Array} wave2Responses - Respostas possíveis da Onda 2 (da base)
  * @returns {Object} Resultado da validação
  */
 export const validateWaveCompatibility = (
-  wave1Question,
-  wave2Question,
   wave1Responses = [],
   wave2Responses = []
 ) => {
   const result = {
     isCompatible: false,
-    checks: {
-      sameQuestion: false,
-      sameResponses: false,
-    },
     details: {
-      wave1QuestionText: null,
-      wave2QuestionText: null,
       wave1Responses: [],
       wave2Responses: [],
       missingInWave1: [],
@@ -36,28 +24,7 @@ export const validateWaveCompatibility = (
     }
   }
 
-  if (!wave1Question || !wave2Question) {
-    return result
-  }
-
-  // 1. Verificar se é a mesma pergunta (normalizado)
-  const normalizeText = (text) => {
-    if (!text) return ''
-    return text
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, ' ')
-      .replace(/[.,;:!?]/g, '')
-  }
-
-  const wave1Text = normalizeText(wave1Question.questionText)
-  const wave2Text = normalizeText(wave2Question.questionText)
-
-  result.details.wave1QuestionText = wave1Question.questionText
-  result.details.wave2QuestionText = wave2Question.questionText
-  result.checks.sameQuestion = wave1Text === wave2Text
-
-  // 2. Verificar se as respostas são as mesmas
+  // Normalizar respostas para comparação
   const normalizeResponse = (response) => {
     if (!response) return ''
     return response.toLowerCase().trim()
@@ -95,12 +62,8 @@ export const validateWaveCompatibility = (
   const sameSize = wave1Filtered.length === wave2Filtered.length
   const allMatch = wave1Filtered.every(r => wave2Filtered.includes(r))
 
-  result.checks.sameResponses = sameSize && allMatch
-
-  // Compatível se passar nos dois checks: mesmo título e mesmas respostas
-  result.isCompatible =
-    result.checks.sameQuestion &&
-    result.checks.sameResponses
+  // Compatível se as respostas forem iguais
+  result.isCompatible = sameSize && allMatch
 
   return result
 }

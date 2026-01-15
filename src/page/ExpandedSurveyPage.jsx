@@ -254,52 +254,32 @@ export default function ExpandedSurveyPage() {
           })
         }
 
-        // NOVO: Validação completa de compatibilidade entre ondas
-        // Critérios: mesmo índice, mesma pergunta, mesmas respostas
+        // Verificar se a variável existe na Onda 1 (mesmo índice)
+        // e se as respostas são iguais entre as ondas
         if (wave1QuestionsMap.has(question.variable)) {
-          const wave1Question = wave1QuestionsMap.get(question.variable)
           const wave2Responses = responsesMap.get(question.variable) || []
           const wave1Responses = wave1ResponsesMap.get(question.variable) || []
 
+          // Validar se as respostas são iguais
           const validation = validateWaveCompatibility(
-            wave1Question,
-            question,
             wave1Responses,
             wave2Responses
           )
 
           if (validation.isCompatible) {
             if (!group.hasWaveComparison) {
-              console.log(`✅ Variável ${question.variable} é compatível entre ondas:`, {
-                sameQuestion: validation.checks.sameQuestion,
-                sameResponses: validation.checks.sameResponses
-              })
+              console.log(`✅ Variável ${question.variable} é compatível entre ondas (respostas iguais)`)
             }
             group.hasWaveComparison = true
             if (!group.wave1Variables.includes(question.variable)) {
               group.wave1Variables.push(question.variable)
             }
-            // Armazenar detalhes da validação para exibição
-            if (!group.waveValidationDetails) {
-              group.waveValidationDetails = []
-            }
-            group.waveValidationDetails.push({
-              variable: question.variable,
-              ...validation
-            })
           } else {
-            console.log(`⚠️ Variável ${question.variable} NÃO é compatível:`, {
-              sameQuestion: validation.checks.sameQuestion,
-              sameResponses: validation.checks.sameResponses,
-              details: validation.details
-            })
-            // Armazenar incompatibilidade para possível exibição
-            if (!group.waveIncompatibilityDetails) {
-              group.waveIncompatibilityDetails = []
-            }
-            group.waveIncompatibilityDetails.push({
-              variable: question.variable,
-              ...validation
+            console.log(`⚠️ Variável ${question.variable} existe nas duas ondas mas respostas são diferentes:`, {
+              wave1Responses: validation.details.wave1Responses,
+              wave2Responses: validation.details.wave2Responses,
+              missingInWave1: validation.details.missingInWave1,
+              missingInWave2: validation.details.missingInWave2
             })
           }
         }
