@@ -296,6 +296,50 @@ export const ApiMethods = {
       throw error
     }
   },
+
+  // NOVO: Buscar mapeamento de perguntas entre Rodada 13 (Onda 1) e Rodada 16 (Onda 2)
+  // Este mapeamento define quais perguntas são equivalentes entre as duas ondas
+  getQuestionMapping: async () => {
+    try {
+      const response = await axios.get(
+        "https://nmbcoamazonia-api.vercel.app/google/sheets/1KE58via47wIUxYyx23ByPGwR8j1nL8JQC6CVEq7mm4U/data"
+      )
+
+      if (!response.data?.success) {
+        throw new Error("Erro ao buscar mapeamento de perguntas")
+      }
+
+      const values = response.data.data.values
+
+      // Pular header e criar objeto de mapeamento
+      // Estrutura: { rodada13Var: rodada16Var }
+      const mappingR13toR16 = {}
+      const mappingR16toR13 = {}
+
+      values.slice(1).forEach(row => {
+        const rodada13Var = row[0] // Variável da Rodada 13
+        const rodada16Var = row[1] // Variável correspondente na Rodada 16
+        const existeEmAmbas = row[2] // "VERDADEIRO" ou "FALSO"
+
+        if (rodada13Var && rodada16Var && existeEmAmbas === "VERDADEIRO") {
+          mappingR13toR16[rodada13Var] = rodada16Var
+          mappingR16toR13[rodada16Var] = rodada13Var
+        }
+      })
+
+      return {
+        success: true,
+        data: {
+          r13ToR16: mappingR13toR16, // Mapeia Rodada 13 -> Rodada 16
+          r16ToR13: mappingR16toR13, // Mapeia Rodada 16 -> Rodada 13
+          rawData: values.slice(1)   // Dados brutos para referência
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao buscar mapeamento de perguntas:", error)
+      throw error
+    }
+  },
 }
 
 export default ApiBase

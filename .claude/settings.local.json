@@ -9,7 +9,10 @@
       "Bash(cat:*)",
       "Bash(tree:*)",
       "Bash(node -e \"\nconst axios = require\\(''axios''\\);\n\nasync function test\\(\\) {\n  // Buscar o índice geral\n  const idx = await axios.get\\(''https://nmbcoamazonia-api.vercel.app/google/sheets/1pcJqXSzEzqNYWMdThadgmt3FDib5V5gzZz2DSeXg1AU/data''\\);\n  \n  // Verificar valores únicos na primeira coluna \\(Número da Pesquisa\\)\n  const uniqueRounds = new Set\\(idx.data.data.values.slice\\(1\\).map\\(r => r[0]\\)\\);\n  console.log\\(''Rodadas disponíveis no índice:'', [...uniqueRounds].sort\\(\\)\\);\n  \n  // Contar perguntas por rodada\n  const countByRound = {};\n  idx.data.data.values.slice\\(1\\).forEach\\(row => {\n    const round = row[0];\n    countByRound[round] = \\(countByRound[round] || 0\\) + 1;\n  }\\);\n  console.log\\(''\\\\nContagem por rodada:'', countByRound\\);\n  \n  // Verificar se tem rodada 13\n  const r13Questions = idx.data.data.values.slice\\(1\\).filter\\(row => row[0] === ''13''\\);\n  console.log\\(''\\\\nPerguntas da Rodada 13:'', r13Questions.length\\);\n  if \\(r13Questions.length > 0\\) {\n    console.log\\(''Primeiras 5:'', r13Questions.slice\\(0, 5\\).map\\(r => r[2]\\)\\);\n  }\n}\n\ntest\\(\\).catch\\(console.error\\);\n\")",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(powershell -Command \"\\(Invoke-WebRequest -Uri ''https://nmbcoamazonia-api.vercel.app/google/sheets/1KE58via47wIUxYyx23ByPGwR8j1nL8JQC6CVEq7mm4U/data''\\).Content\")",
+      "Bash(powershell -Command:*)"
     ],
     "deny": [],
     "ask": []

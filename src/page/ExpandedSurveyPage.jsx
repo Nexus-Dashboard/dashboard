@@ -8,7 +8,7 @@ import { ArrowLeft, TrendingUp, AlertCircle } from "lucide-react"
 import CommonHeader from "../components/CommonHeader"
 import { ApiMethods } from "../service/ApiBase"
 import { RESPONSE_ORDER } from "../utils/chartUtils"
-import { validateWaveCompatibility } from "../utils/waveComparisonUtils"
+import { getWave1Variable } from "../utils/questionMappingUtils"
 import "./ThemeQuestionsPage.css"
 
 export default function ExpandedSurveyPage() {
@@ -22,14 +22,6 @@ export default function ExpandedSurveyPage() {
     refetchOnWindowFocus: false,
   })
 
-  // Buscar índice de perguntas da Rodada 13 (Onda 1)
-  const { data: wave1Index, isLoading: isLoadingWave1Index } = useQuery({
-    queryKey: ["wave1SurveyIndex"],
-    queryFn: ApiMethods.getWave1SurveyIndex,
-    staleTime: 1000 * 60 * 30,
-    refetchOnWindowFocus: false,
-  })
-
   // Buscar dados brutos da Rodada 16 (Onda 2)
   const { data: rawData, isLoading: isLoadingRawData } = useQuery({
     queryKey: ["expandedSurveyData"],
@@ -38,11 +30,12 @@ export default function ExpandedSurveyPage() {
     refetchOnWindowFocus: false,
   })
 
-  // Buscar dados brutos da Rodada 13 (Onda 1)
-  const { data: wave1RawData, isLoading: isLoadingWave1Data } = useQuery({
-    queryKey: ["wave1SurveyData"],
-    queryFn: ApiMethods.getWave1SurveyData,
-    staleTime: 1000 * 60 * 30,
+  // Buscar mapeamento de perguntas entre R13 e R16
+  // Este mapeamento define quais perguntas da R16 têm correspondente na R13 para comparativo
+  const { data: questionMapping, isLoading: isLoadingMapping } = useQuery({
+    queryKey: ["questionMapping"],
+    queryFn: ApiMethods.getQuestionMapping,
+    staleTime: 1000 * 60 * 60, // 1 hora (mapeamento muda raramente)
     refetchOnWindowFocus: false,
   })
 
@@ -99,65 +92,9 @@ export default function ExpandedSurveyPage() {
     return map
   }, [rawData])
 
-  // NOVO: Processar respostas possíveis dos dados brutos da Onda 1
-  const wave1ResponsesMap = useMemo(() => {
-    if (!wave1RawData?.data?.values) return new Map()
-
-    const map = new Map()
-    const values = wave1RawData.data.values
-    const headers = values[0]
-
-    headers.forEach((header, columnIndex) => {
-      if (!header) return
-
-      const uniqueResponses = new Set()
-
-      for (let i = 1; i < values.length; i++) {
-        const response = values[i][columnIndex]
-        if (response && response.trim() !== '' && response.trim() !== '#NULL!' && response.trim() !== '-1') {
-          uniqueResponses.add(response.trim())
-        }
-      }
-
-      const responsesArray = Array.from(uniqueResponses)
-
-      responsesArray.sort((a, b) => {
-        const indexA = RESPONSE_ORDER.indexOf(a)
-        const indexB = RESPONSE_ORDER.indexOf(b)
-        if (indexA >= 0 && indexB >= 0) return indexA - indexB
-        if (indexA >= 0) return -1
-        if (indexB >= 0) return 1
-        return a.localeCompare(b)
-      })
-
-      if (responsesArray.length > 0 && responsesArray.length <= 10) {
-        map.set(header, responsesArray)
-      }
-    })
-
-    console.log('✅ Wave1 Responses Map criado:', map.size, 'variáveis')
-    return map
-  }, [wave1RawData])
-
-  // Criar mapeamento de perguntas da Onda 1 por variável
-  const wave1QuestionsMap = useMemo(() => {
-    if (!wave1Index?.data) {
-      console.log('⚠️ wave1Index não disponível ainda')
-      return new Map()
-    }
-
-    const map = new Map()
-    wave1Index.data.forEach(q => {
-      if (q.variable) {
-        map.set(q.variable, q)
-      }
-    })
-
-    console.log('✅ Wave1 Questions Map criado:', map.size, 'variáveis')
-    console.log('   Primeiras 10 variáveis:', [...map.keys()].slice(0, 10))
-
-    return map
-  }, [wave1Index])
+  // NOTA: wave1ResponsesMap e wave1QuestionsMap foram removidos
+  // O mapeamento de perguntas agora vem da planilha de mapeamento (questionMapping)
+  // que já valida se as perguntas são equivalentes entre R13 e R16
 
   // Agrupar perguntas idênticas com rótulos diferentes
   const filteredQuestions = useMemo(() => {
@@ -254,33 +191,23 @@ export default function ExpandedSurveyPage() {
           })
         }
 
-        // Verificar se a variável existe na Onda 1 (mesmo índice)
-        // e se as respostas são iguais entre as ondas
-        if (wave1QuestionsMap.has(question.variable)) {
-          const wave2Responses = responsesMap.get(question.variable) || []
-          const wave1Responses = wave1ResponsesMap.get(question.variable) || []
+        // NOVO: Usar o mapeamento da API para encontrar a variável correspondente na Onda 1
+        // O mapeamento define qual variável da R13 corresponde a qual variável da R16
+        // A planilha de mapeamento já valida que as perguntas são equivalentes
+        // (Texto Pergunta Igual = VERDADEIRO, Rótulo Igual = VERDADEIRO)
+        const mappingData = questionMapping?.data
+        const wave1Variable = getWave1Variable(question.variable, mappingData)
 
-          // Validar se as respostas são iguais
-          const validation = validateWaveCompatibility(
-            wave1Responses,
-            wave2Responses
-          )
-
-          if (validation.isCompatible) {
-            if (!group.hasWaveComparison) {
-              console.log(`✅ Variável ${question.variable} é compatível entre ondas (respostas iguais)`)
-            }
-            group.hasWaveComparison = true
-            if (!group.wave1Variables.includes(question.variable)) {
-              group.wave1Variables.push(question.variable)
-            }
-          } else {
-            console.log(`⚠️ Variável ${question.variable} existe nas duas ondas mas respostas são diferentes:`, {
-              wave1Responses: validation.details.wave1Responses,
-              wave2Responses: validation.details.wave2Responses,
-              missingInWave1: validation.details.missingInWave1,
-              missingInWave2: validation.details.missingInWave2
-            })
+        if (wave1Variable) {
+          // Encontrou mapeamento! A planilha já garante que são perguntas equivalentes
+          // Não precisamos validar respostas - o mapeamento é a fonte de verdade
+          if (!group.hasWaveComparison) {
+            console.log(`✅ Variável ${question.variable} (R16) → ${wave1Variable} (R13) tem mapeamento para comparação`)
+          }
+          group.hasWaveComparison = true
+          // Armazenar a variável da Onda 1 correspondente (pode ter nome diferente!)
+          if (!group.wave1Variables.includes(wave1Variable)) {
+            group.wave1Variables.push(wave1Variable)
           }
         }
       }
@@ -323,7 +250,7 @@ export default function ExpandedSurveyPage() {
     }
 
     return questionsArray
-  }, [data, responsesMap, wave1QuestionsMap, wave1ResponsesMap])
+  }, [data, responsesMap, questionMapping])
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
 
@@ -379,13 +306,15 @@ export default function ExpandedSurveyPage() {
           )}
 
           {/* Estado de carregamento */}
-          {(isLoading || isLoadingRawData || isLoadingWave1Index || isLoadingWave1Data) && !error && (
+          {(isLoading || isLoadingRawData || isLoadingMapping) && !error && (
             <div className="loading-state">
               <Spinner animation="border" variant="primary" />
               <p className="mt-3 text-muted">
-                {isLoading || isLoadingWave1Index
-                  ? "Carregando perguntas das pesquisas (Onda 1 e 2)..."
-                  : isLoadingRawData || isLoadingWave1Data
+                {isLoading
+                  ? "Carregando perguntas da pesquisa..."
+                  : isLoadingMapping
+                  ? "Carregando mapeamento de perguntas comparativas..."
+                  : isLoadingRawData
                   ? "Processando respostas possíveis..."
                   : "Carregando dados..."}
               </p>
@@ -393,7 +322,7 @@ export default function ExpandedSurveyPage() {
           )}
 
           {/* Lista de perguntas */}
-          {!isLoading && !isLoadingRawData && !isLoadingWave1Index && !isLoadingWave1Data && !error && (
+          {!isLoading && !isLoadingRawData && !isLoadingMapping && !error && (
             <>
               {filteredQuestions.length === 0 ? (
                 <div className="empty-state">

@@ -18,13 +18,16 @@ export default function WaveComparisonChart({
   wave1Stats,
   wave2Stats,
   questionText,
-  variableName,
+  variableName, // Variável da Rodada 16 (Onda 2)
+  wave1VariableName, // Variável da Rodada 13 (Onda 1) - pode ser diferente!
   variableLabel,
   wave1SampleSize,
   wave2SampleSize,
   wave1MarginOfError,
   wave2MarginOfError,
 }) {
+  // Verificar se as variáveis têm nomes diferentes entre as ondas
+  const hasDifferentVariableNames = wave1VariableName && wave1VariableName !== variableName
   // Processar dados para o gráfico de linhas
   const chartData = useMemo(() => {
     if (!wave1Stats || !wave2Stats) return []
@@ -233,10 +236,23 @@ export default function WaveComparisonChart({
         <div style={customStyles.cardHeaderOverlay}></div>
         <div style={customStyles.headerContent}>
           {variableName && (
-            <>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <span style={customStyles.variableBadge}>{variableName}</span>
+              {hasDifferentVariableNames && (
+                <>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>↔</span>
+                  <span style={{
+                    ...customStyles.variableBadge,
+                    background: 'rgba(255,255,255,0.15)',
+                    fontSize: '12px',
+                    padding: '4px 10px'
+                  }}>
+                    R13: {wave1VariableName}
+                  </span>
+                </>
+              )}
               <span style={customStyles.comparisonBadge}>Comparativo Ondas</span>
-            </>
+            </div>
           )}
           {questionText && (
             <h6 style={{...customStyles.title, marginTop: '8px', marginBottom: 0}}>{questionText}</h6>

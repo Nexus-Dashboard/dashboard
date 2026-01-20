@@ -35,9 +35,13 @@ export default function ExpandedSurveyDashboard() {
   }, [searchParams])
 
   // Log dos parâmetros de comparação
+  // NOTA: wave1Variables contém as variáveis da Rodada 13 (Onda 1), que podem ter nomes
+  // diferentes das variáveis da Rodada 16 (Onda 2). O mapeamento foi feito no ExpandedSurveyPage.
+  // Exemplo: variables = ['P06'] (R16), wave1Variables = ['P05'] (R13)
   console.log('🔍 Parâmetros de comparação:', {
     hasWaveComparison,
-    wave1Variables,
+    variables, // Variáveis da Rodada 16
+    wave1Variables, // Variáveis correspondentes da Rodada 13 (podem ter nomes diferentes!)
     rawHasWaveComparison: searchParams.get('hasWaveComparison'),
     rawWave1Variables: searchParams.get('wave1Variables')
   })
@@ -183,10 +187,14 @@ export default function ExpandedSurveyDashboard() {
   }, [filters, isReady, isWave1Ready, hasWaveComparison, getWave1Rows, getWave2Rows])
 
   // NOVO: Calcular estatísticas de comparação entre ondas COM FILTROS UNIFICADOS
+  // IMPORTANTE: As variáveis podem ter nomes diferentes entre R13 e R16!
+  // - `variables` contém as variáveis da Rodada 16 (ex: ['P06', 'T_P10_1'])
+  // - `wave1Variables` contém as variáveis correspondentes da Rodada 13 (ex: ['P05', 'T_P09_1'])
   const waveComparisonData = useMemo(() => {
     console.log('🔄 Calculando waveComparisonData:', {
       hasWaveComparison,
-      wave1Variables,
+      variables, // R16
+      wave1Variables, // R13
       isWave1Ready,
       hasCalculateWave1StatsWithRows: !!calculateWave1StatsWithRows,
       isReady,
@@ -198,15 +206,22 @@ export default function ExpandedSurveyDashboard() {
       return []
     }
 
-    // Para cada variável que existe em ambas as ondas
-    const results = wave1Variables.map(variable => {
-      const label = variableLabels[variable] || ''
+    // Para cada variável com correspondência entre as ondas
+    // Iteramos sobre os índices para pegar a variável R16 e a R13 correspondente
+    const results = wave1Variables.map((wave1Variable, index) => {
+      // A variável da R16 correspondente está no mesmo índice do array `variables`
+      const wave2Variable = variables[index]
+      const label = variableLabels[wave2Variable] || ''
 
-      // Estatísticas da Onda 1 COM FILTROS UNIFICADOS
-      const wave1Stats = calculateWave1StatsWithRows(variable, unifiedFilteredData.wave1Rows)
+      console.log(`🔗 Mapeamento: R16[${wave2Variable}] ↔ R13[${wave1Variable}]`)
 
-      // Estatísticas da Onda 2 COM FILTROS UNIFICADOS
-      const wave2Stats = calculateVariableStatsWithRows(variable, unifiedFilteredData.wave2Rows)
+      // Estatísticas da Onda 1 (R13) COM FILTROS UNIFICADOS
+      // Usa a variável da R13!
+      const wave1Stats = calculateWave1StatsWithRows(wave1Variable, unifiedFilteredData.wave1Rows)
+
+      // Estatísticas da Onda 2 (R16) COM FILTROS UNIFICADOS
+      // Usa a variável da R16!
+      const wave2Stats = calculateVariableStatsWithRows(wave2Variable, unifiedFilteredData.wave2Rows)
 
       // Calcular margem de erro para cada onda
       const wave1SampleSize = wave1Stats?.totalResponses || 0
@@ -220,7 +235,7 @@ export default function ExpandedSurveyDashboard() {
         ? (1.96 * Math.sqrt(0.25 / wave2SampleSize)) * 100
         : 0
 
-      console.log(`📈 Comparação para ${variable}:`, {
+      console.log(`📈 Comparação para R16[${wave2Variable}] ↔ R13[${wave1Variable}]:`, {
         wave1Stats: wave1Stats?.data?.length || 0,
         wave2Stats: wave2Stats?.data?.length || 0,
         wave1SampleSize,
@@ -228,7 +243,8 @@ export default function ExpandedSurveyDashboard() {
       })
 
       return {
-        variable,
+        variable: wave2Variable, // Usamos a variável R16 como referência principal
+        wave1Variable, // Também guardamos a variável R13 para referência
         label,
         wave1Stats: wave1Stats?.data || [],
         wave2Stats: wave2Stats?.data || [],
@@ -241,7 +257,7 @@ export default function ExpandedSurveyDashboard() {
 
     console.log('✅ waveComparisonData calculado:', results.length, 'variáveis')
     return results
-  }, [hasWaveComparison, wave1Variables, isWave1Ready, calculateWave1StatsWithRows, isReady, calculateVariableStatsWithRows, variableLabels, unifiedFilteredData])
+  }, [hasWaveComparison, variables, wave1Variables, isWave1Ready, calculateWave1StatsWithRows, isReady, calculateVariableStatsWithRows, variableLabels, unifiedFilteredData])
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
 
@@ -370,6 +386,7 @@ export default function ExpandedSurveyDashboard() {
                           wave2Stats={data.wave2Stats}
                           questionText={questionText}
                           variableName={data.variable}
+                          wave1VariableName={data.wave1Variable}
                           variableLabel={data.label}
                           wave1SampleSize={data.wave1SampleSize}
                           wave2SampleSize={data.wave2SampleSize}
