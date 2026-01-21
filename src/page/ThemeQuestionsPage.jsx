@@ -370,7 +370,7 @@ export default function ThemeQuestionsPage() {
                                   fontWeight: '600',
                                   color: '#212529'
                                 }}>
-                                  F2F Brasil - Pesquisa Ampliada - Onda 2 - Rodada 16
+                                  F2F Brasil - Pesquisa Ampliada - Onda 2 (Nov/25)
                                 </h6>
                                 <Badge bg="success" style={{ fontSize: '0.7rem' }}>
                                   Comparativo disponível
@@ -425,7 +425,7 @@ export default function ThemeQuestionsPage() {
                                 fontWeight: '600',
                                 color: '#212529'
                               }}>
-                                F2F Brasil - Pesquisa Ampliada - Onda 1 - Rodada 13
+                                F2F Brasil - Pesquisa Ampliada - Onda 1 (Mai/25)
                               </h6>
                               <p className="mb-0" style={{
                                 fontSize: '0.875rem',

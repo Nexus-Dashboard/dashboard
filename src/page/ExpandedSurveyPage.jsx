@@ -84,7 +84,7 @@ export default function ExpandedSurveyPage() {
         return a.localeCompare(b)
       })
 
-      if (responsesArray.length > 0 && responsesArray.length <= 10) {
+      if (responsesArray.length > 0 && responsesArray.length <= 15) {
         map.set(header, responsesArray)
       }
     })
@@ -258,7 +258,7 @@ export default function ExpandedSurveyPage() {
     const params = new URLSearchParams({
       variables: JSON.stringify(question.variables),
       questionText: question.questionText,
-      pageTitle: "F2F Brasil - Pesquisa Ampliada - Rodada 16",
+      pageTitle: "F2F Brasil - Pesquisa Ampliada - Onda 2 (Nov/25)",
       hasWaveComparison: question.hasWaveComparison ? "true" : "false",
       wave1Variables: JSON.stringify(question.wave1Variables || [])
     })
@@ -284,7 +284,7 @@ export default function ExpandedSurveyPage() {
           <div className="page-title-section">
             <div className="d-flex align-items-center justify-content-between">
               <div>
-                <h1 className="main-title">F2F Brasil - Pesquisa Ampliada - Onda 2 - Rodada 16</h1>                
+                <h1 className="main-title">F2F Brasil - Pesquisa Ampliada - Onda 2 (Nov/25)</h1>                
               </div>
               <Button variant="outline-secondary" onClick={handleBack} className="back-button">
                 <ArrowLeft size={16} className="me-2" />
@@ -390,7 +390,7 @@ export default function ExpandedSurveyPage() {
                                 }}
                               >
                                 <TrendingUp size={12} />
-                                Comparativo Onda 1 x 2
+                                Comparativo Onda 1 (Mai/25) x Onda 2 (Nov/25)
                               </Badge>
                             )}
                           </div>

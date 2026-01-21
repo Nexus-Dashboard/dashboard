@@ -16,6 +16,15 @@ export default function HorizontalBarChart({
 }) {
   // Processar e ordenar dados usando RESPONSE_ORDER
   const processedData = useMemo(() => {
+    // Respostas que devem sempre ficar no final
+    const ALWAYS_LAST_RESPONSES = ['outros', 'nenhum', 'ns/nr', 'não sabe', 'não respondeu', 'nenhuma']
+
+    // Função para verificar se uma resposta deve ficar no final
+    const shouldBeAtEnd = (response) => {
+      if (!response) return false
+      const normalized = response.toLowerCase().trim()
+      return ALWAYS_LAST_RESPONSES.some(last => normalized === last || normalized.includes(last))
+    }
     if (!data || data.length === 0) {
       return []
     }
@@ -32,16 +41,30 @@ export default function HorizontalBarChart({
       return color !== "#999999" // Cor padrão para respostas não definidas
     })
 
-    // Verificar se alguma resposta tem ordem definida no sistema
-    const hasDefinedOrder = filteredData.some(item =>
-      RESPONSE_ORDER.indexOf(item.response) >= 0
-    )
+    // Verificar se a MAIORIA das respostas tem ordem definida no sistema
+    // (excluindo NS/NR que sempre existe) - só usa RESPONSE_ORDER se pelo menos 50% das respostas estão nele
+    const responsesInOrder = filteredData.filter(item => {
+      const response = item.response
+      // Não contar NS/NR como "resposta com ordem definida" para decidir o modo de ordenação
+      if (shouldBeAtEnd(response)) return false
+      return RESPONSE_ORDER.indexOf(response) >= 0
+    })
+    const hasDefinedOrder = responsesInOrder.length >= (filteredData.length - filteredData.filter(i => shouldBeAtEnd(i.response)).length) * 0.5
 
     let sorted
 
     if (hasDefinedOrder) {
       // Ordenar usando RESPONSE_ORDER quando houver ordem definida
       sorted = [...filteredData].sort((a, b) => {
+        const aIsLast = shouldBeAtEnd(a.response)
+        const bIsLast = shouldBeAtEnd(b.response)
+
+        // Primeiro: respostas que devem ficar no final sempre vão para o final
+        if (aIsLast && !bIsLast) return 1
+        if (!aIsLast && bIsLast) return -1
+        // Se ambos devem ficar no final, ordenar por porcentagem entre eles
+        if (aIsLast && bIsLast) return b.percentage - a.percentage
+
         const indexA = RESPONSE_ORDER.indexOf(a.response)
         const indexB = RESPONSE_ORDER.indexOf(b.response)
 
@@ -56,12 +79,24 @@ export default function HorizontalBarChart({
         // Se apenas B está na lista, B vem primeiro
         if (indexB >= 0) return 1
 
-        // Se nenhum está na lista, ordenar alfabeticamente
-        return a.response.localeCompare(b.response)
+        // Se nenhum está na lista, ordenar por porcentagem (maior primeiro)
+        return b.percentage - a.percentage
       })
     } else {
       // Ordenar por porcentagem (maior para menor) quando não houver ordem definida
-      sorted = [...filteredData].sort((a, b) => b.percentage - a.percentage)
+      // MAS manter Outros, Nenhum, NS/NR sempre no final
+      sorted = [...filteredData].sort((a, b) => {
+        const aIsLast = shouldBeAtEnd(a.response)
+        const bIsLast = shouldBeAtEnd(b.response)
+
+        // Se apenas A deve ficar no final, A vem depois
+        if (aIsLast && !bIsLast) return 1
+        // Se apenas B deve ficar no final, B vem depois
+        if (!aIsLast && bIsLast) return -1
+        // Se ambos devem ficar no final, ordenar entre si por porcentagem
+        // Se nenhum deve ficar no final, ordenar por porcentagem (maior primeiro)
+        return b.percentage - a.percentage
+      })
     }
 
     // Adicionar cores

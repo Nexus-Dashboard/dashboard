@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { Container, Row, Col, Button, Alert, Spinner } from "react-bootstrap"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
@@ -45,6 +45,11 @@ export default function ExpandedSurveyDashboard() {
     rawHasWaveComparison: searchParams.get('hasWaveComparison'),
     rawWave1Variables: searchParams.get('wave1Variables')
   })
+
+  // Scroll para o topo ao carregar a página
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
 
   // Estado de filtros demográficos
   const [filters, setFilters] = useState({})
@@ -122,6 +127,8 @@ export default function ExpandedSurveyDashboard() {
   }, [indexData])
 
   // Calcular estatísticas para cada variável
+  // Se houver múltiplas variáveis com mesmo texto mas labels diferentes (ex: P7_O1 e P7_O2),
+  // aglomerar as respostas somando os pesos e dividindo pelo universo total
   const chartData = useMemo(() => {
     console.log('Calculando chartData:', { isReady, hasCalculateFunc: !!calculateVariableStats, variables })
 
@@ -130,6 +137,76 @@ export default function ExpandedSurveyDashboard() {
       return []
     }
 
+    // Se houver múltiplas variáveis, aglomerar as respostas
+    // LÓGICA CORRETA: Somar weights das menções e dividir pelo N (count) do universo
+    // Porcentagem = (soma dos weights das menções) / N * 100
+    // Exemplo: Se N=1000 pessoas e soma dos weights de "TV" = 300, = 30%
+    if (variables.length > 1) {
+      console.log('📊 Múltiplas variáveis detectadas - aglomerando respostas:', variables)
+
+      // Mapear para acumular menções de todas as variáveis
+      const aggregatedResponses = new Map() // response -> { weightSum, count }
+
+      // Primeiro, obter o universo (N = count real de respondentes) de UMA variável apenas
+      // O universo é o mesmo para todas as variáveis (mesmo número de respondentes)
+      const firstVarStats = calculateVariableStats(variables[0], filters)
+      const universeCount = firstVarStats?.totalCount || firstVarStats?.totalResponses || 0
+
+      // Processar cada variável e somar as menções (weights)
+      variables.forEach(variable => {
+        const stats = calculateVariableStats(variable, filters)
+        if (!stats?.data) return
+
+        stats.data.forEach(item => {
+          const existing = aggregatedResponses.get(item.response) || { weightSum: 0, count: 0 }
+          aggregatedResponses.set(item.response, {
+            weightSum: existing.weightSum + (item.weightSum || item.count || 0),
+            count: existing.count + (item.count || 0)
+          })
+        })
+      })
+
+      // Calcular porcentagens: soma dos weights / N (universo count) * 100
+      // Isso é o correto: dividir a soma ponderada pelo número real de respondentes
+      const aggregatedStats = Array.from(aggregatedResponses.entries()).map(([response, data]) => ({
+        response,
+        count: data.count,
+        weightSum: data.weightSum,
+        percentage: universeCount > 0 ? (data.weightSum / universeCount) * 100 : 0
+      }))
+
+      // Calcular estatísticas sem filtros para margem de erro
+      const firstVarStatsNoFilter = calculateVariableStats(variables[0], {})
+      const originalUniverseCount = firstVarStatsNoFilter?.totalCount || firstVarStatsNoFilter?.totalResponses || 0
+
+      // Calcular margem de erro baseado no universo
+      const marginOfError = universeCount > 0
+        ? (1.96 * Math.sqrt(0.25 / universeCount)) * 100
+        : 0
+
+      // Criar labels combinados
+      const labels = variables.map(v => variableLabels[v]).filter(Boolean)
+      const combinedLabel = labels.length > 0 ? labels.join(' / ') : ''
+
+      console.log('📊 Respostas aglomeradas (weights / N):', {
+        variables,
+        universeCount,
+        uniqueResponses: aggregatedStats.length,
+        sample: aggregatedStats.slice(0, 3)
+      })
+
+      return [{
+        variable: variables.join(' + '),
+        label: combinedLabel,
+        stats: aggregatedStats,
+        totalWeight: universeCount, // Usar N como referência
+        totalResponses: universeCount,
+        originalSampleSize: originalUniverseCount,
+        marginOfError: Math.round(marginOfError * 100) / 100
+      }]
+    }
+
+    // Se for apenas uma variável, comportamento normal
     const results = variables.map(variable => {
       console.log(`Processando variável: ${variable}`)
       const label = variableLabels[variable] || ''
@@ -155,6 +232,27 @@ export default function ExpandedSurveyDashboard() {
         originalSampleSize,
         marginOfError: Math.round(marginOfError * 100) / 100
       }
+    })
+
+    // Ordenar resultados: variáveis "Outros" (numéricas como P9_1, P9_2 ou com _OUT) devem vir após as principais
+    // Ordem: P9_A (Primeiro), P9_B (Segundo), P9_1 (Primeiro Outros), P9_2 (Segundo Outros)
+    results.sort((a, b) => {
+      const varA = a.variable
+      const varB = b.variable
+      const labelA = (a.label || '').toLowerCase()
+      const labelB = (b.label || '').toLowerCase()
+
+      // Verificar se é uma variável "Outros" pelo label ou pelo padrão do nome
+      const isOthersA = labelA.includes('outros') || /_\d+$/.test(varA) || /_OUT$/i.test(varA)
+      const isOthersB = labelB.includes('outros') || /_\d+$/.test(varB) || /_OUT$/i.test(varB)
+
+      // Se apenas A é "Outros", A vem depois
+      if (isOthersA && !isOthersB) return 1
+      // Se apenas B é "Outros", B vem depois
+      if (!isOthersA && isOthersB) return -1
+
+      // Caso contrário, ordenar alfabeticamente pela variável
+      return varA.localeCompare(varB)
     })
 
     console.log('ChartData calculado:', results)
@@ -190,6 +288,7 @@ export default function ExpandedSurveyDashboard() {
   // IMPORTANTE: As variáveis podem ter nomes diferentes entre R13 e R16!
   // - `variables` contém as variáveis da Rodada 16 (ex: ['P06', 'T_P10_1'])
   // - `wave1Variables` contém as variáveis correspondentes da Rodada 13 (ex: ['P05', 'T_P09_1'])
+  // Se houver múltiplas variáveis (ex: P7_O1 e P7_O2), aglomerar as respostas
   const waveComparisonData = useMemo(() => {
     console.log('🔄 Calculando waveComparisonData:', {
       hasWaveComparison,
@@ -204,6 +303,100 @@ export default function ExpandedSurveyDashboard() {
     if (!hasWaveComparison || !isWave1Ready || !calculateWave1StatsWithRows || !isReady || !calculateVariableStatsWithRows) {
       console.log('❌ Condições não atendidas para calcular comparação')
       return []
+    }
+
+    // Se houver múltiplas variáveis, aglomerar as respostas de ambas as ondas
+    // LÓGICA CORRETA: Somar weights das menções e dividir pelo N (count) do universo
+    // Porcentagem = (soma dos weights das menções) / N * 100
+    if (variables.length > 1 && wave1Variables.length > 1) {
+      console.log('📊 Múltiplas variáveis detectadas para comparação - aglomerando:', {
+        r16: variables,
+        r13: wave1Variables
+      })
+
+      // Primeiro, obter o UNIVERSO (N = count real de respondentes) de UMA variável apenas
+      const firstWave1Stats = calculateWave1StatsWithRows(wave1Variables[0], unifiedFilteredData.wave1Rows)
+      const wave1UniverseCount = firstWave1Stats?.totalCount || firstWave1Stats?.totalResponses || 0
+
+      const firstWave2Stats = calculateVariableStatsWithRows(variables[0], unifiedFilteredData.wave2Rows)
+      const wave2UniverseCount = firstWave2Stats?.totalCount || firstWave2Stats?.totalResponses || 0
+
+      // Aglomerar Onda 1 (R13) - somar weights das menções de todas as variáveis
+      const wave1Aggregated = new Map()
+
+      wave1Variables.forEach(wave1Variable => {
+        const stats = calculateWave1StatsWithRows(wave1Variable, unifiedFilteredData.wave1Rows)
+        if (!stats?.data) return
+
+        stats.data.forEach(item => {
+          const existing = wave1Aggregated.get(item.response) || { weightSum: 0, count: 0 }
+          wave1Aggregated.set(item.response, {
+            weightSum: existing.weightSum + (item.weightSum || item.count || 0),
+            count: existing.count + (item.count || 0)
+          })
+        })
+      })
+
+      // Aglomerar Onda 2 (R16) - somar weights das menções de todas as variáveis
+      const wave2Aggregated = new Map()
+
+      variables.forEach(wave2Variable => {
+        const stats = calculateVariableStatsWithRows(wave2Variable, unifiedFilteredData.wave2Rows)
+        if (!stats?.data) return
+
+        stats.data.forEach(item => {
+          const existing = wave2Aggregated.get(item.response) || { weightSum: 0, count: 0 }
+          wave2Aggregated.set(item.response, {
+            weightSum: existing.weightSum + (item.weightSum || item.count || 0),
+            count: existing.count + (item.count || 0)
+          })
+        })
+      })
+
+      // Converter para formato de stats: soma dos weights / N (count) * 100
+      const wave1Stats = Array.from(wave1Aggregated.entries()).map(([response, data]) => ({
+        response,
+        count: data.count,
+        weightSum: data.weightSum,
+        percentage: wave1UniverseCount > 0 ? (data.weightSum / wave1UniverseCount) * 100 : 0
+      }))
+
+      const wave2Stats = Array.from(wave2Aggregated.entries()).map(([response, data]) => ({
+        response,
+        count: data.count,
+        weightSum: data.weightSum,
+        percentage: wave2UniverseCount > 0 ? (data.weightSum / wave2UniverseCount) * 100 : 0
+      }))
+
+      // Calcular margem de erro baseado no N (count de respondentes)
+      const wave1MarginOfError = wave1UniverseCount > 0
+        ? (1.96 * Math.sqrt(0.25 / wave1UniverseCount)) * 100
+        : 0
+
+      const wave2MarginOfError = wave2UniverseCount > 0
+        ? (1.96 * Math.sqrt(0.25 / wave2UniverseCount)) * 100
+        : 0
+
+      // Criar labels combinados
+      const labels = variables.map(v => variableLabels[v]).filter(Boolean)
+      const combinedLabel = labels.length > 0 ? labels.join(' / ') : ''
+
+      console.log('📊 Comparação aglomerada (weights / N):', {
+        wave1: { universeCount: wave1UniverseCount, responses: wave1Stats.length },
+        wave2: { universeCount: wave2UniverseCount, responses: wave2Stats.length }
+      })
+
+      return [{
+        variable: variables.join(' + '),
+        wave1Variable: wave1Variables.join(' + '),
+        label: combinedLabel,
+        wave1Stats,
+        wave2Stats,
+        wave1SampleSize: wave1UniverseCount,
+        wave2SampleSize: wave2UniverseCount,
+        wave1MarginOfError: Math.round(wave1MarginOfError * 100) / 100,
+        wave2MarginOfError: Math.round(wave2MarginOfError * 100) / 100,
+      }]
     }
 
     // Para cada variável com correspondência entre as ondas
@@ -429,7 +622,7 @@ export default function ExpandedSurveyDashboard() {
                             Comparativo entre Ondas
                           </h5>
                           <p style={{ margin: 0, fontSize: '13px', color: '#198754' }}>
-                            Análise da variação das respostas entre a Onda 1 (Rodada 13) e Onda 2 (Rodada 16)
+                            Análise da variação das respostas entre a Onda 1 (Mai/25) e Onda 2 (Nov/25)
                           </p>
                         </div>
                       </div>
@@ -464,7 +657,7 @@ export default function ExpandedSurveyDashboard() {
                       }}>
                         <div>
                           <h5 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#1565c0' }}>
-                            Dados da Onda 2 (Rodada 16)
+                            Dados da Onda 2 (Nov/25)
                           </h5>
                           <p style={{ margin: 0, fontSize: '13px', color: '#1976d2' }}>
                             Resultados detalhados da pesquisa atual com filtros demográficos

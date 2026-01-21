@@ -60,7 +60,7 @@ export default function ExpandedSurveyPageWave1() {
         return a.localeCompare(b)
       })
 
-      if (responsesArray.length > 0 && responsesArray.length <= 10) {
+      if (responsesArray.length > 0 && responsesArray.length <= 15) {
         map.set(header, responsesArray)
       }
     })
@@ -182,7 +182,7 @@ export default function ExpandedSurveyPageWave1() {
     const params = new URLSearchParams({
       variables: JSON.stringify(question.variables),
       questionText: question.questionText,
-      pageTitle: "F2F Brasil - Pesquisa Ampliada - Rodada 13",
+      pageTitle: "F2F Brasil - Pesquisa Ampliada - Onda 1 (Mai/25)",
     })
 
     const isOpenQuestion = !question.possibleResponses || question.possibleResponses.length === 0
@@ -203,7 +203,7 @@ export default function ExpandedSurveyPageWave1() {
           <div className="page-title-section">
             <div className="d-flex align-items-center justify-content-between">
               <div>
-                <h1 className="main-title">F2F Brasil - Pesquisa Ampliada - Onda 1 - Rodada 13</h1>
+                <h1 className="main-title">F2F Brasil - Pesquisa Ampliada - Onda 1 (Mai/25)</h1>
               </div>
               <Button variant="outline-secondary" onClick={handleBack} className="back-button">
                 <ArrowLeft size={16} className="me-2" />

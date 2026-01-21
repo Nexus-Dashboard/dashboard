@@ -28,8 +28,19 @@ export default function WaveComparisonChart({
 }) {
   // Verificar se as variáveis têm nomes diferentes entre as ondas
   const hasDifferentVariableNames = wave1VariableName && wave1VariableName !== variableName
+
   // Processar dados para o gráfico de linhas
   const chartData = useMemo(() => {
+    // Respostas que devem sempre ficar no final
+    const ALWAYS_LAST_RESPONSES = ['outros', 'nenhum', 'ns/nr', 'não sabe', 'não respondeu', 'nenhuma']
+
+    // Função para verificar se uma resposta deve ficar no final
+    const shouldBeAtEnd = (response) => {
+      if (!response) return false
+      const normalized = response.toLowerCase().trim()
+      return ALWAYS_LAST_RESPONSES.some(last => normalized === last || normalized.includes(last))
+    }
+
     if (!wave1Stats || !wave2Stats) return []
 
     // Combinar todas as respostas de ambas as ondas
@@ -58,23 +69,67 @@ export default function WaveComparisonChart({
       wave2Map.set(item.response, item.percentage)
     })
 
-    // Converter para array e ordenar usando RESPONSE_ORDER
+    // Converter para array
     const responses = Array.from(allResponses)
-    responses.sort((a, b) => {
-      const indexA = RESPONSE_ORDER.indexOf(a)
-      const indexB = RESPONSE_ORDER.indexOf(b)
 
-      if (indexA >= 0 && indexB >= 0) return indexA - indexB
-      if (indexA >= 0) return -1
-      if (indexB >= 0) return 1
-      return a.localeCompare(b)
-    })
+    // Verificar se a MAIORIA das respostas tem ordem definida no sistema
+    // (excluindo NS/NR que sempre existe) - só usa RESPONSE_ORDER se pelo menos 50% das respostas estão nele
+    const responsesNotAtEnd = responses.filter(r => !shouldBeAtEnd(r))
+    const responsesInOrder = responsesNotAtEnd.filter(r => RESPONSE_ORDER.indexOf(r) >= 0)
+    const hasDefinedOrder = responsesInOrder.length >= responsesNotAtEnd.length * 0.5
+
+    if (hasDefinedOrder) {
+      // Ordenar usando RESPONSE_ORDER quando houver ordem definida
+      responses.sort((a, b) => {
+        const aIsLast = shouldBeAtEnd(a)
+        const bIsLast = shouldBeAtEnd(b)
+
+        // Primeiro: respostas que devem ficar no final sempre vão para o final
+        if (aIsLast && !bIsLast) return 1
+        if (!aIsLast && bIsLast) return -1
+        // Se ambos devem ficar no final, ordenar por porcentagem média entre eles
+        if (aIsLast && bIsLast) {
+          const avgA = ((wave1Map.get(a) || 0) + (wave2Map.get(a) || 0)) / 2
+          const avgB = ((wave1Map.get(b) || 0) + (wave2Map.get(b) || 0)) / 2
+          return avgB - avgA
+        }
+
+        const indexA = RESPONSE_ORDER.indexOf(a)
+        const indexB = RESPONSE_ORDER.indexOf(b)
+
+        if (indexA >= 0 && indexB >= 0) return indexA - indexB
+        if (indexA >= 0) return -1
+        if (indexB >= 0) return 1
+
+        // Se nenhum está na lista, ordenar por porcentagem média (maior primeiro)
+        const avgA = ((wave1Map.get(a) || 0) + (wave2Map.get(a) || 0)) / 2
+        const avgB = ((wave1Map.get(b) || 0) + (wave2Map.get(b) || 0)) / 2
+        return avgB - avgA
+      })
+    } else {
+      // Ordenar por porcentagem média (maior para menor) quando não houver ordem definida
+      // MAS manter Outros, Nenhum, NS/NR sempre no final
+      responses.sort((a, b) => {
+        const aIsLast = shouldBeAtEnd(a)
+        const bIsLast = shouldBeAtEnd(b)
+
+        // Se apenas A deve ficar no final, A vem depois
+        if (aIsLast && !bIsLast) return 1
+        // Se apenas B deve ficar no final, B vem depois
+        if (!aIsLast && bIsLast) return -1
+
+        // Calcular média das duas ondas para ordenação
+        const avgA = ((wave1Map.get(a) || 0) + (wave2Map.get(a) || 0)) / 2
+        const avgB = ((wave1Map.get(b) || 0) + (wave2Map.get(b) || 0)) / 2
+        return avgB - avgA
+      })
+    }
 
     // Criar dados para o gráfico
     return responses.map(response => ({
       response,
-      "Onda 1 (R13)": wave1Map.get(response) || 0,
-      "Onda 2 (R16)": wave2Map.get(response) || 0,
+      "Onda 1 (Mai/25)": wave1Map.get(response) || 0,
+      "Onda 2 (Nov/25)": wave2Map.get(response) || 0,
       variation: (wave2Map.get(response) || 0) - (wave1Map.get(response) || 0),
       color: getResponseColor(response)
     }))
@@ -86,8 +141,8 @@ export default function WaveComparisonChart({
 
     // Criar array com as duas ondas
     return [
-      { wave: "Onda 1 (R13)", ...chartData.reduce((acc, item) => ({ ...acc, [item.response]: item["Onda 1 (R13)"] }), {}) },
-      { wave: "Onda 2 (R16)", ...chartData.reduce((acc, item) => ({ ...acc, [item.response]: item["Onda 2 (R16)"] }), {}) }
+      { wave: "Onda 1 (Mai/25)", ...chartData.reduce((acc, item) => ({ ...acc, [item.response]: item["Onda 1 (Mai/25)"] }), {}) },
+      { wave: "Onda 2 (Nov/25)", ...chartData.reduce((acc, item) => ({ ...acc, [item.response]: item["Onda 2 (Nov/25)"] }), {}) }
     ]
   }, [chartData])
 
@@ -247,7 +302,7 @@ export default function WaveComparisonChart({
                     fontSize: '12px',
                     padding: '4px 10px'
                   }}>
-                    R13: {wave1VariableName}
+                    Mai/25: {wave1VariableName}
                   </span>
                 </>
               )}
@@ -400,8 +455,8 @@ export default function WaveComparisonChart({
           <div style={customStyles.tableHeader}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <div style={{ flex: 2 }}>Resposta</div>
-              <div style={{ flex: 1, textAlign: 'center' }}>Onda 1 (R13)</div>
-              <div style={{ flex: 1, textAlign: 'center' }}>Onda 2 (R16)</div>
+              <div style={{ flex: 1, textAlign: 'center' }}>Onda 1 (Mai/25)</div>
+              <div style={{ flex: 1, textAlign: 'center' }}>Onda 2 (Nov/25)</div>
               <div style={{ flex: 1, textAlign: 'center' }}>Variação</div>
             </div>
           </div>
@@ -428,10 +483,10 @@ export default function WaveComparisonChart({
                 <span style={{ fontWeight: '500' }}>{item.response}</span>
               </div>
               <div style={{ flex: 1, textAlign: 'center' }}>
-                {item["Onda 1 (R13)"].toFixed(1)}%
+                {item["Onda 1 (Mai/25)"].toFixed(1)}%
               </div>
               <div style={{ flex: 1, textAlign: 'center' }}>
-                {item["Onda 2 (R16)"].toFixed(1)}%
+                {item["Onda 2 (Nov/25)"].toFixed(1)}%
               </div>
               <div style={{
                 flex: 1,

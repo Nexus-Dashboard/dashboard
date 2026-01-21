@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { Container, Row, Col, Button, Alert, Spinner } from "react-bootstrap"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
@@ -24,6 +24,11 @@ export default function ExpandedSurveyDashboardWave1() {
 
   const questionText = searchParams.get('questionText') || ''
   const pageTitle = searchParams.get('pageTitle') || 'Análise de Pergunta'
+
+  // Scroll para o topo ao carregar a página
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
 
   // Estado de filtros demográficos
   const [filters, setFilters] = useState({})
@@ -112,6 +117,26 @@ export default function ExpandedSurveyDashboardWave1() {
         originalSampleSize,
         marginOfError: Math.round(marginOfError * 100) / 100
       }
+    })
+
+    // Ordenar resultados: variáveis "Outros" (numéricas como P9_1, P9_2 ou com _OUT) devem vir após as principais
+    results.sort((a, b) => {
+      const varA = a.variable
+      const varB = b.variable
+      const labelA = (a.label || '').toLowerCase()
+      const labelB = (b.label || '').toLowerCase()
+
+      // Verificar se é uma variável "Outros" pelo label ou pelo padrão do nome
+      const isOthersA = labelA.includes('outros') || /_\d+$/.test(varA) || /_OUT$/i.test(varA)
+      const isOthersB = labelB.includes('outros') || /_\d+$/.test(varB) || /_OUT$/i.test(varB)
+
+      // Se apenas A é "Outros", A vem depois
+      if (isOthersA && !isOthersB) return 1
+      // Se apenas B é "Outros", B vem depois
+      if (!isOthersA && isOthersB) return -1
+
+      // Caso contrário, ordenar alfabeticamente pela variável
+      return varA.localeCompare(varB)
     })
 
     console.log('ChartData Onda 1 calculado:', results)
@@ -223,7 +248,7 @@ export default function ExpandedSurveyDashboardWave1() {
                   }}>
                     <div>
                       <h5 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#e65100' }}>
-                        Dados da Onda 1 (Rodada 13)
+                        Dados da Onda 1 (Mai/25)
                       </h5>
                       <p style={{ margin: 0, fontSize: '13px', color: '#f57c00' }}>
                         Resultados da primeira onda da pesquisa ampliada
