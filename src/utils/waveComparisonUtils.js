@@ -2,6 +2,8 @@
  * Utilitários para validação e comparação entre ondas de pesquisa
  */
 
+import { R16_TO_R13_COLUMN_MAP } from "./demographicUtils"
+
 /**
  * Valida se as respostas de duas ondas são compatíveis para comparação
  * Critério: Mesmas opções de resposta (vindas da base de dados)
@@ -157,9 +159,10 @@ export const createDemographicValueMapping = (wave1Data, wave2Data, variable) =>
 
 /**
  * Aplica filtros em dados de ambas as ondas
- * @param {Array} filters - Filtros selecionados
- * @param {Object} wave1ProcessedData - Dados processados da Onda 1
- * @param {Object} wave2ProcessedData - Dados processados da Onda 2
+ * Lida com mapeamento de colunas entre R13 e R16 (ex: PF16 -> PF17 para Raça/Cor)
+ * @param {Object} filters - Filtros selecionados (chave = nome da coluna R16, valor = array de valores)
+ * @param {Object} wave1ProcessedData - Dados processados da Onda 1 (R13)
+ * @param {Object} wave2ProcessedData - Dados processados da Onda 2 (R16)
  * @returns {Object} Dados filtrados de ambas as ondas
  */
 export const applyUnifiedFilters = (filters, wave1ProcessedData, wave2ProcessedData) => {
@@ -172,12 +175,17 @@ export const applyUnifiedFilters = (filters, wave1ProcessedData, wave2ProcessedD
     return result
   }
 
-  // Aplicar filtros na Onda 1
+  // Aplicar filtros na Onda 1 (R13)
+  // Precisa converter nomes de colunas R16 -> R13 quando necessário
   if (wave1ProcessedData?.rows) {
     result.wave1Rows = wave1ProcessedData.rows.filter(row => {
       return Object.entries(filters).every(([filterKey, filterValues]) => {
         if (!filterValues || filterValues.length === 0) return true
-        const rowValue = row[filterKey]
+
+        // Mapear a coluna R16 para R13 se necessário
+        const r13Key = R16_TO_R13_COLUMN_MAP[filterKey] || filterKey
+        const rowValue = row[r13Key]
+
         // Verificar correspondência direta ou normalizada
         return filterValues.some(fv => {
           if (rowValue === fv) return true
@@ -190,7 +198,7 @@ export const applyUnifiedFilters = (filters, wave1ProcessedData, wave2ProcessedD
     })
   }
 
-  // Aplicar filtros na Onda 2
+  // Aplicar filtros na Onda 2 (R16)
   if (wave2ProcessedData?.rows) {
     result.wave2Rows = wave2ProcessedData.rows.filter(row => {
       return Object.entries(filters).every(([filterKey, filterValues]) => {

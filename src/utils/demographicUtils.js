@@ -54,3 +54,80 @@ export const DEMOGRAPHIC_R16 = {
   PF16: "COR/RAÇA",
   "Faixa de idade": "Faixa de idade",
 }
+
+/**
+ * Colunas demográficas unificadas para filtros entre R13 e R16
+ * Estas são as colunas agrupadas que existem em ambas as rodadas
+ */
+export const UNIFIED_DEMOGRAPHIC_COLUMNS = [
+  {
+    // Coluna com nome igual em ambas as rodadas
+    column: "Sub-regiões",
+    label: "Sub-regiões",
+    r13Column: "Sub-regiões",
+    r16Column: "Sub-regiões"
+  },
+  {
+    column: "Faixa Etária",
+    label: "Faixa Etária",
+    r13Column: "Faixa Etária",
+    r16Column: "Faixa Etária"
+  },
+  {
+    column: "Escolaridade",
+    label: "Escolaridade",
+    r13Column: "Escolaridade",
+    r16Column: "Escolaridade"
+  },
+  {
+    column: "Tipo de Eleitor",
+    label: "Tipo de Eleitor",
+    r13Column: "Tipo de Eleitor",
+    r16Column: "Tipo de Eleitor"
+  },
+  {
+    column: "Renda Familiar",
+    label: "Renda Familiar",
+    r13Column: "Renda Familiar",
+    r16Column: "Renda Familiar"
+  },
+  {
+    column: "Religião Agrupada",
+    label: "Religião Agrupada",
+    r13Column: "Religião Agrupada",
+    r16Column: "Religião Agrupada"
+  },
+  {
+    // Raça/Cor tem nomes diferentes nas rodadas
+    column: "Raça/Cor",
+    label: "Raça/Cor",
+    r13Column: "PF17",
+    r16Column: "PF16"
+  }
+]
+
+/**
+ * Mapeamento de colunas R13 -> R16 para filtros unificados
+ */
+export const R13_TO_R16_COLUMN_MAP = {
+  "Sub-regiões": "Sub-regiões",
+  "Faixa Etária": "Faixa Etária",
+  "Escolaridade": "Escolaridade",
+  "Tipo de Eleitor": "Tipo de Eleitor",
+  "Renda Familiar": "Renda Familiar",
+  "Religião Agrupada": "Religião Agrupada",
+  "PF17": "PF16" // Raça/Cor
+}
+
+/**
+ * Mapeamento de colunas R16 -> R13 para filtros unificados
+ */
+export const R16_TO_R13_COLUMN_MAP = {
+  "Sub-regiões": "Sub-regiões",
+  "Faixa Etária": "Faixa Etária",
+  "Escolaridade": "Escolaridade",
+  "Tipo de Eleitor": "Tipo de Eleitor",
+  "Renda Familiar": "Renda Familiar",
+  "Religião Agrupada": "Religião Agrupada",
+  "PF16": "PF17" // Raça/Cor
+}

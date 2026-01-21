@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from "react"
-import { DEMOGRAPHIC_R16 } from "../utils/demographicUtils"
+import { UNIFIED_DEMOGRAPHIC_COLUMNS } from "../utils/demographicUtils"
 
 /**
  * Hook para processar dados da pesquisa ampliada
@@ -163,62 +163,43 @@ export const useExpandedSurveyData = (rawData) => {
     }
   }, [processedData])
 
-  // Função para obter variáveis demográficas (regiões + PF...)
+  // Função para obter variáveis demográficas unificadas
+  // Usa as colunas agrupadas que existem em ambas as rodadas R13 e R16
   const getDemographicVariables = useMemo(() => {
     if (!processedData) return []
 
     const { headers, rows } = processedData
 
-    // Coletar variáveis demográficas: regiões + PF*
+    // Usar apenas as colunas demográficas unificadas
     const demographicList = []
 
-    // 1. PRIMEIRO: Adicionar "regiões" se existir
-    const regioesHeader = headers.find(h =>
-      h && (h.toLowerCase() === 'regiões' || h.toLowerCase() === 'regiao' || h.toLowerCase() === 'região')
-    )
+    UNIFIED_DEMOGRAPHIC_COLUMNS.forEach(config => {
+      // Verificar qual coluna usar (R16 por padrão, mas pode ser diferente como Raça/Cor)
+      // Precisamos encontrar a coluna que existe neste dataset
+      const possibleColumns = [config.r16Column, config.r13Column, config.column]
+      const foundColumn = possibleColumns.find(col => headers.includes(col))
 
-    if (regioesHeader) {
-      const uniqueValues = new Set()
-      rows.forEach(row => {
-        const value = row[regioesHeader]
-        if (value && value.trim() !== '' && value.trim() !== '#NULL!') {
-          uniqueValues.add(value.trim())
-        }
-      })
+      if (foundColumn) {
+        const uniqueValues = new Set()
 
-      if (uniqueValues.size > 0) {
-        demographicList.push({
-          key: regioesHeader,
-          label: 'Região',
-          values: Array.from(uniqueValues).sort()
+        rows.forEach(row => {
+          const value = row[foundColumn]
+          if (value && value.trim() !== '' && value.trim() !== '#NULL!' && value.trim() !== '-1') {
+            uniqueValues.add(value.trim())
+          }
         })
-      }
-    }
 
-    // 2. DEPOIS: Adicionar variáveis que começam com PF
-    const pfHeaders = headers.filter(header =>
-      header && header.startsWith('PF')
-    )
-
-    pfHeaders.forEach(header => {
-      const uniqueValues = new Set()
-
-      rows.forEach(row => {
-        const value = row[header]
-        // Filtrar valores vazios e #NULL!
-        if (value && value.trim() !== '' && value.trim() !== '#NULL!') {
-          uniqueValues.add(value.trim())
+        if (uniqueValues.size > 0) {
+          demographicList.push({
+            key: foundColumn,
+            label: config.label,
+            values: Array.from(uniqueValues).sort()
+          })
         }
-      })
-
-      if (uniqueValues.size > 0) {
-        demographicList.push({
-          key: header,
-          label: DEMOGRAPHIC_R16[header] || header,
-          values: Array.from(uniqueValues).sort()
-        })
       }
     })
+
+    console.log('📊 Variáveis demográficas encontradas:', demographicList.map(d => d.label))
 
     return demographicList
   }, [processedData])

@@ -336,16 +336,71 @@ export default function ExpandedSurveyDashboard() {
                         fontWeight: '600',
                         color: '#1565c0',
                         margin: 0,
-                        marginBottom: '8px'
+                        marginBottom: '12px'
                       }}>
                         Filtros Ativos
                       </p>
-                      <p style={{
-                        fontSize: '11px',
-                        color: '#1976d2',
-                        margin: 0
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
                       }}>
-                        {Object.values(filters).reduce((sum, arr) => sum + arr.length, 0)} filtro(s) aplicado(s)
+                        {Object.entries(filters).map(([filterKey, filterValues]) => {
+                          // Encontrar o label do filtro nas variáveis demográficas
+                          const demographicVar = demographicVariables.find(d => d.key === filterKey)
+                          const filterLabel = demographicVar?.label || filterKey
+
+                          return (
+                            <div
+                              key={filterKey}
+                              style={{
+                                background: 'rgba(255,255,255,0.7)',
+                                borderRadius: '8px',
+                                padding: '8px 10px'
+                              }}
+                            >
+                              <p style={{
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                color: '#1565c0',
+                                margin: 0,
+                                marginBottom: '4px'
+                              }}>
+                                {filterLabel}:
+                              </p>
+                              <div style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '4px'
+                              }}>
+                                {filterValues.map(value => (
+                                  <span
+                                    key={value}
+                                    style={{
+                                      background: '#1976d2',
+                                      color: '#ffffff',
+                                      fontSize: '10px',
+                                      padding: '2px 8px',
+                                      borderRadius: '10px',
+                                      fontWeight: '500'
+                                    }}
+                                  >
+                                    {value}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p style={{
+                        fontSize: '10px',
+                        color: '#1976d2',
+                        margin: 0,
+                        marginTop: '10px',
+                        fontStyle: 'italic'
+                      }}>
+                        {Object.values(filters).reduce((sum, arr) => sum + arr.length, 0)} valor(es) selecionado(s)
                       </p>
                     </div>
                   )}
