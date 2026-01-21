@@ -61,6 +61,13 @@ export const DEMOGRAPHIC_R16 = {
  */
 export const UNIFIED_DEMOGRAPHIC_COLUMNS = [
   {
+    // Regiões - primeiro filtro
+    column: "Regiões",
+    label: "Regiões",
+    r13Column: "Regiões",
+    r16Column: "Regiões"
+  },
+  {
     // Coluna com nome igual em ambas as rodadas
     column: "Sub-regiões",
     label: "Sub-regiões",
@@ -110,6 +117,7 @@ export const UNIFIED_DEMOGRAPHIC_COLUMNS = [
  * Mapeamento de colunas R13 -> R16 para filtros unificados
  */
 export const R13_TO_R16_COLUMN_MAP = {
+  "Regiões": "Regiões",
   "Sub-regiões": "Sub-regiões",
   "Faixa Etária": "Faixa Etária",
   "Escolaridade": "Escolaridade",
@@ -123,6 +131,7 @@ export const R13_TO_R16_COLUMN_MAP = {
  * Mapeamento de colunas R16 -> R13 para filtros unificados
  */
 export const R16_TO_R13_COLUMN_MAP = {
+  "Regiões": "Regiões",
   "Sub-regiões": "Sub-regiões",
   "Faixa Etária": "Faixa Etária",
   "Escolaridade": "Escolaridade",

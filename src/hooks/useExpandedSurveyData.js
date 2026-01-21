@@ -86,28 +86,26 @@ export const useExpandedSurveyData = (rawData) => {
       }
 
       // Calcular estatísticas com pesos
-      const responseCounts = new Map()
+      const responseCounts = new Map()  // Soma de pesos por resposta
+      const responseRawCounts = new Map() // Contagem bruta (N) por resposta
       let totalWeight = 0
+      let totalCount = 0 // Contagem real de respostas (N)
 
-      // Buscar a coluna de peso (weights) - procurar por várias variações
+      // Buscar a coluna de peso EXATA: "weights (16 casas decimais do spss)"
       const allKeys = Object.keys(filteredRows[0] || {})
-      const weightKey = allKeys.find(key => {
+      const exactWeightKey = "weights (16 casas decimais do spss)"
+      const weightKey = allKeys.includes(exactWeightKey) ? exactWeightKey : allKeys.find(key => {
         const lowerKey = key.toLowerCase()
         return lowerKey === 'weights' ||
                lowerKey === 'weight' ||
-               lowerKey === 'peso' ||
-               lowerKey === 'pesos' ||
-               lowerKey.includes('weight') ||
-               lowerKey.includes('peso')
+               lowerKey.includes('16 casas')
       })
 
       if (!weightKey && filteredRows.length > 0) {
         console.warn('⚠️ Coluna de pesos não encontrada!')
-        console.warn('Todas as colunas disponíveis:', allKeys)
-        console.warn('Primeira linha de exemplo:', filteredRows[0])
+        console.warn('Todas as colunas disponíveis:', allKeys.filter(k => k.toLowerCase().includes('weight')))
       } else if (weightKey) {
         console.log(`✅ Usando coluna de pesos: "${weightKey}"`)
-        console.log(`Exemplo de peso da primeira linha: ${filteredRows[0][weightKey]}`)
       }
 
       filteredRows.forEach(row => {
@@ -135,30 +133,37 @@ export const useExpandedSurveyData = (rawData) => {
           weight = parseFloat(weightStr) || 1
         }
 
-        // Acumular contagens usando pesos
-        const currentCount = responseCounts.get(trimmedResponse) || 0
-        responseCounts.set(trimmedResponse, currentCount + weight)
+        // Acumular contagens usando pesos (para porcentagem)
+        const currentWeightSum = responseCounts.get(trimmedResponse) || 0
+        responseCounts.set(trimmedResponse, currentWeightSum + weight)
         totalWeight += weight
+
+        // Acumular contagem bruta (para N)
+        const currentRawCount = responseRawCounts.get(trimmedResponse) || 0
+        responseRawCounts.set(trimmedResponse, currentRawCount + 1)
+        totalCount += 1
       })
 
       // Converter para array com porcentagens baseadas em WEIGHTS
       const stats = Array.from(responseCounts.entries()).map(([response, weightSum]) => ({
         response,
-        count: weightSum, // count é na verdade a soma dos weights
+        count: responseRawCounts.get(response) || 0, // Contagem bruta (N real)
+        weightSum, // Soma dos pesos para esta resposta
         percentage: totalWeight > 0 ? (weightSum / totalWeight) * 100 : 0
       }))
 
       console.log(`Estatísticas para ${variableName}:`, {
-        totalRowsFiltered: filteredRows.length,
-        totalWeight, // Soma total dos weights
+        totalCount,      // N real (contagem de respostas)
+        totalWeight,     // Soma total dos weights (para porcentagem)
         uniqueResponses: stats.length,
         stats: stats.slice(0, 3)
       })
 
       return {
         data: stats,
-        totalWeight, // Soma total dos weights
-        totalResponses: totalWeight // MUDANÇA: retornar totalWeight em vez de filteredRows.length
+        totalWeight,     // Soma total dos weights (para cálculo de porcentagem)
+        totalCount,      // N real - contagem de respostas
+        totalResponses: totalCount // N = contagem real de respostas
       }
     }
   }, [processedData])
@@ -217,19 +222,19 @@ export const useExpandedSurveyData = (rawData) => {
     }
 
     // Calcular estatísticas com pesos
-    const responseCounts = new Map()
+    const responseCounts = new Map()  // Soma de pesos por resposta
+    const responseRawCounts = new Map() // Contagem bruta (N) por resposta
     let totalWeight = 0
+    let totalCount = 0 // Contagem real de respostas (N)
 
-    // Buscar a coluna de peso
+    // Buscar a coluna de peso EXATA: "weights (16 casas decimais do spss)"
     const allKeys = Object.keys(filteredRows[0] || {})
-    const weightKey = allKeys.find(key => {
+    const exactWeightKey = "weights (16 casas decimais do spss)"
+    const weightKey = allKeys.includes(exactWeightKey) ? exactWeightKey : allKeys.find(key => {
       const lowerKey = key.toLowerCase()
       return lowerKey === 'weights' ||
              lowerKey === 'weight' ||
-             lowerKey === 'peso' ||
-             lowerKey === 'pesos' ||
-             lowerKey.includes('weight') ||
-             lowerKey.includes('peso')
+             lowerKey.includes('16 casas')
     })
 
     filteredRows.forEach(row => {
@@ -252,21 +257,29 @@ export const useExpandedSurveyData = (rawData) => {
         weight = parseFloat(weightStr) || 1
       }
 
-      const currentCount = responseCounts.get(trimmedResponse) || 0
-      responseCounts.set(trimmedResponse, currentCount + weight)
+      // Acumular contagens usando pesos (para porcentagem)
+      const currentWeightSum = responseCounts.get(trimmedResponse) || 0
+      responseCounts.set(trimmedResponse, currentWeightSum + weight)
       totalWeight += weight
+
+      // Acumular contagem bruta (para N)
+      const currentRawCount = responseRawCounts.get(trimmedResponse) || 0
+      responseRawCounts.set(trimmedResponse, currentRawCount + 1)
+      totalCount += 1
     })
 
     const stats = Array.from(responseCounts.entries()).map(([response, weightSum]) => ({
       response,
-      count: weightSum,
+      count: responseRawCounts.get(response) || 0, // Contagem bruta (N real)
+      weightSum, // Soma dos pesos para esta resposta
       percentage: totalWeight > 0 ? (weightSum / totalWeight) * 100 : 0
     }))
 
     return {
       data: stats,
-      totalWeight,
-      totalResponses: totalWeight
+      totalWeight,     // Soma total dos weights (para cálculo de porcentagem)
+      totalCount,      // N real - contagem de respostas
+      totalResponses: totalCount // N = contagem real de respostas
     }
   }, [processedData])
 
