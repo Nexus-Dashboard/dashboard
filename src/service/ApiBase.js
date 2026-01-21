@@ -298,7 +298,8 @@ export const ApiMethods = {
   },
 
   // NOVO: Buscar mapeamento de perguntas entre Rodada 13 (Onda 1) e Rodada 16 (Onda 2)
-  // Este mapeamento define quais perguntas são equivalentes entre as duas ondas
+  // O mapeamento é feito comparando "Texto da Pergunta" e "Rótulo" entre as rodadas
+  // A estrutura da API agora é um índice unificado com todas as perguntas
   getQuestionMapping: async () => {
     try {
       const response = await axios.get(
@@ -310,29 +311,72 @@ export const ApiMethods = {
       }
 
       const values = response.data.data.values
+      const rows = values.slice(1) // Pular header
 
-      // Pular header e criar objeto de mapeamento
-      // Estrutura: { rodada13Var: rodada16Var }
-      const mappingR13toR16 = {}
-      const mappingR16toR13 = {}
+      // Separar perguntas por rodada
+      // Estrutura: [Número da Pesquisa, Arquivo do BD, Variável, Texto da Pergunta, , Rótulo, Index, ...]
+      const r13Questions = []
+      const r16Questions = []
 
-      values.slice(1).forEach(row => {
-        const rodada13Var = row[0] // Variável da Rodada 13
-        const rodada16Var = row[1] // Variável correspondente na Rodada 16
-        const existeEmAmbas = row[2] // "VERDADEIRO" ou "FALSO"
+      rows.forEach(row => {
+        const surveyNumber = row[0]
+        const variable = row[2]
+        const questionText = row[3]?.trim() || ''
+        const label = row[5]?.trim() || ''
 
-        if (rodada13Var && rodada16Var && existeEmAmbas === "VERDADEIRO") {
-          mappingR13toR16[rodada13Var] = rodada16Var
-          mappingR16toR13[rodada16Var] = rodada13Var
+        const questionObj = {
+          surveyNumber,
+          variable,
+          questionText,
+          label,
+          // Criar chave de comparação: combinação de texto + rótulo (normalizado)
+          comparisonKey: normalizeForComparison(questionText, label)
+        }
+
+        if (surveyNumber === "13") {
+          r13Questions.push(questionObj)
+        } else if (surveyNumber === "16") {
+          r16Questions.push(questionObj)
         }
       })
+
+      // Criar mapeamento baseado no texto da pergunta e rótulo
+      const mappingR13toR16 = {}
+      const mappingR16toR13 = {}
+      const matchedPairs = []
+
+      r16Questions.forEach(r16Q => {
+        // Procurar pergunta equivalente na R13
+        const matchingR13 = r13Questions.find(r13Q => {
+          // Comparar pela chave normalizada (texto + rótulo)
+          return r13Q.comparisonKey === r16Q.comparisonKey && r13Q.comparisonKey !== ''
+        })
+
+        if (matchingR13) {
+          mappingR13toR16[matchingR13.variable] = r16Q.variable
+          mappingR16toR13[r16Q.variable] = matchingR13.variable
+
+          matchedPairs.push({
+            r13Variable: matchingR13.variable,
+            r16Variable: r16Q.variable,
+            questionText: r16Q.questionText,
+            label: r16Q.label
+          })
+        }
+      })
+
+      console.log(`📋 Mapeamento criado: ${matchedPairs.length} perguntas equivalentes encontradas`)
+      console.log('Exemplos de mapeamento:', matchedPairs.slice(0, 5))
 
       return {
         success: true,
         data: {
           r13ToR16: mappingR13toR16, // Mapeia Rodada 13 -> Rodada 16
           r16ToR13: mappingR16toR13, // Mapeia Rodada 16 -> Rodada 13
-          rawData: values.slice(1)   // Dados brutos para referência
+          matchedPairs,              // Pares correspondentes com detalhes
+          r13Questions,              // Todas as perguntas da R13
+          r16Questions,              // Todas as perguntas da R16
+          rawData: rows              // Dados brutos para referência
         }
       }
     } catch (error) {
@@ -340,6 +384,27 @@ export const ApiMethods = {
       throw error
     }
   },
+}
+
+/**
+ * Normaliza texto da pergunta e rótulo para comparação
+ * Remove acentos, pontuação, espaços extras e converte para minúsculas
+ */
+function normalizeForComparison(questionText, label) {
+  const text = `${questionText || ''} ${label || ''}`.trim()
+
+  if (!text) return ''
+
+  return text
+    .toLowerCase()
+    // Remover acentos
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    // Remover pontuação
+    .replace(/[.,;:!?()[\]{}'"]/g, '')
+    // Normalizar espaços
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export default ApiBase
