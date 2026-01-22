@@ -303,14 +303,9 @@ export default function StackedBarChart({
                   fill={responseColors[response]}
                   name={response}
                 >
-                  {chartData.map((entry, idx) => {
-                    const value = entry[response] || 0
-                    return (
-                      <Cell key={`cell-${idx}`}>
-                        {/* Label dentro da barra se houver espaço */}
-                      </Cell>
-                    )
-                  })}
+                  {chartData.map((_, idx) => (
+                    <Cell key={`cell-${idx}`} />
+                  ))}
                 </Bar>
               ))}
             </BarChart>
