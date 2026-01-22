@@ -95,34 +95,36 @@ export const ApiMethods = {
       // Buscar as páginas restantes em paralelo (mas com limite)
       const batchSize = 5 // Processar 5 páginas por vez para não sobrecarregar
 
+      const fetchPage = (page) => {
+        return ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
+          .then((response) => {
+            if (response.data?.success) {
+              console.log(`Página ${page} carregada com ${response.data.data.questions.length} questões`)
+              return response.data.data.questions
+            }
+            return []
+          })
+          .catch((error) => {
+            console.error(`Erro ao buscar página ${page}:`, error)
+            return []
+          })
+      }
+
       for (let startPage = 2; startPage <= totalPages; startPage += batchSize) {
         const endPage = Math.min(startPage + batchSize - 1, totalPages)
         const promises = []
 
         for (let page = startPage; page <= endPage; page++) {
-          promises.push(
-            ApiBase.get(`/api/data/questions/all?page=${page}&limit=50`)
-              .then((response) => {
-                if (response.data?.success) {
-                  console.log(`Página ${page} carregada com ${response.data.data.questions.length} questões`)
-                  return response.data.data.questions
-                }
-                return []
-              })
-              .catch((error) => {
-                console.error(`Erro ao buscar página ${page}:`, error)
-                return []
-              }),
-          )
+          promises.push(fetchPage(page))
         }
 
         // Aguardar o lote atual
         const batchResults = await Promise.all(promises)
 
         // Adicionar resultados do lote
-        batchResults.forEach((pageQuestions) => {
+        for (const pageQuestions of batchResults) {
           allQuestions = [...allQuestions, ...pageQuestions]
-        })
+        }
 
         console.log(
           `Progresso: ${allQuestions.length} questões carregadas de ${firstResponse.data.data.pagination.totalQuestions}`,

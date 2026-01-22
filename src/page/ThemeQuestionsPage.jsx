@@ -6,7 +6,7 @@ import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 import { useNavigate, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, Search, BarChart3, Filter, Layers, FileText } from "lucide-react"
+import { ArrowLeft, Search, BarChart3, Layers, FileText } from "lucide-react"
 import CommonHeader from "../components/CommonHeader"
 import ApiBase from "../service/ApiBase"
 import "./ThemeQuestionsPage.css"
@@ -199,10 +199,6 @@ export default function ThemeQuestionsPage() {
     },
     [navigate, themeName, surveyType, themeSlug],
   )
-
-  const handleSpecialSurveyClick = useCallback(() => {
-    navigate(`/pesquisa-ampliada/f2f/rodada-16`)
-  }, [navigate])
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
   const handleSearchChange = useCallback((e) => setSearchTerm(e.target.value), [])

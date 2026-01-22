@@ -169,7 +169,7 @@ function Upload() {
       let surveyInfo = null
 
       console.log("🚀 INICIANDO ANÁLISE DOS ARQUIVOS")
-      console.log("=" .repeat(50))
+      console.log("=".repeat(50))
 
       // Processar arquivo de dados
       if (dataFile) {

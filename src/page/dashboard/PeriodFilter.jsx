@@ -124,7 +124,6 @@ const PeriodDropdown = ({
         
         const now = new Date();
         const currentYear = now.getFullYear();
-        const currentMonth = now.getMonth() + 1;
         
         const periods = [];
         

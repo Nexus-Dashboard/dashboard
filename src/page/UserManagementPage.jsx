@@ -63,6 +63,7 @@ const UserManagementPage = () => {
       return
     }
     fetchUsers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, searchTerm, roleFilter])
 
   const fetchUsers = async () => {
