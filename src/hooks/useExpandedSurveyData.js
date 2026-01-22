@@ -16,10 +16,19 @@ export const useExpandedSurveyData = (rawData) => {
     const values = rawData.data.values
     const headers = values[0]
 
+    // DEBUG: Encontrar e listar todas as colunas de peso
+    const weightColumns = headers.filter(h => h && h.toLowerCase().includes('weight'))
+    console.log('🔍 Colunas de WEIGHT no dataset:', weightColumns)
+    console.log('🔍 Nomes EXATOS das colunas de weight:')
+    weightColumns.forEach((col, i) => {
+      console.log(`  [${i}] "${col}" (length: ${col.length})`)
+    })
+
     console.log('Processando dados brutos:', {
       totalRows: values.length,
       totalColumns: headers.length,
-      sampleHeaders: headers.slice(0, 10)
+      sampleHeaders: headers.slice(0, 10),
+      weightColumns: weightColumns
     })
 
     // Criar mapa de índices para acesso rápido
@@ -43,6 +52,17 @@ export const useExpandedSurveyData = (rawData) => {
       })
 
       rows.push(rowObject)
+    }
+
+    // DEBUG: Verificar soma total dos weights de TODAS as linhas
+    const weightColName = weightColumns.find(c => c.toLowerCase().includes('16 casas') || c.toLowerCase().includes('spss')) || weightColumns[0]
+    if (weightColName) {
+      let totalWeightAllRows = 0
+      rows.forEach(row => {
+        const val = parseFloat(String(row[weightColName]).replace(',', '.')) || 0
+        totalWeightAllRows += val
+      })
+      console.log(`📊 SOMA TOTAL DE WEIGHTS (todas as ${rows.length} linhas): ${totalWeightAllRows.toFixed(4)} usando coluna "${weightColName}"`)
     }
 
     console.log('Dados processados:', {
@@ -71,11 +91,40 @@ export const useExpandedSurveyData = (rawData) => {
         return null
       }
 
+      // ========== DEBUG PROFUNDO: ANÁLISE DE FILTROS ==========
+      console.log('═══════════════════════════════════════════════════════')
+      console.log('🔬 ANÁLISE PROFUNDA DE CÁLCULO')
+      console.log('═══════════════════════════════════════════════════════')
+      console.log('📌 Variável:', variableName)
+      console.log('📌 Filtros aplicados:', JSON.stringify(filters))
+      console.log('📌 Total de linhas ANTES do filtro:', rows.length)
+
       // Aplicar filtros
       let filteredRows = rows
 
       // Aplicar filtros demográficos
       if (Object.keys(filters).length > 0) {
+        // DEBUG PRÉ-FILTRO: Verificar valores únicos na coluna de filtro
+        Object.entries(filters).forEach(([filterKey, filterValues]) => {
+          const uniqueInData = new Set()
+          rows.forEach(row => {
+            const val = row[filterKey]
+            if (val !== undefined && val !== null) {
+              uniqueInData.add(val)
+            }
+          })
+          console.log(`📌 PRÉ-FILTRO - Coluna "${filterKey}":`)
+          console.log(`   Valores únicos na base (${uniqueInData.size}): [${Array.from(uniqueInData).slice(0, 10).join(', ')}${uniqueInData.size > 10 ? '...' : ''}]`)
+          console.log(`   Valores do filtro: [${filterValues?.join(', ')}]`)
+
+          // Verificar se algum valor do filtro existe na base
+          const matchingValues = filterValues?.filter(fv => uniqueInData.has(fv)) || []
+          console.log(`   Valores com match: [${matchingValues.join(', ')}]`)
+          if (matchingValues.length !== filterValues?.length) {
+            console.warn(`   ⚠️ ATENÇÃO: Alguns valores do filtro NÃO existem na base!`)
+          }
+        })
+
         filteredRows = rows.filter(row => {
           return Object.entries(filters).every(([filterKey, filterValues]) => {
             if (!filterValues || filterValues.length === 0) return true
@@ -83,6 +132,20 @@ export const useExpandedSurveyData = (rawData) => {
             return filterValues.includes(rowValue)
           })
         })
+
+        // DEBUG: Mostrar quantas linhas passaram pelo filtro
+        console.log('📌 Total de linhas APÓS filtro demográfico:', filteredRows.length)
+
+        // DEBUG: Mostrar amostra das linhas filtradas
+        if (filteredRows.length > 0) {
+          const sampleRow = filteredRows[0]
+          Object.entries(filters).forEach(([filterKey, filterValues]) => {
+            console.log(`   → Filtro "${filterKey}": valores aceitos = [${filterValues?.join(', ')}]`)
+            console.log(`     Valor na amostra: "${sampleRow[filterKey]}"`)
+          })
+        }
+      } else {
+        console.log('📌 Nenhum filtro aplicado - usando todas as linhas')
       }
 
       // Calcular estatísticas com pesos
@@ -92,21 +155,85 @@ export const useExpandedSurveyData = (rawData) => {
       let totalCount = 0 // Contagem real de respostas (N)
 
       // Buscar a coluna de peso EXATA: "weights (16 casas decimais do spss)"
+      // IMPORTANTE: Priorizar a coluna com 16 casas decimais, não a coluna "weights" genérica
       const allKeys = Object.keys(filteredRows[0] || {})
-      const exactWeightKey = "weights (16 casas decimais do spss)"
-      const weightKey = allKeys.includes(exactWeightKey) ? exactWeightKey : allKeys.find(key => {
+
+      // DEBUG: Mostrar TODAS as colunas que contêm "weight" para diagnóstico
+      const allWeightColumns = allKeys.filter(k => k.toLowerCase().includes('weight'))
+      console.log('📋 TODAS as colunas de weight encontradas:', allWeightColumns)
+
+      // DEBUG AVANÇADO: Calcular soma de TODAS as colunas de weight para comparar
+      // Primeiro: soma de TODAS as linhas filtradas (sem filtrar por resposta)
+      console.log('🔬 SOMA DE WEIGHTS - TODAS AS LINHAS FILTRADAS (antes de filtrar por resposta válida):')
+      allWeightColumns.forEach(col => {
+        let sumAll = 0
+        filteredRows.forEach(row => {
+          const val = parseFloat(String(row[col]).replace(',', '.')) || 0
+          sumAll += val
+        })
+        console.log(`  → "${col}": soma_total=${sumAll.toFixed(4)}, linhas=${filteredRows.length}`)
+      })
+
+      // Segundo: soma apenas das linhas com resposta válida
+      if (allWeightColumns.length >= 1) {
+        console.log('🔬 SOMA DE WEIGHTS - APENAS RESPOSTAS VÁLIDAS:')
+        allWeightColumns.forEach(col => {
+          let sum = 0
+          let count = 0
+          let excluded = { empty: 0, null: 0, minusOne: 0 }
+          filteredRows.forEach(row => {
+            const response = row[variableName]
+            if (!response || response.trim() === '') {
+              excluded.empty++
+              return
+            }
+            if (response.trim() === '#NULL!' || response.trim() === '#NULL' || response.trim() === '#null') {
+              excluded.null++
+              return
+            }
+            if (response.trim() === '-1') {
+              excluded.minusOne++
+              return
+            }
+            const val = parseFloat(String(row[col]).replace(',', '.')) || 0
+            sum += val
+            count++
+          })
+          console.log(`  → "${col}": soma=${sum.toFixed(4)}, count=${count}`)
+          console.log(`     Excluídos: vazios=${excluded.empty}, #NULL!=${excluded.null}, -1=${excluded.minusOne}`)
+        })
+      }
+
+      // Procurar primeiro pela coluna específica com 16 casas decimais
+      // Buscar por "16 casas" OU "decimais" (permitindo typos como "deciamis")
+      const weightKey = allKeys.find(key => {
         const lowerKey = key.toLowerCase()
-        return lowerKey === 'weights' ||
-               lowerKey === 'weight' ||
-               lowerKey.includes('16 casas')
+        return lowerKey.includes('16 casas') ||
+               lowerKey.includes('decimais') ||
+               lowerKey.includes('deciamis') || // Typo comum
+               lowerKey.includes('spss')
+      }) || allKeys.find(key => {
+        // Fallback: usar "weights" apenas se não encontrar a específica
+        const lowerKey = key.toLowerCase()
+        return lowerKey === 'weights' || lowerKey === 'weight'
       })
 
       if (!weightKey && filteredRows.length > 0) {
         console.warn('⚠️ Coluna de pesos não encontrada!')
-        console.warn('Todas as colunas disponíveis:', allKeys.filter(k => k.toLowerCase().includes('weight')))
+        console.warn('Todas as colunas disponíveis:', allWeightColumns)
       } else if (weightKey) {
         console.log(`✅ Usando coluna de pesos: "${weightKey}"`)
+        // DEBUG: Mostrar os primeiros 3 valores da coluna de peso selecionada
+        const sampleWeightValues = filteredRows.slice(0, 3).map(r => ({
+          raw: r[weightKey],
+          parsed: parseFloat(String(r[weightKey]).replace(',', '.')) || 1
+        }))
+        console.log('📊 Amostras de valores de peso:', sampleWeightValues)
       }
+
+      // DEBUG: Verificar primeiras linhas para conferir valores de weight
+      let debugCount = 0
+      const debugSamples = []
 
       filteredRows.forEach(row => {
         const response = row[variableName]
@@ -127,10 +254,22 @@ export const useExpandedSurveyData = (rawData) => {
         }
 
         // Obter peso - converter vírgula em ponto e parsear
-        let weight = 1
-        if (weightKey && row[weightKey]) {
+        // IMPORTANTE: Se o peso estiver vazio/undefined, usar 0 (não 1) para não inflar o total
+        let weight = 0
+        if (weightKey && row[weightKey] !== undefined && row[weightKey] !== null && row[weightKey] !== '') {
           const weightStr = String(row[weightKey]).replace(',', '.')
-          weight = parseFloat(weightStr) || 1
+          const parsedWeight = parseFloat(weightStr)
+          weight = isNaN(parsedWeight) ? 0 : parsedWeight
+
+          // DEBUG: Coletar amostras dos weights
+          if (debugCount < 5) {
+            debugSamples.push({
+              response: trimmedResponse,
+              weightRaw: row[weightKey],
+              weightParsed: weight
+            })
+            debugCount++
+          }
         }
 
         // Acumular contagens usando pesos (para porcentagem)
@@ -142,6 +281,21 @@ export const useExpandedSurveyData = (rawData) => {
         const currentRawCount = responseRawCounts.get(trimmedResponse) || 0
         responseRawCounts.set(trimmedResponse, currentRawCount + 1)
         totalCount += 1
+      })
+
+      // DEBUG: Log detalhado para verificar cálculo
+      console.log(`🔍 DEBUG ${variableName}:`, {
+        weightKey,
+        totalCount,
+        totalWeight: totalWeight.toFixed(4),
+        sampleWeights: debugSamples,
+        responseSummary: Array.from(responseCounts.entries()).slice(0, 3).map(([r, w]) => ({
+          response: r,
+          weightSum: w.toFixed(4),
+          count: responseRawCounts.get(r),
+          pctWeight: ((w / totalWeight) * 100).toFixed(2) + '%',
+          pctCount: ((responseRawCounts.get(r) / totalCount) * 100).toFixed(2) + '%'
+        }))
       })
 
       // Converter para array com porcentagens baseadas em WEIGHTS
@@ -221,6 +375,13 @@ export const useExpandedSurveyData = (rawData) => {
       return null
     }
 
+    // ========== DEBUG PROFUNDO: calculateVariableStatsWithRows ==========
+    console.log('═══════════════════════════════════════════════════════')
+    console.log('🔬 ANÁLISE PROFUNDA - calculateVariableStatsWithRows')
+    console.log('═══════════════════════════════════════════════════════')
+    console.log('📌 Variável:', variableName)
+    console.log('📌 Linhas recebidas (já filtradas):', filteredRows.length)
+
     // Calcular estatísticas com pesos
     const responseCounts = new Map()  // Soma de pesos por resposta
     const responseRawCounts = new Map() // Contagem bruta (N) por resposta
@@ -228,14 +389,38 @@ export const useExpandedSurveyData = (rawData) => {
     let totalCount = 0 // Contagem real de respostas (N)
 
     // Buscar a coluna de peso EXATA: "weights (16 casas decimais do spss)"
+    // IMPORTANTE: Priorizar a coluna com 16 casas decimais, não a coluna "weights" genérica
     const allKeys = Object.keys(filteredRows[0] || {})
-    const exactWeightKey = "weights (16 casas decimais do spss)"
-    const weightKey = allKeys.includes(exactWeightKey) ? exactWeightKey : allKeys.find(key => {
+
+    // DEBUG: Mostrar colunas de weight disponíveis
+    const allWeightColumns = allKeys.filter(k => k.toLowerCase().includes('weight'))
+    console.log('📋 Colunas de weight disponíveis:', allWeightColumns)
+
+    // Procurar primeiro pela coluna específica com 16 casas decimais
+    // Buscar por "16 casas" OU "decimais" (permitindo typos como "deciamis")
+    const weightKey = allKeys.find(key => {
       const lowerKey = key.toLowerCase()
-      return lowerKey === 'weights' ||
-             lowerKey === 'weight' ||
-             lowerKey.includes('16 casas')
+      return lowerKey.includes('16 casas') ||
+             lowerKey.includes('decimais') ||
+             lowerKey.includes('deciamis') || // Typo comum
+             lowerKey.includes('spss')
+    }) || allKeys.find(key => {
+      // Fallback: usar "weights" apenas se não encontrar a específica
+      const lowerKey = key.toLowerCase()
+      return lowerKey === 'weights' || lowerKey === 'weight'
     })
+
+    console.log(`✅ Usando coluna de pesos: "${weightKey}"`)
+
+    // DEBUG: Soma de TODAS as linhas recebidas (antes de filtrar por resposta válida)
+    if (weightKey) {
+      let sumAllRows = 0
+      filteredRows.forEach(row => {
+        const val = parseFloat(String(row[weightKey]).replace(',', '.')) || 0
+        sumAllRows += val
+      })
+      console.log(`📊 Soma de weights de TODAS as ${filteredRows.length} linhas: ${sumAllRows.toFixed(4)}`)
+    }
 
     filteredRows.forEach(row => {
       const response = row[variableName]
@@ -251,10 +436,13 @@ export const useExpandedSurveyData = (rawData) => {
         trimmedResponse = 'NS/NR'
       }
 
-      let weight = 1
-      if (weightKey && row[weightKey]) {
+      // Obter peso - converter vírgula em ponto e parsear
+      // IMPORTANTE: Se o peso estiver vazio/undefined, usar 0 (não 1) para não inflar o total
+      let weight = 0
+      if (weightKey && row[weightKey] !== undefined && row[weightKey] !== null && row[weightKey] !== '') {
         const weightStr = String(row[weightKey]).replace(',', '.')
-        weight = parseFloat(weightStr) || 1
+        const parsedWeight = parseFloat(weightStr)
+        weight = isNaN(parsedWeight) ? 0 : parsedWeight
       }
 
       // Acumular contagens usando pesos (para porcentagem)
@@ -274,6 +462,18 @@ export const useExpandedSurveyData = (rawData) => {
       weightSum, // Soma dos pesos para esta resposta
       percentage: totalWeight > 0 ? (weightSum / totalWeight) * 100 : 0
     }))
+
+    // DEBUG FINAL
+    console.log(`📊 RESULTADO FINAL - calculateVariableStatsWithRows(${variableName}):`, {
+      totalCount,
+      totalWeight: totalWeight.toFixed(4),
+      respostasComMaiorPeso: stats.sort((a, b) => b.weightSum - a.weightSum).slice(0, 3).map(s => ({
+        resposta: s.response,
+        peso: s.weightSum.toFixed(4),
+        count: s.count,
+        pct: s.percentage.toFixed(2) + '%'
+      }))
+    })
 
     return {
       data: stats,

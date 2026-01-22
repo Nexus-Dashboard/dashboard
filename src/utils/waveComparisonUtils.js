@@ -171,7 +171,14 @@ export const applyUnifiedFilters = (filters, wave1ProcessedData, wave2ProcessedD
     wave2Rows: wave2ProcessedData?.rows || [],
   }
 
+  console.log('🔬 applyUnifiedFilters CHAMADO:', {
+    filtros: JSON.stringify(filters),
+    wave1TotalRows: wave1ProcessedData?.rows?.length || 0,
+    wave2TotalRows: wave2ProcessedData?.rows?.length || 0
+  })
+
   if (!filters || Object.keys(filters).length === 0) {
+    console.log('📌 Nenhum filtro - retornando todas as linhas')
     return result
   }
 
@@ -213,6 +220,11 @@ export const applyUnifiedFilters = (filters, wave1ProcessedData, wave2ProcessedD
       })
     })
   }
+
+  console.log('📌 applyUnifiedFilters RESULTADO:', {
+    wave1RowsFiltradas: result.wave1Rows.length,
+    wave2RowsFiltradas: result.wave2Rows.length
+  })
 
   return result
 }
