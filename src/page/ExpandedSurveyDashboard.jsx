@@ -7,7 +7,9 @@ import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft, TrendingUp } from "lucide-react"
 import CommonHeader from "../components/CommonHeader"
 import HorizontalBarChart from "../components/dashboard/expanded-survey/HorizontalBarChart"
+import StackedBarChart from "../components/dashboard/expanded-survey/StackedBarChart"
 import WaveComparisonChart from "../components/dashboard/expanded-survey/WaveComparisonChart"
+import StackedWaveComparisonChart from "../components/dashboard/expanded-survey/StackedWaveComparisonChart"
 import DemographicFilters from "../components/dashboard/expanded-survey/DemographicFilters"
 import { ApiMethods } from "../service/ApiBase"
 import { useExpandedSurveyData } from "../hooks/useExpandedSurveyData"
@@ -126,23 +128,45 @@ export default function ExpandedSurveyDashboard() {
     return mapping
   }, [indexData])
 
+  // Verificar se os rótulos indicam que devemos aglomerar (Primeiro, Segundo, Outros)
+  // ou se devemos criar gráficos separados para cada variável
+  const shouldAggregate = useMemo(() => {
+    if (variables.length <= 1) return false
+
+    // Rótulos que indicam aglomeração (perguntas de múltipla menção como P7_O1, P7_O2)
+    const aggregationLabels = ['primeiro', 'segundo', 'terceiro', 'quarto', 'quinto',
+      'primeiro outros', 'segundo outros', 'terceiro outros', 'quarto outros', 'quinto outros']
+
+    // Obter os labels das variáveis
+    const labels = variables.map(v => (variableLabels[v] || '').toLowerCase().trim())
+
+    // Se TODOS os labels forem do tipo agregação, aglomerar
+    const allAreAggregationLabels = labels.every(label =>
+      aggregationLabels.some(aggLabel => label === aggLabel || label.includes(aggLabel))
+    )
+
+    console.log('🔍 Verificando se deve aglomerar:', { labels, allAreAggregationLabels })
+    return allAreAggregationLabels
+  }, [variables, variableLabels])
+
   // Calcular estatísticas para cada variável
-  // Se houver múltiplas variáveis com mesmo texto mas labels diferentes (ex: P7_O1 e P7_O2),
+  // Se houver múltiplas variáveis com rótulos de aglomeração (ex: P7_O1 e P7_O2 com "Primeiro", "Segundo"),
   // aglomerar as respostas somando os pesos e dividindo pelo universo total
+  // Caso contrário (ex: T_P10_1 com "À renda da sua família"), criar gráficos separados
   const chartData = useMemo(() => {
-    console.log('Calculando chartData:', { isReady, hasCalculateFunc: !!calculateVariableStats, variables })
+    console.log('Calculando chartData:', { isReady, hasCalculateFunc: !!calculateVariableStats, variables, shouldAggregate })
 
     if (!isReady || !calculateVariableStats) {
       console.log('Aguardando dados ficarem prontos...')
       return []
     }
 
-    // Se houver múltiplas variáveis, aglomerar as respostas
+    // Só aglomerar se shouldAggregate for true (rótulos como Primeiro, Segundo, etc.)
     // LÓGICA CORRETA: Somar weights das menções e dividir pelo N (count) do universo
     // Porcentagem = (soma dos weights das menções) / N * 100
     // Exemplo: Se N=1000 pessoas e soma dos weights de "TV" = 300, = 30%
-    if (variables.length > 1) {
-      console.log('📊 Múltiplas variáveis detectadas - aglomerando respostas:', variables)
+    if (variables.length > 1 && shouldAggregate) {
+      console.log('📊 Múltiplas variáveis com rótulos de aglomeração - aglomerando respostas:', variables)
 
       // Mapear para acumular menções de todas as variáveis
       const aggregatedResponses = new Map() // response -> { weightSum, count }
@@ -257,7 +281,7 @@ export default function ExpandedSurveyDashboard() {
 
     console.log('ChartData calculado:', results)
     return results
-  }, [variables, filters, isReady, calculateVariableStats, variableLabels])
+  }, [variables, filters, isReady, calculateVariableStats, variableLabels, shouldAggregate])
 
   // NOVO: Aplicar filtros unificados em ambas as ondas
   const unifiedFilteredData = useMemo(() => {
@@ -305,11 +329,11 @@ export default function ExpandedSurveyDashboard() {
       return []
     }
 
-    // Se houver múltiplas variáveis, aglomerar as respostas de ambas as ondas
+    // Só aglomerar se shouldAggregate for true (rótulos como Primeiro, Segundo, etc.)
     // LÓGICA CORRETA: Somar weights das menções e dividir pelo N (count) do universo
     // Porcentagem = (soma dos weights das menções) / N * 100
-    if (variables.length > 1 && wave1Variables.length > 1) {
-      console.log('📊 Múltiplas variáveis detectadas para comparação - aglomerando:', {
+    if (variables.length > 1 && wave1Variables.length > 1 && shouldAggregate) {
+      console.log('📊 Múltiplas variáveis com rótulos de aglomeração para comparação - aglomerando:', {
         r16: variables,
         r13: wave1Variables
       })
@@ -450,7 +474,7 @@ export default function ExpandedSurveyDashboard() {
 
     console.log('✅ waveComparisonData calculado:', results.length, 'variáveis')
     return results
-  }, [hasWaveComparison, variables, wave1Variables, isWave1Ready, calculateWave1StatsWithRows, isReady, calculateVariableStatsWithRows, variableLabels, unifiedFilteredData])
+  }, [hasWaveComparison, variables, wave1Variables, isWave1Ready, calculateWave1StatsWithRows, isReady, calculateVariableStatsWithRows, variableLabels, unifiedFilteredData, shouldAggregate])
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
 
@@ -604,6 +628,7 @@ export default function ExpandedSurveyDashboard() {
               <Col lg={9}>
                 <div className="d-flex flex-column gap-4">
                   {/* NOVO: Gráficos de comparação entre ondas */}
+                  {/* Gráficos de comparação entre ondas */}
                   {hasWaveComparison && waveComparisonData.length > 0 && (
                     <>
                       <div style={{
@@ -627,21 +652,43 @@ export default function ExpandedSurveyDashboard() {
                         </div>
                       </div>
 
-                      {waveComparisonData.map((data, idx) => (
-                        <WaveComparisonChart
-                          key={`wave-comparison-${idx}`}
-                          wave1Stats={data.wave1Stats}
-                          wave2Stats={data.wave2Stats}
+                      {/* Se não deve aglomerar e há múltiplas variáveis, usar gráfico empilhado comparativo */}
+                      {!shouldAggregate && waveComparisonData.length > 1 ? (
+                        <StackedWaveComparisonChart
+                          wave1Data={waveComparisonData.map(d => ({
+                            variable: d.wave1Variable,
+                            label: d.label,
+                            stats: d.wave1Stats
+                          }))}
+                          wave2Data={waveComparisonData.map(d => ({
+                            variable: d.variable,
+                            label: d.label,
+                            stats: d.wave2Stats
+                          }))}
                           questionText={questionText}
-                          variableName={data.variable}
-                          wave1VariableName={data.wave1Variable}
-                          variableLabel={data.label}
-                          wave1SampleSize={data.wave1SampleSize}
-                          wave2SampleSize={data.wave2SampleSize}
-                          wave1MarginOfError={data.wave1MarginOfError}
-                          wave2MarginOfError={data.wave2MarginOfError}
+                          wave1SampleSize={waveComparisonData[0]?.wave1SampleSize}
+                          wave2SampleSize={waveComparisonData[0]?.wave2SampleSize}
+                          wave1MarginOfError={waveComparisonData[0]?.wave1MarginOfError}
+                          wave2MarginOfError={waveComparisonData[0]?.wave2MarginOfError}
                         />
-                      ))}
+                      ) : (
+                        // Gráficos individuais de comparação para cada variável (ou aglomerado)
+                        waveComparisonData.map((data, idx) => (
+                          <WaveComparisonChart
+                            key={`wave-comparison-${idx}`}
+                            wave1Stats={data.wave1Stats}
+                            wave2Stats={data.wave2Stats}
+                            questionText={questionText}
+                            variableName={data.variable}
+                            wave1VariableName={data.wave1Variable}
+                            variableLabel={data.label}
+                            wave1SampleSize={data.wave1SampleSize}
+                            wave2SampleSize={data.wave2SampleSize}
+                            wave1MarginOfError={data.wave1MarginOfError}
+                            wave2MarginOfError={data.wave2MarginOfError}
+                          />
+                        ))
+                      )}
 
                       <hr style={{ margin: '24px 0', borderColor: '#dee2e6' }} />
 
@@ -667,18 +714,31 @@ export default function ExpandedSurveyDashboard() {
                     </>
                   )}
 
-                  {chartData.map((data, idx) => (
-                    <HorizontalBarChart
-                      key={idx}
-                      data={data.stats}
+                  {/* Gráficos de dados da Onda 2 */}
+                  {/* Se não deve aglomerar e há múltiplas variáveis, usar gráfico empilhado */}
+                  {!shouldAggregate && chartData.length > 1 ? (
+                    <StackedBarChart
+                      data={chartData}
                       questionText={questionText}
-                      variableName={data.variable}
-                      variableLabel={data.label}
-                      sampleSize={data.totalResponses}
-                      originalSampleSize={data.originalSampleSize}
-                      marginOfError={data.marginOfError}
+                      sampleSize={chartData[0]?.totalResponses}
+                      originalSampleSize={chartData[0]?.originalSampleSize}
+                      marginOfError={chartData[0]?.marginOfError}
                     />
-                  ))}
+                  ) : (
+                    // Gráficos individuais (ou único aglomerado)
+                    chartData.map((data, idx) => (
+                      <HorizontalBarChart
+                        key={idx}
+                        data={data.stats}
+                        questionText={questionText}
+                        variableName={data.variable}
+                        variableLabel={data.label}
+                        sampleSize={data.totalResponses}
+                        originalSampleSize={data.originalSampleSize}
+                        marginOfError={data.marginOfError}
+                      />
+                    ))
+                  )}
 
                   {chartData.length === 0 && (
                     <div className="empty-state">

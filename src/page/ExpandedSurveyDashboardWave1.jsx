@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
 import CommonHeader from "../components/CommonHeader"
 import HorizontalBarChart from "../components/dashboard/expanded-survey/HorizontalBarChart"
+import StackedBarChart from "../components/dashboard/expanded-survey/StackedBarChart"
 import DemographicFilters from "../components/dashboard/expanded-survey/DemographicFilters"
 import { ApiMethods } from "../service/ApiBase"
 import { useExpandedSurveyData } from "../hooks/useExpandedSurveyData"
@@ -84,13 +85,83 @@ export default function ExpandedSurveyDashboardWave1() {
     return mapping
   }, [indexData])
 
+  // Verificar se os rótulos indicam que devemos aglomerar (Primeiro, Segundo, Outros)
+  // ou se devemos criar gráficos separados para cada variável
+  const shouldAggregate = useMemo(() => {
+    if (variables.length <= 1) return false
+
+    // Rótulos que indicam aglomeração (perguntas de múltipla menção como P7_O1, P7_O2)
+    const aggregationLabels = ['primeiro', 'segundo', 'terceiro', 'quarto', 'quinto',
+      'primeiro outros', 'segundo outros', 'terceiro outros', 'quarto outros', 'quinto outros']
+
+    // Obter os labels das variáveis
+    const labels = variables.map(v => (variableLabels[v] || '').toLowerCase().trim())
+
+    // Se TODOS os labels forem do tipo agregação, aglomerar
+    const allAreAggregationLabels = labels.every(label =>
+      aggregationLabels.some(aggLabel => label === aggLabel || label.includes(aggLabel))
+    )
+
+    console.log('🔍 Verificando se deve aglomerar (Onda 1):', { labels, allAreAggregationLabels })
+    return allAreAggregationLabels
+  }, [variables, variableLabels])
+
   // Calcular estatísticas para cada variável
   const chartData = useMemo(() => {
-    console.log('Calculando chartData Onda 1:', { isReady, hasCalculateFunc: !!calculateVariableStats, variables })
+    console.log('Calculando chartData Onda 1:', { isReady, hasCalculateFunc: !!calculateVariableStats, variables, shouldAggregate })
 
     if (!isReady || !calculateVariableStats) {
       console.log('Aguardando dados ficarem prontos...')
       return []
+    }
+
+    // Só aglomerar se shouldAggregate for true (rótulos como Primeiro, Segundo, etc.)
+    if (variables.length > 1 && shouldAggregate) {
+      console.log('📊 Múltiplas variáveis com rótulos de aglomeração (Onda 1) - aglomerando respostas:', variables)
+
+      const aggregatedResponses = new Map()
+      const firstVarStats = calculateVariableStats(variables[0], filters)
+      const universeCount = firstVarStats?.totalCount || firstVarStats?.totalResponses || 0
+
+      variables.forEach(variable => {
+        const stats = calculateVariableStats(variable, filters)
+        if (!stats?.data) return
+
+        stats.data.forEach(item => {
+          const existing = aggregatedResponses.get(item.response) || { weightSum: 0, count: 0 }
+          aggregatedResponses.set(item.response, {
+            weightSum: existing.weightSum + (item.weightSum || item.count || 0),
+            count: existing.count + (item.count || 0)
+          })
+        })
+      })
+
+      const aggregatedStats = Array.from(aggregatedResponses.entries()).map(([response, data]) => ({
+        response,
+        count: data.count,
+        weightSum: data.weightSum,
+        percentage: universeCount > 0 ? (data.weightSum / universeCount) * 100 : 0
+      }))
+
+      const firstVarStatsNoFilter = calculateVariableStats(variables[0], {})
+      const originalUniverseCount = firstVarStatsNoFilter?.totalCount || firstVarStatsNoFilter?.totalResponses || 0
+
+      const marginOfError = universeCount > 0
+        ? (1.96 * Math.sqrt(0.25 / universeCount)) * 100
+        : 0
+
+      const labels = variables.map(v => variableLabels[v]).filter(Boolean)
+      const combinedLabel = labels.length > 0 ? labels.join(' / ') : ''
+
+      return [{
+        variable: variables.join(' + '),
+        label: combinedLabel,
+        stats: aggregatedStats,
+        totalWeight: universeCount,
+        totalResponses: universeCount,
+        originalSampleSize: originalUniverseCount,
+        marginOfError: Math.round(marginOfError * 100) / 100
+      }]
     }
 
     const results = variables.map(variable => {
@@ -141,7 +212,7 @@ export default function ExpandedSurveyDashboardWave1() {
 
     console.log('ChartData Onda 1 calculado:', results)
     return results
-  }, [variables, filters, isReady, calculateVariableStats, variableLabels])
+  }, [variables, filters, isReady, calculateVariableStats, variableLabels, shouldAggregate])
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
 
@@ -256,18 +327,30 @@ export default function ExpandedSurveyDashboardWave1() {
                     </div>
                   </div>
 
-                  {chartData.map((data, idx) => (
-                    <HorizontalBarChart
-                      key={idx}
-                      data={data.stats}
+                  {/* Se não deve aglomerar e há múltiplas variáveis, usar gráfico empilhado */}
+                  {!shouldAggregate && chartData.length > 1 ? (
+                    <StackedBarChart
+                      data={chartData}
                       questionText={questionText}
-                      variableName={data.variable}
-                      variableLabel={data.label}
-                      sampleSize={data.totalResponses}
-                      originalSampleSize={data.originalSampleSize}
-                      marginOfError={data.marginOfError}
+                      sampleSize={chartData[0]?.totalResponses}
+                      originalSampleSize={chartData[0]?.originalSampleSize}
+                      marginOfError={chartData[0]?.marginOfError}
                     />
-                  ))}
+                  ) : (
+                    // Gráficos individuais (ou único aglomerado)
+                    chartData.map((data, idx) => (
+                      <HorizontalBarChart
+                        key={idx}
+                        data={data.stats}
+                        questionText={questionText}
+                        variableName={data.variable}
+                        variableLabel={data.label}
+                        sampleSize={data.totalResponses}
+                        originalSampleSize={data.originalSampleSize}
+                        marginOfError={data.marginOfError}
+                      />
+                    ))
+                  )}
 
                   {chartData.length === 0 && (
                     <div className="empty-state">
