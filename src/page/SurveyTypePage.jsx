@@ -25,10 +25,6 @@ export default function SurveyTypePage() {
     }
   }
 
-  const handleUserManagement = () => {
-    navigate("/admin/users")
-  }
-
   return (
     <div className="survey-type-page-wrapper">
       <CommonHeader />

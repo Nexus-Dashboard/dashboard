@@ -25,10 +25,9 @@ import ChartCard from "./dashboard/chart-card"
 import MapCard from "./dashboard/map-card"
 import "./Dashboard.css"
 // formatApiDateForDisplay não é mais necessário - as datas já vêm formatadas da API
-import { 
-  STATES_BY_REGION, 
-  getStatesFromRegion, 
-  isStateInSelectedRegions 
+import {
+  STATES_BY_REGION,
+  isStateInSelectedRegions
 } from "../utils/regionMapping"
 
 const FULL_MONTH_TO_SHORT = {
@@ -159,7 +158,6 @@ export default function Dashboard() {
 
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [loadingStage, setLoadingStage] = useState("")
-  const [startTime, setStartTime] = useState(null)
 
   const theme = useMemo(() => {
     const params = new URLSearchParams(location.search)
@@ -171,11 +169,6 @@ export default function Dashboard() {
     return params.get("questionText")
   }, [location.search])
 
-  const groupId = useMemo(() => {
-    const params = new URLSearchParams(location.search)
-    return params.get("groupId")
-  }, [location.search])
-
   const surveyType = useMemo(() => {
     const params = new URLSearchParams(location.search)
     return params.get("type")
@@ -183,8 +176,7 @@ export default function Dashboard() {
 
   const { data, error, status } = useQuery({
     queryKey: ["groupedQuestionData", theme, questionText, surveyType],
-    queryFn: async (queryKey) => {
-      setStartTime(Date.now())
+    queryFn: async () => {
       setLoadingProgress(5)
       setLoadingStage("Iniciando busca de dados...")
 
@@ -201,7 +193,7 @@ export default function Dashboard() {
         setLoadingStage("Conectando com a API...")
         setLoadingProgress(15)
 
-        const result = await fetchGroupedQuestionData(queryKey)
+        const result = await fetchGroupedQuestionData({ queryKey: ["groupedQuestionData", theme, questionText, surveyType] })
 
         clearInterval(progressInterval)
         setLoadingStage("Processando dados históricos...")
@@ -870,7 +862,6 @@ export default function Dashboard() {
     const allNormalizedResponses = selectedChartData.flatMap(
       (r) => r.distribution.map((d) => normalizeAndGroupNSNR(d.response)).filter((response) => response !== null),
     )
-    const uniqueNormalizedResponses = new Set(allNormalizedResponses)
 
     const useGrouping = shouldGroupResponses(allNormalizedResponses)
     const responseOrder = useGrouping ? GROUPED_RESPONSE_ORDER : RESPONSE_ORDER

@@ -30,7 +30,7 @@ export default function OpenQuestionDashboardWave1() {
   const [filters, setFilters] = useState({})
 
   // Buscar índice de perguntas da Onda 1
-  const { data: indexData, isLoading: indexLoading } = useQuery({
+  const { data: indexData } = useQuery({
     queryKey: ["wave1SurveyIndex"],
     queryFn: ApiMethods.getWave1SurveyIndex,
     staleTime: 1000 * 60 * 30,

@@ -46,7 +46,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
   const tooltipRef = useRef(null)
   const [geoData, setGeoData] = useState(null)
   const [hoveredRegion, setHoveredRegion] = useState(null)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0, position: "right" })
   const [colorScale, setColorScale] = useState(() => d3.scaleLinear().domain([0, 100]).range(["#e9ecef", "#e9ecef"]))
 
@@ -401,8 +400,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
         const mouseX = event.clientX - containerRect.left
         const mouseY = event.clientY - containerRect.top
 
-        setMousePosition({ x: mouseX, y: mouseY })
-
         const tooltipPos = calculateTooltipPosition(mouseX, mouseY, {
           width: containerRect.width,
           height: containerRect.height,
@@ -413,8 +410,6 @@ const InteractiveBrazilMap = ({ responses, selectedQuestion, onStateClick, selec
         const containerRect = containerRef.current.getBoundingClientRect()
         const mouseX = event.clientX - containerRect.left
         const mouseY = event.clientY - containerRect.top
-
-        setMousePosition({ x: mouseX, y: mouseY })
 
         const tooltipPos = calculateTooltipPosition(mouseX, mouseY, {
           width: containerRect.width,

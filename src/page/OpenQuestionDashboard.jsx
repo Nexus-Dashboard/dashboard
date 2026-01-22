@@ -30,7 +30,7 @@ export default function OpenQuestionDashboard() {
   const [filters, setFilters] = useState({})
 
   // Buscar índice de perguntas para obter labels
-  const { data: indexData, isLoading: indexLoading } = useQuery({
+  const { data: indexData } = useQuery({
     queryKey: ["expandedSurveyIndex"],
     queryFn: ApiMethods.getExpandedSurveyIndex,
     staleTime: 1000 * 60 * 30,

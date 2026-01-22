@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { Container, Row, Col, Card, Button, Form, InputGroup, Spinner } from "react-bootstrap"
 import { useNavigate, useParams } from "react-router-dom"
-import { Folder, Search, ArrowLeft, Filter } from "lucide-react"
+import { Search, ArrowLeft } from "lucide-react"
 import ApiBase from "../service/ApiBase"
 import CommonHeader from "../components/CommonHeader"
 import "./HomePage.css"

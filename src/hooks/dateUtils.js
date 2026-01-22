@@ -3,9 +3,9 @@
 /**
  * Mapeia número do mês para nome abreviado
  */
-const MONTH_NAMES = {
+const MONTH_NAMES = { // eslint-disable-line no-unused-vars
   1: "Jan",
-  2: "Fev", 
+  2: "Fev",
   3: "Mar",
   4: "Abr",
   5: "Mai",

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Card, Badge } from "react-bootstrap"
+import { Card } from "react-bootstrap"
 import { getResponseColor } from "../../../utils/chartUtils"
 
 export default function ResponseList({
