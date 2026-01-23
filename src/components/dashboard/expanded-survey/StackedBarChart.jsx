@@ -2,8 +2,9 @@
 
 import { useMemo } from "react"
 import { Card } from "react-bootstrap"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from "recharts"
-import { getResponseColor, RESPONSE_ORDER } from "../../../utils/chartUtils"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from "recharts"
+import { RESPONSE_ORDER } from "../../../utils/chartUtils"
+import { MAP_RESPONSE_BASE_COLORS } from "../../../utils/questionGrouping"
 
 /**
  * Gráfico de barras empilhadas 100% para perguntas com múltiplos rótulos
@@ -53,10 +54,11 @@ export default function StackedBarChart({
       return a.localeCompare(b)
     })
 
-    // Criar mapeamento de cores para cada resposta
+    // Criar mapeamento de cores para cada resposta usando MAP_RESPONSE_BASE_COLORS
     const colors = {}
     sortedResponses.forEach(response => {
-      colors[response] = getResponseColor(response)
+      // Usar MAP_RESPONSE_BASE_COLORS ou cor padrão se não encontrar
+      colors[response] = MAP_RESPONSE_BASE_COLORS[response] || '#6c757d'
     })
 
     // Transformar dados para o formato do Recharts
@@ -271,31 +273,33 @@ export default function StackedBarChart({
         </div>
       </Card.Header>
       <Card.Body style={customStyles.cardBody}>
-        <div style={{ ...customStyles.chartContainer, height: chartHeight }}>
+        <div style={{ ...customStyles.chartContainer, height: chartHeight, padding: '20px 0' }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
               layout="vertical"
-              margin={{ top: 20, right: 30, bottom: 20, left: 250 }}
+              margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
+              stackOffset="expand"
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f3f4" horizontal={true} vertical={false} />
               <XAxis
                 type="number"
-                domain={[0, 100]}
-                tickFormatter={(value) => `${value}%`}
+                domain={[0, 1]}
+                tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
                 tick={{ fontSize: 12, fill: '#495057' }}
+                ticks={[0, 0.25, 0.5, 0.75, 1]}
               />
               <YAxis
                 type="category"
                 dataKey="label"
-                width={240}
+                width={350}
                 tick={{ fontSize: 11, fill: '#495057', fontWeight: 500 }}
                 tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend content={<CustomLegend />} verticalAlign="top" />
 
-              {responseKeys.map((response, index) => (
+              {responseKeys.map((response) => (
                 <Bar
                   key={response}
                   dataKey={response}
@@ -303,9 +307,21 @@ export default function StackedBarChart({
                   fill={responseColors[response]}
                   name={response}
                 >
-                  {chartData.map((_, idx) => (
-                    <Cell key={`cell-${idx}`} />
-                  ))}
+                  <LabelList
+                    dataKey={response}
+                    position="center"
+                    formatter={(value) => {
+                      // Com stackOffset="expand", os valores vêm como decimais (0-1)
+                      const percentage = value * 100
+                      return percentage >= 5 ? `${percentage.toFixed(1)}%` : ''
+                    }}
+                    style={{
+                      fill: '#ffffff',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                    }}
+                  />
                 </Bar>
               ))}
             </BarChart>

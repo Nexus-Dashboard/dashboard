@@ -48,7 +48,11 @@ export const getAnswerTypeTitle = (possibleAnswers) => {
 export const MAP_RESPONSE_BASE_COLORS = {
   // Respostas positivas - azul
   Ótimo: "#334D99",
+  Ótima: "#334D99",
+  "Muito Melhor": "#334D99",
   Bom: "#4D66CC",
+  Boa: "#4D66CC",
+  Melhor: "#4D66CC",
   "Regular mais para positivo": "#334D99",
   "Melhorar muito": "#334D99",
   "Melhorar um pouco": "#4D66CC",
@@ -56,12 +60,16 @@ export const MAP_RESPONSE_BASE_COLORS = {
 
   // Respostas neutras - laranja
   Regular: "#CC804D",
+  Igual: "#CC804D",
   "Ficar igual": "#CC804D",
 
   // Respostas negativas - VERMELHO
   "Regular mais para negativo": "#B33333",
   Ruim: "#B33333",
+  Pior: "#B33333",
   Péssimo: "#801A1A",
+  Péssima: "#801A1A",
+  "Muito Pior": "#801A1A",
   "Piorar um pouco": "#B33333",
   "Piorar muito": "#801A1A",
   "Ruim/Péssimo": "#B33333",

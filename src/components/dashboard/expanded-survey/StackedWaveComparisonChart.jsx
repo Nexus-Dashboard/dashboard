@@ -2,8 +2,9 @@
 
 import { useMemo } from "react"
 import { Card, Badge } from "react-bootstrap"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
-import { getResponseColor, RESPONSE_ORDER } from "../../../utils/chartUtils"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from "recharts"
+import { RESPONSE_ORDER } from "../../../utils/chartUtils"
+import { MAP_RESPONSE_BASE_COLORS } from "../../../utils/questionGrouping"
 
 /**
  * Gráfico de barras empilhadas 100% comparativo entre Onda 1 e Onda 2
@@ -69,10 +70,11 @@ export default function StackedWaveComparisonChart({
       return a.localeCompare(b)
     })
 
-    // Criar mapeamento de cores
+    // Criar mapeamento de cores usando MAP_RESPONSE_BASE_COLORS
     const colors = {}
     sortedResponses.forEach(response => {
-      colors[response] = getResponseColor(response)
+      // Usar MAP_RESPONSE_BASE_COLORS ou cor padrão se não encontrar
+      colors[response] = MAP_RESPONSE_BASE_COLORS[response] || '#6c757d'
     })
 
     // Criar dados para o gráfico - cada label terá duas linhas (Onda 1 e Onda 2)
@@ -343,24 +345,26 @@ export default function StackedWaveComparisonChart({
           </div>
         </div>
 
-        <div style={{ height: chartHeight, width: '100%' }}>
+        <div style={{ height: chartHeight, width: '100%', padding: '0' }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
               layout="vertical"
-              margin={{ top: 20, right: 30, bottom: 20, left: 280 }}
+              margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
+              stackOffset="expand"
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f3f4" horizontal={true} vertical={false} />
               <XAxis
                 type="number"
-                domain={[0, 100]}
-                tickFormatter={(value) => `${value}%`}
+                domain={[0, 1]}
+                tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
                 tick={{ fontSize: 12, fill: '#495057' }}
+                ticks={[0, 0.25, 0.5, 0.75, 1]}
               />
               <YAxis
                 type="category"
                 dataKey={(d) => `${d.fullLabel} - ${d.wave.includes('Onda 1') ? 'O1' : 'O2'}`}
-                width={270}
+                width={450}
                 tick={{ fontSize: 10, fill: '#495057' }}
                 tickLine={false}
               />
@@ -374,7 +378,23 @@ export default function StackedWaveComparisonChart({
                   stackId="stack"
                   fill={responseColors[response]}
                   name={response}
-                />
+                >
+                  <LabelList
+                    dataKey={response}
+                    position="center"
+                    formatter={(value) => {
+                      // Com stackOffset="expand", os valores vêm como decimais (0-1)
+                      const percentage = value * 100
+                      return percentage >= 5 ? `${percentage.toFixed(1)}%` : ''
+                    }}
+                    style={{
+                      fill: '#ffffff',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                    }}
+                  />
+                </Bar>
               ))}
             </BarChart>
           </ResponsiveContainer>
