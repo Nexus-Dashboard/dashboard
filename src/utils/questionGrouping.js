@@ -50,6 +50,8 @@ export const MAP_RESPONSE_BASE_COLORS = {
   Ótimo: "#334D99",
   Ótima: "#334D99",
   "Muito Melhor": "#334D99",
+  "Concorda totalmente": "#334D99",
+  "Concorda em parte": "#4D66CC",
   Bom: "#4D66CC",
   Boa: "#4D66CC",
   Melhor: "#4D66CC",
@@ -57,11 +59,15 @@ export const MAP_RESPONSE_BASE_COLORS = {
   "Melhorar muito": "#334D99",
   "Melhorar um pouco": "#4D66CC",
   "Ótimo/Bom": "#334D99",
+  "O Governo atual": "#334D99",
 
   // Respostas neutras - laranja
   Regular: "#CC804D",
   Igual: "#CC804D",
   "Ficar igual": "#CC804D",
+  "Nem concorda, nem discorda": "#CC804D",
+  "Os dois, de maneira igual (ESPONTÂNEO, NÃO LER)": "#CC804D",
+  
 
   // Respostas negativas - VERMELHO
   "Regular mais para negativo": "#B33333",
@@ -74,6 +80,13 @@ export const MAP_RESPONSE_BASE_COLORS = {
   "Piorar muito": "#801A1A",
   "Ruim/Péssimo": "#B33333",
 
+  
+  
+  "Discorda em parte": "#B33333",
+  "Discorda totalmente": "#801A1A",
+  "O Governo anterior": "#B33333",
+  "Nenhum dos dois (ESPONTÂNEO, NÃO LER)": "#801A1A",
+
   // Outros - CINZA
   "Não sabe": "#999999",
   "Não respondeu": "#999999",
@@ -83,6 +96,11 @@ export const MAP_RESPONSE_BASE_COLORS = {
   Aprova: "#334D99",
   Desaprova: "#B33333",
 }
+
+
+
+
+
 
 // Função para obter descrição do grupo
 export const getAnswerTypeDescription = (possibleAnswers) => {

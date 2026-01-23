@@ -345,27 +345,69 @@ export default function StackedWaveComparisonChart({
           </div>
         </div>
 
-        <div style={{ height: chartHeight, width: '100%', padding: '0' }}>
+        <div style={{ height: chartHeight, width: '100%', padding: '20px' }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
               layout="vertical"
-              margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
-              stackOffset="expand"
+              margin={{ top: 20, right: 30, bottom: 20, left: 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f3f4" horizontal={true} vertical={false} />
               <XAxis
                 type="number"
-                domain={[0, 1]}
-                tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+                domain={[0, 100]}
+                tickFormatter={(value) => `${Math.round(value)}%`}
                 tick={{ fontSize: 12, fill: '#495057' }}
-                ticks={[0, 0.25, 0.5, 0.75, 1]}
               />
               <YAxis
                 type="category"
                 dataKey={(d) => `${d.fullLabel} - ${d.wave.includes('Onda 1') ? 'O1' : 'O2'}`}
                 width={450}
-                tick={{ fontSize: 10, fill: '#495057' }}
+                tick={(props) => {
+                  const { x, y, payload } = props
+                  const text = payload.value
+                  const maxCharsPerLine = 55
+                  const lines = []
+
+                  // Separar o texto principal do sufixo (O1/O2)
+                  const parts = text.split(' - ')
+                  const mainText = parts[0] || ''
+                  const suffix = parts[1] || ''
+
+                  const words = mainText.split(' ')
+                  let currentLine = ''
+
+                  words.forEach(word => {
+                    if ((currentLine + word).length > maxCharsPerLine && currentLine.length > 0) {
+                      lines.push(currentLine.trim())
+                      currentLine = word + ' '
+                    } else {
+                      currentLine += word + ' '
+                    }
+                  })
+                  if (currentLine.trim()) {
+                    lines.push(currentLine.trim() + (suffix ? ` - ${suffix}` : ''))
+                  }
+
+                  return (
+                    <g transform={`translate(${x},${y})`}>
+                      {lines.map((line, index) => (
+                        <text
+                          key={index}
+                          x={0}
+                          y={0}
+                          dy={index * 12 - ((lines.length - 1) * 12) / 2}
+                          textAnchor="end"
+                          fill="#495057"
+                          fontSize="10"
+                          fontWeight="500"
+                        >
+                          {line}
+                        </text>
+                      ))}
+                    </g>
+                  )
+                }}
                 tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
@@ -382,11 +424,7 @@ export default function StackedWaveComparisonChart({
                   <LabelList
                     dataKey={response}
                     position="center"
-                    formatter={(value) => {
-                      // Com stackOffset="expand", os valores vêm como decimais (0-1)
-                      const percentage = value * 100
-                      return percentage >= 5 ? `${percentage.toFixed(1)}%` : ''
-                    }}
+                    formatter={(value) => value >= 5 ? `${value.toFixed(1)}%` : ''}
                     style={{
                       fill: '#ffffff',
                       fontSize: '10px',
