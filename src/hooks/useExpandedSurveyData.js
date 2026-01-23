@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from "react"
-import { UNIFIED_DEMOGRAPHIC_COLUMNS } from "../utils/demographicUtils"
+import { UNIFIED_DEMOGRAPHIC_COLUMNS, POLITICAL_ATTITUDINAL_FILTERS } from "../utils/demographicUtils"
 
 /**
  * Hook para processar dados da pesquisa ampliada
@@ -363,6 +363,37 @@ export const useExpandedSurveyData = (rawData) => {
     return demographicList
   }, [processedData])
 
+  // NOVO: Função para obter variáveis político-atitudinais
+  const getPoliticalVariables = useMemo(() => {
+    if (!processedData) return []
+
+    const { headers } = processedData
+
+    const politicalList = []
+
+    POLITICAL_ATTITUDINAL_FILTERS.forEach(config => {
+      const possibleColumns = [config.r16Column, config.r13Column, config.column]
+      const foundColumn = possibleColumns.find(col => headers.includes(col))
+
+      if (foundColumn && config.groupedValues) {
+        // Usar os valores agrupados definidos na configuração
+        const groupedOptions = Object.keys(config.groupedValues)
+
+        politicalList.push({
+          key: foundColumn,
+          label: config.label,
+          values: groupedOptions,
+          groupedValues: config.groupedValues,
+          isPolitical: true
+        })
+      }
+    })
+
+    console.log('🗳️ Variáveis político-atitudinais encontradas:', politicalList.map(p => p.label))
+
+    return politicalList
+  }, [processedData])
+
   // NOVO: Função para calcular estatísticas com rows pré-filtradas
   // Útil para filtros unificados entre ondas
   const calculateVariableStatsWithRows = useCallback((variableName, filteredRows) => {
@@ -493,6 +524,7 @@ export const useExpandedSurveyData = (rawData) => {
     calculateVariableStats,
     calculateVariableStatsWithRows,
     demographicVariables: getDemographicVariables,
+    politicalVariables: getPoliticalVariables,
     getProcessedRows,
     isReady: !!processedData
   }

@@ -94,6 +94,7 @@ export default function ExpandedSurveyDashboard() {
     calculateVariableStats,
     calculateVariableStatsWithRows,
     demographicVariables,
+    politicalVariables,
     getProcessedRows: getWave2Rows,
     isReady
   } = useExpandedSurveyData(rawData)
@@ -532,6 +533,7 @@ export default function ExpandedSurveyDashboard() {
                 <div style={{ position: 'sticky', top: '20px', height: 'calc(100vh - 200px)' }}>
                   <DemographicFilters
                     demographicVariables={demographicVariables}
+                    politicalVariables={politicalVariables}
                     filters={filters}
                     onFilterChange={handleFilterChange}
                     onClearFilters={handleClearFilters}

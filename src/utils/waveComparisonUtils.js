@@ -2,7 +2,7 @@
  * Utilitários para validação e comparação entre ondas de pesquisa
  */
 
-import { R16_TO_R13_COLUMN_MAP } from "./demographicUtils"
+import { R16_TO_R13_COLUMN_MAP, POLITICAL_ATTITUDINAL_FILTERS } from "./demographicUtils"
 
 /**
  * Valida se as respostas de duas ondas são compatíveis para comparação
@@ -182,8 +182,43 @@ export const applyUnifiedFilters = (filters, wave1ProcessedData, wave2ProcessedD
     return result
   }
 
+  // Criar mapa de filtros político-atitudinais para acesso rápido
+  const politicalFiltersMap = new Map()
+  POLITICAL_ATTITUDINAL_FILTERS.forEach(filter => {
+    politicalFiltersMap.set(filter.column, filter.groupedValues)
+    politicalFiltersMap.set(filter.r13Column, filter.groupedValues)
+    politicalFiltersMap.set(filter.r16Column, filter.groupedValues)
+  })
+
+  // Função auxiliar para verificar se um valor corresponde ao filtro
+  const matchesFilter = (rowValue, filterValues, filterKey) => {
+    if (!rowValue) return false
+
+    // Verificar se é um filtro político-atitudinal com valores agrupados
+    const groupedValues = politicalFiltersMap.get(filterKey)
+
+    if (groupedValues) {
+      // Filtro político-atitudinal: verificar se o valor da linha pertence a algum grupo selecionado
+      return filterValues.some(groupKey => {
+        const allowedValues = groupedValues[groupKey] || []
+        return allowedValues.some(allowedValue => {
+          const normalizedRow = rowValue?.toLowerCase().trim()
+          const normalizedAllowed = allowedValue?.toLowerCase().trim()
+          return normalizedRow === normalizedAllowed || rowValue === allowedValue
+        })
+      })
+    } else {
+      // Filtro demográfico normal: correspondência direta
+      return filterValues.some(fv => {
+        if (rowValue === fv) return true
+        const normalizedRow = rowValue?.toLowerCase().trim()
+        const normalizedFilter = fv?.toLowerCase().trim()
+        return normalizedRow === normalizedFilter
+      })
+    }
+  }
+
   // Aplicar filtros na Onda 1 (R13)
-  // Precisa converter nomes de colunas R16 -> R13 quando necessário
   if (wave1ProcessedData?.rows) {
     result.wave1Rows = wave1ProcessedData.rows.filter(row => {
       return Object.entries(filters).every(([filterKey, filterValues]) => {
@@ -193,14 +228,7 @@ export const applyUnifiedFilters = (filters, wave1ProcessedData, wave2ProcessedD
         const r13Key = R16_TO_R13_COLUMN_MAP[filterKey] || filterKey
         const rowValue = row[r13Key]
 
-        // Verificar correspondência direta ou normalizada
-        return filterValues.some(fv => {
-          if (rowValue === fv) return true
-          // Comparação normalizada
-          const normalizedRow = rowValue?.toLowerCase().trim()
-          const normalizedFilter = fv?.toLowerCase().trim()
-          return normalizedRow === normalizedFilter
-        })
+        return matchesFilter(rowValue, filterValues, r13Key)
       })
     })
   }
@@ -211,12 +239,8 @@ export const applyUnifiedFilters = (filters, wave1ProcessedData, wave2ProcessedD
       return Object.entries(filters).every(([filterKey, filterValues]) => {
         if (!filterValues || filterValues.length === 0) return true
         const rowValue = row[filterKey]
-        return filterValues.some(fv => {
-          if (rowValue === fv) return true
-          const normalizedRow = rowValue?.toLowerCase().trim()
-          const normalizedFilter = fv?.toLowerCase().trim()
-          return normalizedRow === normalizedFilter
-        })
+
+        return matchesFilter(rowValue, filterValues, filterKey)
       })
     })
   }

@@ -75,6 +75,13 @@ export const UNIFIED_DEMOGRAPHIC_COLUMNS = [
     r16Column: "Sub-regiões"
   },
   {
+    // Sexo (PF1) - mesmo nome em ambas as rodadas
+    column: "PF1",
+    label: "Sexo",
+    r13Column: "PF1",
+    r16Column: "PF1"
+  },
+  {
     column: "Faixa Etária",
     label: "Faixa Etária",
     r13Column: "Faixa Etária",
@@ -85,12 +92,6 @@ export const UNIFIED_DEMOGRAPHIC_COLUMNS = [
     label: "Escolaridade",
     r13Column: "Escolaridade",
     r16Column: "Escolaridade"
-  },
-  {
-    column: "Tipo de Eleitor",
-    label: "Tipo de Eleitor",
-    r13Column: "Tipo de Eleitor",
-    r16Column: "Tipo de Eleitor"
   },
   {
     column: "Renda Familiar",
@@ -110,6 +111,66 @@ export const UNIFIED_DEMOGRAPHIC_COLUMNS = [
     label: "Raça/Cor",
     r13Column: "PF17",
     r16Column: "PF16"
+  },
+  {
+    // Tipo de Eleitor - movido para o final
+    column: "Tipo de Eleitor",
+    label: "Tipo de Eleitor",
+    r13Column: "Tipo de Eleitor",
+    r16Column: "Tipo de Eleitor"
+  }
+]
+
+/**
+ * Filtros político-atitudinais
+ * Usam agrupamentos específicos das respostas
+ */
+export const POLITICAL_ATTITUDINAL_FILTERS = [
+  {
+    column: "P01",
+    label: "Avaliação Governo Federal",
+    r13Column: "P01",
+    r16Column: "P01",
+    groupedValues: {
+      "Ótimo/Bom": ["Ótimo", "Bom"],
+      "Regular": ["Regular"],
+      "Ruim/Péssimo": ["Ruim", "Péssimo"],
+      "NS/NR": ["Não sabe", "Não respondeu", "NS/NR"]
+    }
+  },
+  {
+    column: "P03",
+    label: "Avaliação Presidente",
+    r13Column: "P03",
+    r16Column: "P03",
+    groupedValues: {
+      "Ótimo/Bom": ["Ótimo", "Bom"],
+      "Regular": ["Regular"],
+      "Ruim/Péssimo": ["Ruim", "Péssimo"],
+      "NS/NR": ["Não sabe", "Não respondeu", "NS/NR"]
+    }
+  },
+  {
+    column: "P02",
+    label: "Aprovação Governo Federal",
+    r13Column: "P02",
+    r16Column: "P02",
+    groupedValues: {
+      "Aprova": ["Aprova"],
+      "Desaprova": ["Desaprova"],
+      "NS/NR": ["Não sabe", "Não respondeu", "NS/NR"]
+    }
+  },
+  {
+    column: "P04",
+    label: "Aprovação Presidente",
+    r13Column: "P04",
+    r16Column: "P04",
+    groupedValues: {
+      "Aprova": ["Aprova"],
+      "Desaprova": ["Desaprova"],
+      "NS/NR": ["Não sabe", "Não respondeu", "NS/NR"]
+    }
   }
 ]
 
@@ -119,12 +180,17 @@ export const UNIFIED_DEMOGRAPHIC_COLUMNS = [
 export const R13_TO_R16_COLUMN_MAP = {
   "Regiões": "Regiões",
   "Sub-regiões": "Sub-regiões",
+  "PF1": "PF1", // Sexo
   "Faixa Etária": "Faixa Etária",
   "Escolaridade": "Escolaridade",
   "Tipo de Eleitor": "Tipo de Eleitor",
   "Renda Familiar": "Renda Familiar",
   "Religião Agrupada": "Religião Agrupada",
-  "PF17": "PF16" // Raça/Cor
+  "PF17": "PF16", // Raça/Cor
+  "P01": "P01", // Avaliação Governo Federal
+  "P02": "P02", // Aprovação Governo Federal
+  "P03": "P03", // Avaliação Presidente
+  "P04": "P04"  // Aprovação Presidente
 }
 
 /**
@@ -133,10 +199,15 @@ export const R13_TO_R16_COLUMN_MAP = {
 export const R16_TO_R13_COLUMN_MAP = {
   "Regiões": "Regiões",
   "Sub-regiões": "Sub-regiões",
+  "PF1": "PF1", // Sexo
   "Faixa Etária": "Faixa Etária",
   "Escolaridade": "Escolaridade",
   "Tipo de Eleitor": "Tipo de Eleitor",
   "Renda Familiar": "Renda Familiar",
   "Religião Agrupada": "Religião Agrupada",
-  "PF16": "PF17" // Raça/Cor
+  "PF16": "PF17", // Raça/Cor
+  "P01": "P01", // Avaliação Governo Federal
+  "P02": "P02", // Aprovação Governo Federal
+  "P03": "P03", // Avaliação Presidente
+  "P04": "P04"  // Aprovação Presidente
 }
