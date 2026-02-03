@@ -11,6 +11,7 @@ import StackedBarChart from "../components/dashboard/expanded-survey/StackedBarC
 import WaveComparisonChart from "../components/dashboard/expanded-survey/WaveComparisonChart"
 import StackedWaveComparisonChart from "../components/dashboard/expanded-survey/StackedWaveComparisonChart"
 import DemographicFilters from "../components/dashboard/expanded-survey/DemographicFilters"
+import P28ViolenceChart from "../components/dashboard/expanded-survey/P28ViolenceChart"
 import { ApiMethods } from "../service/ApiBase"
 import { useExpandedSurveyData } from "../hooks/useExpandedSurveyData"
 import { applyUnifiedFilters } from "../utils/waveComparisonUtils"
@@ -28,6 +29,11 @@ export default function ExpandedSurveyDashboard() {
 
   const questionText = searchParams.get('questionText') || ''
   const pageTitle = searchParams.get('pageTitle') || 'Análise de Pergunta'
+
+  // ESPECIAL: Detectar se é pergunta P28 (violência)
+  const isP28Question = useMemo(() => {
+    return variables.some(v => v.match(/^P28_O\d+$/) || v === 'P28_OUT')
+  }, [variables])
 
   // NOVO: Parâmetros de comparação entre ondas
   const hasWaveComparison = searchParams.get('hasWaveComparison') === 'true'
@@ -717,9 +723,9 @@ export default function ExpandedSurveyDashboard() {
                   )}
 
                   {/* Gráficos de dados da Onda 2 */}
-                  {/* Se não deve aglomerar e há múltiplas variáveis, usar gráfico empilhado */}
-                  {!shouldAggregate && chartData.length > 1 ? (
-                    <StackedBarChart
+                  {/* ESPECIAL: Gráfico personalizado para perguntas P28 (violência) */}
+                  {isP28Question ? (
+                    <P28ViolenceChart
                       data={chartData}
                       questionText={questionText}
                       sampleSize={chartData[0]?.totalResponses}
@@ -727,19 +733,32 @@ export default function ExpandedSurveyDashboard() {
                       marginOfError={chartData[0]?.marginOfError}
                     />
                   ) : (
-                    // Gráficos individuais (ou único aglomerado)
-                    chartData.map((data, idx) => (
-                      <HorizontalBarChart
-                        key={idx}
-                        data={data.stats}
-                        questionText={questionText}
-                        variableName={data.variable}
-                        variableLabel={data.label}
-                        sampleSize={data.totalResponses}
-                        originalSampleSize={data.originalSampleSize}
-                        marginOfError={data.marginOfError}
-                      />
-                    ))
+                    <>
+                      {/* Se não deve aglomerar e há múltiplas variáveis, usar gráfico empilhado */}
+                      {!shouldAggregate && chartData.length > 1 ? (
+                        <StackedBarChart
+                          data={chartData}
+                          questionText={questionText}
+                          sampleSize={chartData[0]?.totalResponses}
+                          originalSampleSize={chartData[0]?.originalSampleSize}
+                          marginOfError={chartData[0]?.marginOfError}
+                        />
+                      ) : (
+                        // Gráficos individuais (ou único aglomerado)
+                        chartData.map((data, idx) => (
+                          <HorizontalBarChart
+                            key={idx}
+                            data={data.stats}
+                            questionText={questionText}
+                            variableName={data.variable}
+                            variableLabel={data.label}
+                            sampleSize={data.totalResponses}
+                            originalSampleSize={data.originalSampleSize}
+                            marginOfError={data.marginOfError}
+                          />
+                        ))
+                      )}
+                    </>
                   )}
 
                   {chartData.length === 0 && (

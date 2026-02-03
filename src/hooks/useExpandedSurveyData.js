@@ -303,6 +303,7 @@ export const useExpandedSurveyData = (rawData) => {
         response,
         count: responseRawCounts.get(response) || 0, // Contagem bruta (N real)
         weightSum, // Soma dos pesos para esta resposta
+        weightedCount: weightSum, // Alias para compatibilidade com P28ViolenceChart
         percentage: totalWeight > 0 ? (weightSum / totalWeight) * 100 : 0
       }))
 

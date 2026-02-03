@@ -60,6 +60,7 @@ export const MAP_RESPONSE_BASE_COLORS = {
   "Melhorar um pouco": "#4D66CC",
   "Ótimo/Bom": "#334D99",
   "O Governo atual": "#334D99",
+  "Sim": "#334D99",
 
   // Respostas neutras - laranja
   Regular: "#CC804D",
@@ -71,6 +72,7 @@ export const MAP_RESPONSE_BASE_COLORS = {
 
   // Respostas negativas - VERMELHO
   "Regular mais para negativo": "#B33333",
+  "Não": "#B33333",
   Ruim: "#B33333",
   Pior: "#B33333",
   Péssimo: "#801A1A",

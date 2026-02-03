@@ -153,6 +153,141 @@ export default function ExpandedSurveyPage() {
       const variable = question.variable
       const questionText = question.questionText?.trim() || ""
 
+      // Filtrar perguntas excluídas (T_P18_1_1 e T_P18_1_2)
+      const excludedVariables = ['T_P18_1_1', 'T_P18_1_2']
+      if (excludedVariables.includes(variable)) {
+        return // Pular esta pergunta
+      }
+
+      // ESPECIAL: Agrupar perguntas P28 (violência) em uma única pergunta
+      // P28_O1, P28_O2, ..., P28_O8, P28_OUT devem ser agrupadas
+      const isP28Question = variable.match(/^P28_O\d+$/) || variable === 'P28_OUT'
+      if (isP28Question) {
+        const p28Key = "Nos últimos 12 meses, você foi vítima de algum tipo de violência ou outro crime? Qual tipo de violência ou crime você foi vítima?"
+
+        if (!questionMap.has(p28Key)) {
+          questionMap.set(p28Key, {
+            questionText: p28Key,
+            variables: [],
+            labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 195",
+            sample: question.sample,
+            methodology: question.methodology,
+            date: question.date,
+            possibleResponses: [],
+            hasWaveComparison: false,
+            wave1Variables: [],
+            isP28Group: true, // Marcador especial para tratamento diferente
+            p28Items: [] // Array para armazenar os itens de P28
+          })
+        }
+
+        const group = questionMap.get(p28Key)
+
+        // Adicionar variável
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+
+          // Adicionar item com label
+          group.p28Items.push({
+            variable: variable,
+            label: question.label || questionText,
+            questionText: questionText
+          })
+
+          // Buscar respostas possíveis
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => {
+              if (!group.possibleResponses.includes(resp)) {
+                group.possibleResponses.push(resp)
+              }
+            })
+          }
+
+          // Verificar mapeamento para Wave 1
+          const mappingData = questionMapping?.data
+          const wave1Variable = getWave1Variable(variable, mappingData)
+          if (wave1Variable) {
+            group.hasWaveComparison = true
+            if (!group.wave1Variables.includes(wave1Variable)) {
+              group.wave1Variables.push(wave1Variable)
+            }
+          }
+        }
+
+        return // Não processar mais, já adicionamos ao grupo P28
+      }
+
+      // ESPECIAL: Agrupar perguntas _2 e _2_OUT com suas _1 correspondentes
+      // Exemplos: P21_2 deve ser agrupado com P21_1, P21_2_OUT com P21_1_OUT
+      // Detectar padrão: P##_2 ou P##_2_OUT
+      const secondMentionMatch = variable.match(/^(P\d+)_2(_OUT)?$/)
+      if (secondMentionMatch) {
+        const baseVar = secondMentionMatch[1] // Ex: P21
+        const hasOut = secondMentionMatch[2] // _OUT ou undefined
+        const firstMentionVar = `${baseVar}_1${hasOut || ''}` // Ex: P21_1 ou P21_1_OUT
+
+        // Buscar a pergunta _1 correspondente para usar seu texto
+        const firstMentionQuestion = data.data.find(q => q.variable === firstMentionVar)
+
+        if (firstMentionQuestion) {
+          // Usar o texto da pergunta _1 como chave para agrupar
+          const mainQuestionText = firstMentionQuestion.questionText?.trim() || ""
+
+          // Se a pergunta _1 é "Outros", buscar no othersMap
+          let key = mainQuestionText
+          if (mainQuestionText.toLowerCase() === "outros" && othersMap.has(firstMentionVar)) {
+            key = othersMap.get(firstMentionVar)
+          }
+
+          // Criar ou obter o grupo
+          if (!questionMap.has(key)) {
+            questionMap.set(key, {
+              questionText: key,
+              variables: [],
+              labels: [],
+              index: firstMentionQuestion.index || "Sem Categoria",
+              sample: firstMentionQuestion.sample,
+              methodology: firstMentionQuestion.methodology,
+              date: firstMentionQuestion.date,
+              possibleResponses: [],
+              hasWaveComparison: false,
+              wave1Variables: [],
+            })
+          }
+
+          const group = questionMap.get(key)
+
+          // Adicionar variável _2 ao grupo (será processada junto com _1)
+          if (!group.variables.includes(variable)) {
+            group.variables.push(variable)
+
+            // Buscar respostas possíveis
+            const responses = responsesMap.get(variable)
+            if (responses && responses.length > 0) {
+              responses.forEach(resp => {
+                if (!group.possibleResponses.includes(resp)) {
+                  group.possibleResponses.push(resp)
+                }
+              })
+            }
+
+            // Verificar mapeamento para Wave 1
+            const mappingData = questionMapping?.data
+            const wave1Variable = getWave1Variable(variable, mappingData)
+            if (wave1Variable) {
+              group.hasWaveComparison = true
+              if (!group.wave1Variables.includes(wave1Variable)) {
+                group.wave1Variables.push(wave1Variable)
+              }
+            }
+          }
+
+          return // Não processar mais, já adicionamos ao grupo da _1
+        }
+      }
+
       // Se é uma pergunta "Outros", usar o texto da pergunta principal como key
       let key = questionText
       if (questionText.toLowerCase() === "outros" && othersMap.has(variable)) {
