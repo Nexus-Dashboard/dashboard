@@ -286,7 +286,7 @@ export default function ExpandedSurveyPageWave1() {
       }
 
       // ESPECIAL: Agrupar P09_O1 e P09_O2 como uma única pergunta "Meio de comunicação"
-      const isP09OQuestion = variable === 'P09_O1' || variable === 'P09_O2'
+      const isP09OQuestion = variable === 'P9_O1' || variable === 'P9_O2'
       if (isP09OQuestion) {
         const p09Key = "Qual é o principal meio de comunicação pelo qual você se informa sobre o que acontece com o Governo Federal? E o segundo principal meio?"
 
