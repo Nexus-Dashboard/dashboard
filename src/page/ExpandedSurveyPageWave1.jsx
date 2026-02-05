@@ -113,6 +113,262 @@ export default function ExpandedSurveyPageWave1() {
       const variable = question.variable
       const questionText = question.questionText?.trim() || ""
 
+      // Filtrar perguntas excluídas
+      const excludedVariables = [
+        'P10_1', 'P10_2',                     // "Outros" de P10_A e P10_B
+        'P22_1_OUT', 'P22_2_OUT',             // "Outros" de P22 (saúde)
+        'P24_1_OUT', 'P24_2_OUT',             // "Outros" de P24 (educação)
+        'P27_1_OUT', 'P27_2_OUT',             // "Outros" de P27 (segurança)
+        'P32_1_OUT', 'P32_2_OUT',             // "Outros" de P32 (economia)
+      ]
+      if (excludedVariables.includes(variable)) {
+        return // Pular esta pergunta
+      }
+
+      // ESPECIAL: Agrupar P22_1 e P22_2 como uma única pergunta "Problema da saúde pública"
+      const isP22Question = variable === 'P22_1' || variable === 'P22_2'
+      if (isP22Question) {
+        const p22Key = "Atualmente, qual o principal problema da saúde pública no Brasil? (ESPONTÂNEA E ÚNICA; PRÉ CATEGORIZADA)"
+
+        if (!questionMap.has(p22Key)) {
+          questionMap.set(p22Key, {
+            questionText: p22Key,
+            variables: [],
+            labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 1",
+            sample: question.sample,
+            methodology: question.methodology,
+            date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'],
+          })
+        }
+
+        const group = questionMap.get(p22Key)
+
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => {
+              if (!group.possibleResponses.includes(resp)) {
+                group.possibleResponses.push(resp)
+              }
+            })
+          }
+        }
+
+        if (question.label && !group.labels.includes(question.label)) {
+          group.labels.push(question.label)
+        }
+
+        return
+      }
+
+      // ESPECIAL: Agrupar P24_1 e P24_2 - Educação pública
+      const isP24Question = variable === 'P24_1' || variable === 'P24_2'
+      if (isP24Question) {
+        const p24Key = "Atualmente, qual o principal problema da educação pública do país? (ESPONTÂNEA E ÚNICA; PRÉ CATEGORIZADA)"
+        if (!questionMap.has(p24Key)) {
+          questionMap.set(p24Key, {
+            questionText: p24Key, variables: [], labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 1",
+            sample: question.sample, methodology: question.methodology, date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'],
+          })
+        }
+        const group = questionMap.get(p24Key)
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => { if (!group.possibleResponses.includes(resp)) group.possibleResponses.push(resp) })
+          }
+        }
+        if (question.label && !group.labels.includes(question.label)) group.labels.push(question.label)
+        return
+      }
+
+      // ESPECIAL: Agrupar P27_1 e P27_2 - Segurança pública
+      const isP27Question = variable === 'P27_1' || variable === 'P27_2'
+      if (isP27Question) {
+        const p27Key = "Atualmente, qual o principal problema da segurança pública no país? (ESPONTÂNEA E ÚNICA; PRÉ CATEGORIZADA)"
+        if (!questionMap.has(p27Key)) {
+          questionMap.set(p27Key, {
+            questionText: p27Key, variables: [], labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 1",
+            sample: question.sample, methodology: question.methodology, date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'],
+          })
+        }
+        const group = questionMap.get(p27Key)
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => { if (!group.possibleResponses.includes(resp)) group.possibleResponses.push(resp) })
+          }
+        }
+        if (question.label && !group.labels.includes(question.label)) group.labels.push(question.label)
+        return
+      }
+
+      // ESPECIAL: Agrupar P32_1 e P32_2 - Economia do Brasil
+      const isP32Question = variable === 'P32_1' || variable === 'P32_2'
+      if (isP32Question) {
+        const p32Key = "Atualmente, qual o principal problema da economia do BRASIL? (ESPONTÂNEA E ÚNICA; PRÉ CATEGORIZADA)"
+        if (!questionMap.has(p32Key)) {
+          questionMap.set(p32Key, {
+            questionText: p32Key, variables: [], labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 1",
+            sample: question.sample, methodology: question.methodology, date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'],
+          })
+        }
+        const group = questionMap.get(p32Key)
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => { if (!group.possibleResponses.includes(resp)) group.possibleResponses.push(resp) })
+          }
+        }
+        if (question.label && !group.labels.includes(question.label)) group.labels.push(question.label)
+        return
+      }
+
+      // ESPECIAL: Agrupar P34_O1 e P34_O2 - Problema do mundo do trabalho
+      const isP34Question = variable === 'P34_O1' || variable === 'P34_O2'
+      if (isP34Question) {
+        const p34Key = "E em relação ao emprego? Qual é na sua opinião o principal problema do mundo do trabalho hoje no Brasil? E o segundo principal problema?"
+        if (!questionMap.has(p34Key)) {
+          questionMap.set(p34Key, {
+            questionText: p34Key, variables: [], labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 1",
+            sample: question.sample, methodology: question.methodology, date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'],
+          })
+        }
+        const group = questionMap.get(p34Key)
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => { if (!group.possibleResponses.includes(resp)) group.possibleResponses.push(resp) })
+          }
+        }
+        if (question.label && !group.labels.includes(question.label)) group.labels.push(question.label)
+        return
+      }
+
+      // ESPECIAL: Agrupar P36_O1 e P36_O2 - Preocupação economia pessoal
+      const isP36Question = variable === 'P36_O1' || variable === 'P36_O2'
+      if (isP36Question) {
+        const p36Key = "E, atualmente, qual destas é a sua principal preocupação com a sua economia pessoal? E a segunda?"
+        if (!questionMap.has(p36Key)) {
+          questionMap.set(p36Key, {
+            questionText: p36Key, variables: [], labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 1",
+            sample: question.sample, methodology: question.methodology, date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'],
+          })
+        }
+        const group = questionMap.get(p36Key)
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => { if (!group.possibleResponses.includes(resp)) group.possibleResponses.push(resp) })
+          }
+        }
+        if (question.label && !group.labels.includes(question.label)) group.labels.push(question.label)
+        return
+      }
+
+      // ESPECIAL: Agrupar P09_O1 e P09_O2 como uma única pergunta "Meio de comunicação"
+      const isP09OQuestion = variable === 'P09_O1' || variable === 'P09_O2'
+      if (isP09OQuestion) {
+        const p09Key = "Qual é o principal meio de comunicação pelo qual você se informa sobre o que acontece com o Governo Federal? E o segundo principal meio?"
+
+        if (!questionMap.has(p09Key)) {
+          questionMap.set(p09Key, {
+            questionText: p09Key,
+            variables: [],
+            labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 1",
+            sample: question.sample,
+            methodology: question.methodology,
+            date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'], // Forçar como pergunta fechada
+          })
+        }
+
+        const group = questionMap.get(p09Key)
+
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => {
+              if (!group.possibleResponses.includes(resp)) {
+                group.possibleResponses.push(resp)
+              }
+            })
+          }
+        }
+
+        if (question.label && !group.labels.includes(question.label)) {
+          group.labels.push(question.label)
+        }
+
+        return // Não processar mais, já adicionamos ao grupo P09
+      }
+
+      // ESPECIAL: Agrupar P10_A e P10_B como uma única pergunta "Problemas do Brasil"
+      // P10_A = "principal problema" (Primeiro), P10_B = "segundo principal problema" (Segundo)
+      // Ambas devem ser combinadas no mesmo gráfico com soma de menções
+      const isP10ABQuestion = variable === 'P10_A' || variable === 'P10_B'
+      if (isP10ABQuestion) {
+        const p10Key = "Pensando nos problemas DO BRASIL, qual é o principal problema do País atualmente? (ESPONTÂNEA E ÚNICA; PRÉ CATEGORIZADA)"
+
+        if (!questionMap.has(p10Key)) {
+          questionMap.set(p10Key, {
+            questionText: p10Key,
+            variables: [],
+            labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 1",
+            sample: question.sample,
+            methodology: question.methodology,
+            date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'], // Forçar como pergunta fechada (não é aberta)
+          })
+        }
+
+        const group = questionMap.get(p10Key)
+
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+
+          // Buscar respostas possíveis
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => {
+              if (!group.possibleResponses.includes(resp)) {
+                group.possibleResponses.push(resp)
+              }
+            })
+          }
+        }
+
+        // Adicionar label se existe
+        if (question.label && !group.labels.includes(question.label)) {
+          group.labels.push(question.label)
+        }
+
+        return // Não processar mais, já adicionamos ao grupo P10
+      }
+
       let key = questionText
       if (questionText.toLowerCase() === "outros" && othersMap.has(variable)) {
         key = othersMap.get(variable)

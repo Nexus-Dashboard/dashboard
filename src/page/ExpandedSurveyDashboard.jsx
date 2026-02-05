@@ -12,6 +12,7 @@ import WaveComparisonChart from "../components/dashboard/expanded-survey/WaveCom
 import StackedWaveComparisonChart from "../components/dashboard/expanded-survey/StackedWaveComparisonChart"
 import DemographicFilters from "../components/dashboard/expanded-survey/DemographicFilters"
 import P28ViolenceChart from "../components/dashboard/expanded-survey/P28ViolenceChart"
+import PairedBarComparisonChart from "../components/dashboard/expanded-survey/PairedBarComparisonChart"
 import { ApiMethods } from "../service/ApiBase"
 import { useExpandedSurveyData } from "../hooks/useExpandedSurveyData"
 import { applyUnifiedFilters } from "../utils/waveComparisonUtils"
@@ -152,8 +153,13 @@ export default function ExpandedSurveyDashboard() {
       aggregationLabels.some(aggLabel => label === aggLabel || label.includes(aggLabel))
     )
 
-    console.log('🔍 Verificando se deve aglomerar:', { labels, allAreAggregationLabels })
-    return allAreAggregationLabels
+    // Fallback: se todas as variáveis seguem padrões de múltipla menção
+    // P##_A, P##_B (como P9_A, P9_B) ou P##_O1, P##_O2 (como P7_O1, P7_O2)
+    const allAreABVariables = variables.every(v => /^P\d+_[A-B]$/.test(v))
+    const allAreOVariables = variables.every(v => /^P\d+_O\d+$/.test(v))
+
+    console.log('🔍 Verificando se deve aglomerar:', { labels, allAreAggregationLabels, allAreABVariables, allAreOVariables })
+    return allAreAggregationLabels || allAreABVariables || allAreOVariables
   }, [variables, variableLabels])
 
   // Calcular estatísticas para cada variável
@@ -183,14 +189,28 @@ export default function ExpandedSurveyDashboard() {
       const firstVarStats = calculateVariableStats(variables[0], filters)
       const universeCount = firstVarStats?.totalCount || firstVarStats?.totalResponses || 0
 
+      // Normalizar nome de resposta: agrupar variantes de "Outros" e filtrar #NULO!
+      const normalizeResponse = (response) => {
+        if (!response) return null
+        const trimmed = response.trim()
+        // Filtrar respostas inválidas
+        if (trimmed === '#NULO!' || trimmed === '#NULL!' || trimmed === '#NULL' || trimmed === '#null') return null
+        // Agrupar variantes de "Outros" (ex: "Outros 1º (ANOTAR)", "Outros 2º (ANOTAR)")
+        if (trimmed.toLowerCase().startsWith('outros') && trimmed.includes('(ANOTAR)')) return 'Outros'
+        return trimmed
+      }
+
       // Processar cada variável e somar as menções (weights)
       variables.forEach(variable => {
         const stats = calculateVariableStats(variable, filters)
         if (!stats?.data) return
 
         stats.data.forEach(item => {
-          const existing = aggregatedResponses.get(item.response) || { weightSum: 0, count: 0 }
-          aggregatedResponses.set(item.response, {
+          const normalizedResponse = normalizeResponse(item.response)
+          if (!normalizedResponse) return // Pular #NULO! e respostas inválidas
+
+          const existing = aggregatedResponses.get(normalizedResponse) || { weightSum: 0, count: 0 }
+          aggregatedResponses.set(normalizedResponse, {
             weightSum: existing.weightSum + (item.weightSum || item.count || 0),
             count: existing.count + (item.count || 0)
           })
@@ -352,6 +372,15 @@ export default function ExpandedSurveyDashboard() {
       const firstWave2Stats = calculateVariableStatsWithRows(variables[0], unifiedFilteredData.wave2Rows)
       const wave2UniverseCount = firstWave2Stats?.totalCount || firstWave2Stats?.totalResponses || 0
 
+      // Normalizar nome de resposta: agrupar variantes de "Outros" e filtrar #NULO!
+      const normalizeResponse = (response) => {
+        if (!response) return null
+        const trimmed = response.trim()
+        if (trimmed === '#NULO!' || trimmed === '#NULL!' || trimmed === '#NULL' || trimmed === '#null') return null
+        if (trimmed.toLowerCase().startsWith('outros') && trimmed.includes('(ANOTAR)')) return 'Outros'
+        return trimmed
+      }
+
       // Aglomerar Onda 1 (R13) - somar weights das menções de todas as variáveis
       const wave1Aggregated = new Map()
 
@@ -360,8 +389,11 @@ export default function ExpandedSurveyDashboard() {
         if (!stats?.data) return
 
         stats.data.forEach(item => {
-          const existing = wave1Aggregated.get(item.response) || { weightSum: 0, count: 0 }
-          wave1Aggregated.set(item.response, {
+          const normalizedResponse = normalizeResponse(item.response)
+          if (!normalizedResponse) return
+
+          const existing = wave1Aggregated.get(normalizedResponse) || { weightSum: 0, count: 0 }
+          wave1Aggregated.set(normalizedResponse, {
             weightSum: existing.weightSum + (item.weightSum || item.count || 0),
             count: existing.count + (item.count || 0)
           })
@@ -376,8 +408,11 @@ export default function ExpandedSurveyDashboard() {
         if (!stats?.data) return
 
         stats.data.forEach(item => {
-          const existing = wave2Aggregated.get(item.response) || { weightSum: 0, count: 0 }
-          wave2Aggregated.set(item.response, {
+          const normalizedResponse = normalizeResponse(item.response)
+          if (!normalizedResponse) return
+
+          const existing = wave2Aggregated.get(normalizedResponse) || { weightSum: 0, count: 0 }
+          wave2Aggregated.set(normalizedResponse, {
             weightSum: existing.weightSum + (item.weightSum || item.count || 0),
             count: existing.count + (item.count || 0)
           })
@@ -679,8 +714,25 @@ export default function ExpandedSurveyDashboard() {
                           wave1MarginOfError={waveComparisonData[0]?.wave1MarginOfError}
                           wave2MarginOfError={waveComparisonData[0]?.wave2MarginOfError}
                         />
+                      ) : shouldAggregate ? (
+                        // Comparação com barras horizontais pareadas para perguntas agrupadas (ex: P9_A + P9_B)
+                        waveComparisonData.map((data, idx) => (
+                          <PairedBarComparisonChart
+                            key={`paired-comparison-${idx}`}
+                            wave1Stats={data.wave1Stats}
+                            wave2Stats={data.wave2Stats}
+                            questionText={questionText}
+                            variableName={data.variable}
+                            wave1VariableName={data.wave1Variable}
+                            variableLabel={data.label}
+                            wave1SampleSize={data.wave1SampleSize}
+                            wave2SampleSize={data.wave2SampleSize}
+                            wave1MarginOfError={data.wave1MarginOfError}
+                            wave2MarginOfError={data.wave2MarginOfError}
+                          />
+                        ))
                       ) : (
-                        // Gráficos individuais de comparação para cada variável (ou aglomerado)
+                        // Gráficos individuais de comparação para cada variável
                         waveComparisonData.map((data, idx) => (
                           <WaveComparisonChart
                             key={`wave-comparison-${idx}`}

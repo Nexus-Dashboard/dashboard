@@ -102,8 +102,13 @@ export default function ExpandedSurveyDashboardWave1() {
       aggregationLabels.some(aggLabel => label === aggLabel || label.includes(aggLabel))
     )
 
-    console.log('🔍 Verificando se deve aglomerar (Onda 1):', { labels, allAreAggregationLabels })
-    return allAreAggregationLabels
+    // Fallback: se todas as variáveis seguem padrões de múltipla menção
+    // P##_A, P##_B (como P10_A, P10_B) ou P##_O1, P##_O2 (como P09_O1, P09_O2)
+    const allAreABVariables = variables.every(v => /^P\d+_[A-B]$/.test(v))
+    const allAreOVariables = variables.every(v => /^P\d+_O\d+$/.test(v))
+
+    console.log('🔍 Verificando se deve aglomerar (Onda 1):', { labels, allAreAggregationLabels, allAreABVariables, allAreOVariables })
+    return allAreAggregationLabels || allAreABVariables || allAreOVariables
   }, [variables, variableLabels])
 
   // Calcular estatísticas para cada variável
@@ -119,6 +124,15 @@ export default function ExpandedSurveyDashboardWave1() {
     if (variables.length > 1 && shouldAggregate) {
       console.log('📊 Múltiplas variáveis com rótulos de aglomeração (Onda 1) - aglomerando respostas:', variables)
 
+      // Normalizar nome de resposta: agrupar variantes de "Outros" e filtrar #NULO!
+      const normalizeResponse = (response) => {
+        if (!response) return null
+        const trimmed = response.trim()
+        if (trimmed === '#NULO!' || trimmed === '#NULL!' || trimmed === '#NULL' || trimmed === '#null') return null
+        if (trimmed.toLowerCase().startsWith('outros') && trimmed.includes('(ANOTAR)')) return 'Outros'
+        return trimmed
+      }
+
       const aggregatedResponses = new Map()
       const firstVarStats = calculateVariableStats(variables[0], filters)
       const universeCount = firstVarStats?.totalCount || firstVarStats?.totalResponses || 0
@@ -128,8 +142,11 @@ export default function ExpandedSurveyDashboardWave1() {
         if (!stats?.data) return
 
         stats.data.forEach(item => {
-          const existing = aggregatedResponses.get(item.response) || { weightSum: 0, count: 0 }
-          aggregatedResponses.set(item.response, {
+          const normalizedResponse = normalizeResponse(item.response)
+          if (!normalizedResponse) return
+
+          const existing = aggregatedResponses.get(normalizedResponse) || { weightSum: 0, count: 0 }
+          aggregatedResponses.set(normalizedResponse, {
             weightSum: existing.weightSum + (item.weightSum || item.count || 0),
             count: existing.count + (item.count || 0)
           })
