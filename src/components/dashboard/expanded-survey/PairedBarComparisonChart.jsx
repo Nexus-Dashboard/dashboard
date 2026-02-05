@@ -11,7 +11,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   LabelList,
-  Legend,
 } from "recharts"
 
 /**
