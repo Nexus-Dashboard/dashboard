@@ -475,9 +475,113 @@ export default function ExpandedSurveyPage() {
         return
       }
 
+      // ESPECIAL: Agrupar P39_O1, P39_O2, P39_O3 - Marcas POSITIVAS (áreas de atuação)
+      // Sem comparação com onda 1
+      const isP39Question = variable === 'P39_O1' || variable === 'P39_O2' || variable === 'P39_O3'
+      if (isP39Question) {
+        const p39Key = "Considerando a lista a seguir das áreas de atuação do Governo Federal (APRESENTAR CARTÃO 4), em ordem, quais vocês diriam que são as três principais marcas POSITIVAS do atual mandato do Presidente da República, até o momento?"
+        if (!questionMap.has(p39Key)) {
+          questionMap.set(p39Key, {
+            questionText: p39Key, variables: [], labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 11",
+            sample: question.sample, methodology: question.methodology, date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'],
+            hasWaveComparison: false, wave1Variables: [],
+          })
+        }
+        const group = questionMap.get(p39Key)
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => { if (!group.possibleResponses.includes(resp)) group.possibleResponses.push(resp) })
+          }
+        }
+        if (question.label && !group.labels.includes(question.label)) group.labels.push(question.label)
+        return
+      }
+
+      // ESPECIAL: Agrupar P40_O1, P40_O2, P40_O3 - Marcas NEGATIVAS (áreas de atuação)
+      // Sem comparação com onda 1
+      const isP40Question = variable === 'P40_O1' || variable === 'P40_O2' || variable === 'P40_O3'
+      if (isP40Question) {
+        const p40Key = "Considerando a lista a seguir das áreas de atuação do Governo Federal (APRESENTAR CARTÃO 4), em ordem, quais vocês diriam que são as três principais marcas NEGATIVAS do atual mandato do Presidente da República, até o momento?"
+        if (!questionMap.has(p40Key)) {
+          questionMap.set(p40Key, {
+            questionText: p40Key, variables: [], labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 11",
+            sample: question.sample, methodology: question.methodology, date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'],
+            hasWaveComparison: false, wave1Variables: [],
+          })
+        }
+        const group = questionMap.get(p40Key)
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => { if (!group.possibleResponses.includes(resp)) group.possibleResponses.push(resp) })
+          }
+        }
+        if (question.label && !group.labels.includes(question.label)) group.labels.push(question.label)
+        return
+      }
+
+      // ESPECIAL: Agrupar P41_O1, P41_O2, P41_O3 - Marcas POSITIVAS (políticas públicas)
+      // Sem comparação com onda 1
+      const isP41Question = variable === 'P41_O1' || variable === 'P41_O2' || variable === 'P41_O3'
+      if (isP41Question) {
+        const p41Key = "Considerando a lista a seguir de políticas públicas do Governo Federal (APRESENTAR CARTÃO 5), em ordem, quais vocês diriam que são as três principais marcas POSITIVAS do atual mandato do Presidente da República, até o momento?"
+        if (!questionMap.has(p41Key)) {
+          questionMap.set(p41Key, {
+            questionText: p41Key, variables: [], labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 11",
+            sample: question.sample, methodology: question.methodology, date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'],
+            hasWaveComparison: false, wave1Variables: [],
+          })
+        }
+        const group = questionMap.get(p41Key)
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => { if (!group.possibleResponses.includes(resp)) group.possibleResponses.push(resp) })
+          }
+        }
+        if (question.label && !group.labels.includes(question.label)) group.labels.push(question.label)
+        return
+      }
+
+      // ESPECIAL: Agrupar P42_O1, P42_O2, P42_O3 - Marcas NEGATIVAS (políticas públicas)
+      // Sem comparação com onda 1
+      const isP42Question = variable === 'P42_O1' || variable === 'P42_O2' || variable === 'P42_O3'
+      if (isP42Question) {
+        const p42Key = "Considerando a lista a seguir de políticas públicas do Governo Federal (APRESENTAR CARTÃO 5), em ordem, quais vocês diriam que são as três principais marcas NEGATIVAS do atual mandato do Presidente da República, até o momento?"
+        if (!questionMap.has(p42Key)) {
+          questionMap.set(p42Key, {
+            questionText: p42Key, variables: [], labels: [],
+            index: question.index || "Pesquisa Ampliada - Onda 11",
+            sample: question.sample, methodology: question.methodology, date: question.date,
+            possibleResponses: ['__FORCE_CLOSED__'],
+            hasWaveComparison: false, wave1Variables: [],
+          })
+        }
+        const group = questionMap.get(p42Key)
+        if (!group.variables.includes(variable)) {
+          group.variables.push(variable)
+          const responses = responsesMap.get(variable)
+          if (responses && responses.length > 0) {
+            responses.forEach(resp => { if (!group.possibleResponses.includes(resp)) group.possibleResponses.push(resp) })
+          }
+        }
+        if (question.label && !group.labels.includes(question.label)) group.labels.push(question.label)
+        return
+      }
+
       // ESPECIAL: Agrupar P7_O1 e P7_O2 como uma única pergunta "Meio de comunicação"
       // P7_O1 = "principal meio" (Primeiro), P7_O2 = "segundo principal meio" (Segundo)
-      // Na onda 1 (R13), as equivalentes são P09_O1 e P09_O2
+      // Na onda 1 (R13), as equivalentes são P9_O1 e P9_O2
       const isP7OQuestion = variable === 'P7_O1' || variable === 'P7_O2'
       if (isP7OQuestion) {
         const p7Key = "Qual é o principal meio de comunicação pelo qual você se informa sobre o que acontece com o Governo Federal? E o segundo principal meio?"
@@ -512,8 +616,8 @@ export default function ExpandedSurveyPage() {
             })
           }
 
-          // Mapeamento manual para onda 1: P7_O1 → P09_O1, P7_O2 → P09_O2
-          const p7ToP09Map = { 'P7_O1': 'P09_O1', 'P7_O2': 'P09_O2' }
+          // Mapeamento manual para onda 1: P7_O1 → P9_O1, P7_O2 → P9_O2
+          const p7ToP09Map = { 'P7_O1': 'P9_O1', 'P7_O2': 'P9_O2' }
           const wave1Variable = p7ToP09Map[variable]
           if (wave1Variable) {
             group.hasWaveComparison = true

@@ -6,8 +6,7 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
 import CommonHeader from "../components/CommonHeader"
-import WordCloudChart from "../components/dashboard/expanded-survey/WordCloudChart"
-import ResponseList from "../components/dashboard/expanded-survey/ResponseList"
+import HorizontalBarChart from "../components/dashboard/expanded-survey/HorizontalBarChart"
 import DemographicFilters from "../components/dashboard/expanded-survey/DemographicFilters"
 import { ApiMethods } from "../service/ApiBase"
 import { useExpandedSurveyData } from "../hooks/useExpandedSurveyData"
@@ -68,12 +67,87 @@ export default function OpenQuestionDashboardWave1() {
     return mapping
   }, [indexData])
 
-  // Calcular estatísticas para cada variável (para perguntas abertas)
+  // Normalizar resposta: filtrar inválidas e agrupar "Outros"
+  const normalizeResponse = (response) => {
+    if (!response) return null
+    const trimmed = response.trim()
+    // Filtrar respostas inválidas
+    if (trimmed === '#NULO!' || trimmed === '#NULL!' || trimmed === '#NULL' || trimmed === '#null') return null
+    if (trimmed === '!NULL' || trimmed === '98' || trimmed === '99') return null
+    // Agrupar variantes de "Outros"
+    if (trimmed.toLowerCase().startsWith('outros') && trimmed.includes('(ANOTAR)')) return 'Outros'
+    return trimmed
+  }
+
+  // Verificar se deve aglomerar (múltiplas variáveis)
+  const shouldAggregate = useMemo(() => {
+    if (variables.length <= 1) return false
+    const aggregationLabels = ['primeiro', 'segundo', 'terceiro', 'quarto', 'quinto']
+    const labels = variables.map(v => (variableLabels[v] || '').toLowerCase().trim())
+    const allAreAggregationLabels = labels.every(label =>
+      aggregationLabels.some(aggLabel => label === aggLabel || label.includes(aggLabel))
+    )
+    const allAreOVariables = variables.every(v => /^P\d+_O\d+$/.test(v))
+    return allAreAggregationLabels || allAreOVariables
+  }, [variables, variableLabels])
+
+  // Calcular estatísticas para cada variável
   const chartData = useMemo(() => {
     if (!isReady || !calculateVariableStats) {
       return []
     }
 
+    // Se deve aglomerar (múltiplas variáveis como P39_O1, P39_O2, P39_O3)
+    if (variables.length > 1 && shouldAggregate) {
+      const aggregatedResponses = new Map()
+      const firstVarStats = calculateVariableStats(variables[0], filters)
+      const universeCount = firstVarStats?.totalCount || firstVarStats?.totalResponses || 0
+
+      variables.forEach(variable => {
+        const stats = calculateVariableStats(variable, filters)
+        if (!stats?.data) return
+
+        stats.data.forEach(item => {
+          const normalizedResponse = normalizeResponse(item.response)
+          if (!normalizedResponse) return
+
+          const existing = aggregatedResponses.get(normalizedResponse) || { weightSum: 0, count: 0 }
+          aggregatedResponses.set(normalizedResponse, {
+            weightSum: existing.weightSum + (item.weightSum || item.count || 0),
+            count: existing.count + (item.count || 0)
+          })
+        })
+      })
+
+      const aggregatedStats = Array.from(aggregatedResponses.entries()).map(([response, data]) => ({
+        response,
+        count: data.count,
+        weightSum: data.weightSum,
+        percentage: universeCount > 0 ? (data.weightSum / universeCount) * 100 : 0
+      }))
+
+      const firstVarStatsNoFilter = calculateVariableStats(variables[0], {})
+      const originalUniverseCount = firstVarStatsNoFilter?.totalCount || firstVarStatsNoFilter?.totalResponses || 0
+
+      const marginOfError = universeCount > 0
+        ? (1.96 * Math.sqrt(0.25 / universeCount)) * 100
+        : 0
+
+      const labels = variables.map(v => variableLabels[v]).filter(Boolean)
+      const combinedLabel = labels.length > 0 ? labels.join(' / ') : ''
+
+      return [{
+        variable: variables.join(' + '),
+        label: combinedLabel,
+        stats: aggregatedStats,
+        totalWeight: universeCount,
+        totalResponses: universeCount,
+        originalSampleSize: originalUniverseCount,
+        marginOfError: Math.round(marginOfError * 100) / 100
+      }]
+    }
+
+    // Caso normal: uma variável ou sem aglomeração
     const results = variables.map(variable => {
       const label = variableLabels[variable] || ''
       const stats = calculateVariableStats(variable, filters)
@@ -82,18 +156,50 @@ export default function OpenQuestionDashboardWave1() {
       const sampleSize = stats?.totalResponses || 0
       const originalSampleSize = statsWithoutFilters?.totalResponses || 0
 
+      // Filtrar e normalizar respostas
+      const filteredStats = (stats?.data || [])
+        .map(item => {
+          const normalizedResponse = normalizeResponse(item.response)
+          if (!normalizedResponse) return null
+          return { ...item, response: normalizedResponse }
+        })
+        .filter(Boolean)
+
+      // Agrupar respostas normalizadas (ex: "Outros 1º" + "Outros 2º" -> "Outros")
+      const groupedResponses = new Map()
+      filteredStats.forEach(item => {
+        const existing = groupedResponses.get(item.response) || { count: 0, weightSum: 0, percentage: 0 }
+        groupedResponses.set(item.response, {
+          count: existing.count + (item.count || 0),
+          weightSum: existing.weightSum + (item.weightSum || 0),
+          percentage: existing.percentage + (item.percentage || 0)
+        })
+      })
+
+      const finalStats = Array.from(groupedResponses.entries()).map(([response, data]) => ({
+        response,
+        count: data.count,
+        weightSum: data.weightSum,
+        percentage: data.percentage
+      }))
+
+      const marginOfError = sampleSize > 0
+        ? (1.96 * Math.sqrt(0.25 / sampleSize)) * 100
+        : 0
+
       return {
         variable,
         label,
-        stats: stats?.data || [],
+        stats: finalStats,
         totalWeight: stats?.totalWeight || 0,
         totalResponses: sampleSize,
-        originalSampleSize
+        originalSampleSize,
+        marginOfError: Math.round(marginOfError * 100) / 100
       }
     })
 
     return results
-  }, [variables, filters, isReady, calculateVariableStats, variableLabels])
+  }, [variables, filters, isReady, calculateVariableStats, variableLabels, shouldAggregate])
 
   const handleBack = useCallback(() => navigate(-1), [navigate])
 
@@ -209,26 +315,16 @@ export default function OpenQuestionDashboardWave1() {
                   </div>
 
                   {chartData.map((data, idx) => (
-                    <div key={idx} className="d-flex flex-column gap-4">
-                      {/* Nuvem de palavras */}
-                      <WordCloudChart
-                        data={data.stats}
-                        questionText={questionText}
-                        variableName={data.variable}
-                        variableLabel={data.label}
-                        sampleSize={data.totalResponses}
-                        originalSampleSize={data.originalSampleSize}
-                      />
-
-                      {/* Lista de respostas */}
-                      <ResponseList
-                        data={data.stats}
-                        questionText={questionText}
-                        variableName={data.variable}
-                        variableLabel={data.label}
-                        sampleSize={data.totalResponses}
-                      />
-                    </div>
+                    <HorizontalBarChart
+                      key={idx}
+                      data={data.stats}
+                      questionText={questionText}
+                      variableName={data.variable}
+                      variableLabel={data.label}
+                      sampleSize={data.totalResponses}
+                      originalSampleSize={data.originalSampleSize}
+                      marginOfError={data.marginOfError}
+                    />
                   ))}
 
                   {chartData.length === 0 && (
