@@ -670,112 +670,7 @@ export default function ExpandedSurveyDashboard() {
               {/* Coluna de Gráficos - 75% */}
               <Col lg={9}>
                 <div className="d-flex flex-column gap-4">
-                  {/* NOVO: Gráficos de comparação entre ondas */}
-                  {/* Gráficos de comparação entre ondas */}
-                  {hasWaveComparison && waveComparisonData.length > 0 && (
-                    <>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        marginBottom: '8px',
-                        padding: '16px 20px',
-                        background: 'linear-gradient(135deg, #d1e7dd 0%, #badbcc 100%)',
-                        borderRadius: '12px',
-                        border: '1px solid #a3cfbb'
-                      }}>
-                        <TrendingUp size={24} color="#198754" />
-                        <div>
-                          <h5 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#146c43' }}>
-                            Comparativo entre Ondas
-                          </h5>
-                          <p style={{ margin: 0, fontSize: '13px', color: '#198754' }}>
-                            Análise da variação das respostas entre a Onda 1 (Mai/25) e Onda 2 (Nov/25)
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Se não deve aglomerar e há múltiplas variáveis, usar gráfico empilhado comparativo */}
-                      {!shouldAggregate && waveComparisonData.length > 1 ? (
-                        <StackedWaveComparisonChart
-                          wave1Data={waveComparisonData.map(d => ({
-                            variable: d.wave1Variable,
-                            label: d.label,
-                            stats: d.wave1Stats
-                          }))}
-                          wave2Data={waveComparisonData.map(d => ({
-                            variable: d.variable,
-                            label: d.label,
-                            stats: d.wave2Stats
-                          }))}
-                          questionText={questionText}
-                          wave1SampleSize={waveComparisonData[0]?.wave1SampleSize}
-                          wave2SampleSize={waveComparisonData[0]?.wave2SampleSize}
-                          wave1MarginOfError={waveComparisonData[0]?.wave1MarginOfError}
-                          wave2MarginOfError={waveComparisonData[0]?.wave2MarginOfError}
-                        />
-                      ) : shouldAggregate ? (
-                        // Comparação com barras horizontais pareadas para perguntas agrupadas (ex: P9_A + P9_B)
-                        waveComparisonData.map((data, idx) => (
-                          <PairedBarComparisonChart
-                            key={`paired-comparison-${idx}`}
-                            wave1Stats={data.wave1Stats}
-                            wave2Stats={data.wave2Stats}
-                            questionText={questionText}
-                            variableName={data.variable}
-                            wave1VariableName={data.wave1Variable}
-                            variableLabel={data.label}
-                            wave1SampleSize={data.wave1SampleSize}
-                            wave2SampleSize={data.wave2SampleSize}
-                            wave1MarginOfError={data.wave1MarginOfError}
-                            wave2MarginOfError={data.wave2MarginOfError}
-                          />
-                        ))
-                      ) : (
-                        // Gráficos individuais de comparação para cada variável
-                        waveComparisonData.map((data, idx) => (
-                          <WaveComparisonChart
-                            key={`wave-comparison-${idx}`}
-                            wave1Stats={data.wave1Stats}
-                            wave2Stats={data.wave2Stats}
-                            questionText={questionText}
-                            variableName={data.variable}
-                            wave1VariableName={data.wave1Variable}
-                            variableLabel={data.label}
-                            wave1SampleSize={data.wave1SampleSize}
-                            wave2SampleSize={data.wave2SampleSize}
-                            wave1MarginOfError={data.wave1MarginOfError}
-                            wave2MarginOfError={data.wave2MarginOfError}
-                          />
-                        ))
-                      )}
-
-                      <hr style={{ margin: '24px 0', borderColor: '#dee2e6' }} />
-
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        marginBottom: '8px',
-                        padding: '16px 20px',
-                        background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
-                        borderRadius: '12px',
-                        border: '1px solid #90caf9'
-                      }}>
-                        <div>
-                          <h5 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#1565c0' }}>
-                            Dados da Onda 2 (Nov/25)
-                          </h5>
-                          <p style={{ margin: 0, fontSize: '13px', color: '#1976d2' }}>
-                            Resultados detalhados da pesquisa atual com filtros demográficos
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Gráficos de dados da Onda 2 */}
-                  {/* ESPECIAL: Gráfico personalizado para perguntas P28 (violência) */}
+                  {/* Gráficos de dados da Onda 2 (primeiro) */}
                   {isP28Question ? (
                     <P28ViolenceChart
                       data={chartData}
@@ -786,7 +681,6 @@ export default function ExpandedSurveyDashboard() {
                     />
                   ) : (
                     <>
-                      {/* Se não deve aglomerar e há múltiplas variáveis, usar gráfico empilhado */}
                       {!shouldAggregate && chartData.length > 1 ? (
                         <StackedBarChart
                           data={chartData}
@@ -796,7 +690,6 @@ export default function ExpandedSurveyDashboard() {
                           marginOfError={chartData[0]?.marginOfError}
                         />
                       ) : (
-                        // Gráficos individuais (ou único aglomerado)
                         chartData.map((data, idx) => (
                           <HorizontalBarChart
                             key={idx}
@@ -818,6 +711,86 @@ export default function ExpandedSurveyDashboard() {
                       <h4>Nenhum gráfico disponível</h4>
                       <p>Não há dados para exibir com os filtros selecionados.</p>
                     </div>
+                  )}
+
+                  {/* Comparativo entre ondas (abaixo do gráfico principal) */}
+                  {hasWaveComparison && waveComparisonData.length > 0 && (
+                    <>
+                      <hr style={{ margin: '24px 0', borderColor: '#dee2e6' }} />
+
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        marginBottom: '8px',
+                        padding: '16px 20px',
+                        background: 'linear-gradient(135deg, #d1e7dd 0%, #badbcc 100%)',
+                        borderRadius: '12px',
+                        border: '1px solid #a3cfbb'
+                      }}>
+                        <TrendingUp size={24} color="#198754" />
+                        <div>
+                          <h5 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#146c43' }}>
+                            Comparativo entre Ondas
+                          </h5>
+                          <p style={{ margin: 0, fontSize: '13px', color: '#198754' }}>
+                            Análise da variação das respostas entre a Onda 1 (Mai/25) e Onda 2 (Nov/25)
+                          </p>
+                        </div>
+                      </div>
+
+                      {!shouldAggregate && waveComparisonData.length > 1 ? (
+                        <StackedWaveComparisonChart
+                          wave1Data={waveComparisonData.map(d => ({
+                            variable: d.wave1Variable,
+                            label: d.label,
+                            stats: d.wave1Stats
+                          }))}
+                          wave2Data={waveComparisonData.map(d => ({
+                            variable: d.variable,
+                            label: d.label,
+                            stats: d.wave2Stats
+                          }))}
+                          questionText={questionText}
+                          wave1SampleSize={waveComparisonData[0]?.wave1SampleSize}
+                          wave2SampleSize={waveComparisonData[0]?.wave2SampleSize}
+                          wave1MarginOfError={waveComparisonData[0]?.wave1MarginOfError}
+                          wave2MarginOfError={waveComparisonData[0]?.wave2MarginOfError}
+                        />
+                      ) : shouldAggregate ? (
+                        waveComparisonData.map((data, idx) => (
+                          <PairedBarComparisonChart
+                            key={`paired-comparison-${idx}`}
+                            wave1Stats={data.wave1Stats}
+                            wave2Stats={data.wave2Stats}
+                            questionText={questionText}
+                            variableName={data.variable}
+                            wave1VariableName={data.wave1Variable}
+                            variableLabel={data.label}
+                            wave1SampleSize={data.wave1SampleSize}
+                            wave2SampleSize={data.wave2SampleSize}
+                            wave1MarginOfError={data.wave1MarginOfError}
+                            wave2MarginOfError={data.wave2MarginOfError}
+                          />
+                        ))
+                      ) : (
+                        waveComparisonData.map((data, idx) => (
+                          <WaveComparisonChart
+                            key={`wave-comparison-${idx}`}
+                            wave1Stats={data.wave1Stats}
+                            wave2Stats={data.wave2Stats}
+                            questionText={questionText}
+                            variableName={data.variable}
+                            wave1VariableName={data.wave1Variable}
+                            variableLabel={data.label}
+                            wave1SampleSize={data.wave1SampleSize}
+                            wave2SampleSize={data.wave2SampleSize}
+                            wave1MarginOfError={data.wave1MarginOfError}
+                            wave2MarginOfError={data.wave2MarginOfError}
+                          />
+                        ))
+                      )}
+                    </>
                   )}
                 </div>
               </Col>
