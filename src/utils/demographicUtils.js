@@ -13,6 +13,7 @@ export const DEMOGRAPHIC_LABELS = {
   PF9: "Possui CNPJ",
   PF10: "Possui CNPJ",
   PF13: "Faixa de Renda",
+  PF15: "Religião",
   "Faixa de idade": "Faixa de idade",
 }
 
@@ -101,7 +102,7 @@ export const UNIFIED_DEMOGRAPHIC_COLUMNS = [
   },
   {
     column: "Religião Agrupada",
-    label: "Religião Agrupada",
+    label: "Religião",
     r13Column: "Religião Agrupada",
     r16Column: "Religião Agrupada"
   },
@@ -110,7 +111,7 @@ export const UNIFIED_DEMOGRAPHIC_COLUMNS = [
     column: "Raça/Cor",
     label: "Raça/Cor",
     r13Column: "PF17",
-    r16Column: "PF16"
+    r16Column: "PF17"
   },
   {
     // Tipo de Eleitor - movido para o final
@@ -186,7 +187,7 @@ export const R13_TO_R16_COLUMN_MAP = {
   "Tipo de Eleitor": "Tipo de Eleitor",
   "Renda Familiar": "Renda Familiar",
   "Religião Agrupada": "Religião Agrupada",
-  "PF17": "PF16", // Raça/Cor
+  "PF17": "PF17", // Raça/Cor
   "P01": "P01", // Avaliação Governo Federal
   "P02": "P02", // Aprovação Governo Federal
   "P03": "P03", // Avaliação Presidente
@@ -205,7 +206,7 @@ export const R16_TO_R13_COLUMN_MAP = {
   "Tipo de Eleitor": "Tipo de Eleitor",
   "Renda Familiar": "Renda Familiar",
   "Religião Agrupada": "Religião Agrupada",
-  "PF16": "PF17", // Raça/Cor
+  "PF17": "PF17", // Raça/Cor
   "P01": "P01", // Avaliação Governo Federal
   "P02": "P02", // Aprovação Governo Federal
   "P03": "P03", // Avaliação Presidente
