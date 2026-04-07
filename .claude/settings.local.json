@@ -13,7 +13,10 @@
       "Bash(curl:*)",
       "Bash(powershell -Command \"\\(Invoke-WebRequest -Uri ''https://nmbcoamazonia-api.vercel.app/google/sheets/1KE58via47wIUxYyx23ByPGwR8j1nL8JQC6CVEq7mm4U/data''\\).Content\")",
       "Bash(powershell -Command:*)",
-      "Bash(npx react-scripts build:*)"
+      "Bash(npx react-scripts build:*)",
+      "Bash(echo \"Exit: $?\")",
+      "Read(//tmp/**)",
+      "Bash(netstat -ano)"
     ],
     "deny": [],
     "ask": []

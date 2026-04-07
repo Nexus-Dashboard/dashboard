@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Container, Row, Col, Card, Button, Image } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
-import { Phone, Users } from "lucide-react"
+import { Phone, Users, Upload } from "lucide-react"
 import { useAuth } from "../contexts/AuthContext"
 import "./SurveyTypePage.css"
 import CommonHeader from "../components/CommonHeader"
@@ -38,7 +38,7 @@ export default function SurveyTypePage() {
           </div>
 
           {/* Cards centralizados quando não é admin */}
-          <Row className={`survey-type-cards ${!isAdmin() ? 'justify-content-center' : ''}`}>
+          <Row className={`survey-type-cards ${!isAdmin() ? 'justify-content-center' : 'justify-content-center'}`}>
             {/* Card Telefônicas - SEMPRE VISÍVEL */}
             <Col lg={6} md={6} >
               <Card
@@ -82,6 +82,29 @@ export default function SurveyTypePage() {
               </Card>
             </Col>
             }
+
+            {/* Card Upload - APENAS ADMIN */}
+            {isAdmin() && (
+              <Col lg={6} md={6}>
+                <Card
+                  className="survey-type-card admin-card"
+                  onClick={() => navigate('/upload')}
+                >
+                  <Card.Body>
+                    <div className="card-icon admin-icon">
+                      <Upload size={48} />
+                    </div>
+                    <Card.Title className="card-title">Upload de Pesquisa</Card.Title>
+                    <Card.Text className="card-description">
+                      Analise e processe arquivos de dados e dicionários de variáveis
+                    </Card.Text>
+                    <Button variant="dark" className="select-button">
+                      Acessar
+                    </Button>
+                  </Card.Body>
+                </Card>
+              </Col>
+            )}
           </Row>
         </Container>
       </main>

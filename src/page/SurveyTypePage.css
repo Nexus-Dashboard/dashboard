@@ -85,7 +85,7 @@
 }
 
 .survey-type-card.admin-card {
-  border: 2px solidrgb(204, 204, 204);
+  border: 2px solid rgb(204, 204, 204);
 }
 
 .survey-type-card.admin-card:hover {
