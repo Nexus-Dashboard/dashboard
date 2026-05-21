@@ -100,10 +100,11 @@ function Upload() {
   const readExcel = (file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader()
-      reader.readAsBinaryString(file)
+      // readAsArrayBuffer é mais robusto que readAsBinaryString (legado)
+      reader.readAsArrayBuffer(file)
       reader.onload = (e) => {
         try {
-          const wb = XLSX.read(e.target.result, { type: "binary" })
+          const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" })
           const ws = wb.Sheets[wb.SheetNames[0]]
           const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" })
 
@@ -132,7 +133,14 @@ function Upload() {
           reject(new Error("Falha ao ler o arquivo Excel de dados."))
         }
       }
-      reader.onerror = reject
+      reader.onerror = () => {
+        // NotReadableError: arquivo bloqueado (aberto no Excel) ou movido após a seleção
+        reject(
+          new Error(
+            "Não foi possível ler o arquivo. Feche-o no Excel (ou em qualquer outro programa), selecione o arquivo novamente e tente de novo."
+          )
+        )
+      }
     })
 
   // --- Analisar arquivo ---
