@@ -39,6 +39,7 @@ function Upload() {
   const [dataFile, setDataFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [uploadLoading, setUploadLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(null)
   const [results, setResults] = useState(null)
   const [processedData, setProcessedData] = useState(null)
   const [uploadResult, setUploadResult] = useState(null)
@@ -189,12 +190,17 @@ function Upload() {
     }
   }
 
-  // --- Enviar para o banco ---
+  // Quantas respostas enviar por requisição.
+  // A Vercel limita o corpo da requisição a 4.5 MB; ~500 registros ficam bem abaixo disso.
+  const UPLOAD_CHUNK_SIZE = 500
+
+  // --- Enviar para o banco (em lotes) ---
   const handleUploadSurvey = async () => {
     if (!processedData || !results?.surveyInfo) return
 
     setUploadLoading(true)
     setUploadResult(null)
+    setUploadProgress(null)
 
     try {
       const { surveyInfo } = results
@@ -206,21 +212,45 @@ function Upload() {
           .map(([k, v]) => ({ k, v })),
       }))
 
-      const response = await ApiBase.post("/api/migration/upload-survey", {
-        surveyName: surveyInfo.name,
-        rodada: surveyInfo.rodada,
-        year: surveyInfo.year,
-        responses,
-      })
+      const totalChunks = Math.ceil(responses.length / UPLOAD_CHUNK_SIZE)
+      let totalInserted = 0
+      let lastSurveyId = null
 
-      setUploadResult({ success: true, data: response.data })
-      showAlert("success", `${response.data.responsesInserted} respostas inseridas com sucesso no banco!`)
+      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        const start = chunkIndex * UPLOAD_CHUNK_SIZE
+        const chunk = responses.slice(start, start + UPLOAD_CHUNK_SIZE)
+
+        setUploadProgress({ current: chunkIndex + 1, total: totalChunks })
+
+        const response = await ApiBase.post("/api/migration/upload-survey", {
+          surveyName: surveyInfo.name,
+          rodada: surveyInfo.rodada,
+          year: surveyInfo.year,
+          responses: chunk,
+          chunkIndex,
+          totalChunks,
+        })
+
+        totalInserted += response.data.responsesInserted || 0
+        lastSurveyId = response.data.surveyId
+      }
+
+      setUploadResult({
+        success: true,
+        data: {
+          message: `Pesquisa "${surveyInfo.name}" importada com sucesso!`,
+          surveyId: lastSurveyId,
+          responsesInserted: totalInserted,
+        },
+      })
+      showAlert("success", `${totalInserted} respostas inseridas com sucesso no banco!`)
     } catch (error) {
       const message = error.response?.data?.error || error.message || "Erro desconhecido"
       setUploadResult({ success: false, message })
       showAlert("danger", `Erro no envio: ${message}`)
     } finally {
       setUploadLoading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -528,7 +558,11 @@ function Upload() {
                       {uploadLoading ? (
                         <>
                           <Spinner as="span" animation="border" size="sm" />
-                          <span className="ms-2">Enviando para o banco...</span>
+                          <span className="ms-2">
+                            {uploadProgress
+                              ? `Enviando lote ${uploadProgress.current}/${uploadProgress.total}...`
+                              : "Enviando para o banco..."}
+                          </span>
                         </>
                       ) : (
                         <>
