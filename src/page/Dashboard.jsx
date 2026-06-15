@@ -318,20 +318,37 @@ export default function Dashboard() {
       }
     })
 
+    // IMPORTANTE: os códigos demográficos (PF*) NÃO são estáveis entre rodadas.
+    // Ex.: PF15 já significou Renda (R1-17), Raça/Cor (R22) e Religião (R18-21, R23+).
+    // Unir os valores de todas as rodadas misturaria categorias diferentes na mesma
+    // caixinha (ex.: renda/raça aparecendo no filtro de Religião). Por isso, fixamos
+    // cada variável nos valores da rodada MAIS RECENTE em que ela aparece, que reflete
+    // o significado atual do questionário. sortedRounds já vem do mais novo p/ o mais antigo.
+    const INVALID_DEMOGRAPHIC_VALUES = new Set(["#NULL!", "#NULL", "#null", "-1", ""])
+    const lockedDemographicKeys = new Set()
+
     sortedRounds.forEach((round) => {
+      // Coletar valores por chave SOMENTE desta rodada
+      const valuesThisRound = new Map()
       round.distribution.forEach((dist) => {
-        if (dist.demographics) {
-          Object.entries(dist.demographics).forEach(([key, values]) => {
-            if (demographicsMap.has(key)) {
-              values.forEach((v) => {
-                const valueToAdd = key === "REGIAO" ? normalizeRegion(v.response) : v.response
-                if (valueToAdd) {
-                  demographicsMap.get(key).values.add(valueToAdd)
-                }
-              })
-            }
+        if (!dist.demographics) return
+        Object.entries(dist.demographics).forEach(([key, values]) => {
+          if (!demographicsMap.has(key)) return
+          values.forEach((v) => {
+            if (!v.response) return
+            const valueToAdd = key === "REGIAO" ? normalizeRegion(v.response) : v.response
+            if (!valueToAdd || INVALID_DEMOGRAPHIC_VALUES.has(String(valueToAdd).trim())) return
+            if (!valuesThisRound.has(key)) valuesThisRound.set(key, new Set())
+            valuesThisRound.get(key).add(valueToAdd)
           })
-        }
+        })
+      })
+
+      // Fixar cada chave ainda não travada nos valores desta rodada (a mais recente que a contém)
+      valuesThisRound.forEach((vals, key) => {
+        if (lockedDemographicKeys.has(key)) return
+        vals.forEach((val) => demographicsMap.get(key).values.add(val))
+        lockedDemographicKeys.add(key)
       })
     })
 
