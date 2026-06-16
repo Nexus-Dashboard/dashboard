@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { useLocation } from "react-router-dom"
 import ApiBase from "../service/ApiBase"
 import { useQuery } from "@tanstack/react-query"
-import { Box, Alert, AlertTitle } from "@mui/material"
+import { Box, Alert, AlertTitle, Chip, Stack, Button } from "@mui/material"
 import OffcanvasNavigation from "../components/OffcanvasNavigation"
 import DashboardHeader from "../components/DashboardHeader"
 import {
@@ -610,9 +610,56 @@ export default function Dashboard() {
     setFilters({})
   }
 
+  // Remove valores específicos de uma chave de filtro (usado pelos chips do alerta).
+  // Recebe um array porque um grupo (ex.: PF13) pode mapear vários valores originais.
+  const handleRemoveFilterValues = (demographicKey, valuesToRemove) => {
+    setFilters((prevFilters) => {
+      const newFilters = { ...prevFilters }
+      const remaining = (newFilters[demographicKey] || []).filter((v) => !valuesToRemove.includes(v))
+      if (remaining.length > 0) {
+        newFilters[demographicKey] = remaining
+      } else {
+        delete newFilters[demographicKey]
+      }
+      return newFilters
+    })
+  }
+
   const handlePeriodChange = (periodData) => {
     setSelectedPeriod(periodData)
   }
+
+  // Monta os chips do alerta de filtros ativos: "Rótulo: Valor".
+  // Para PF13, os valores armazenados são os originais (longos); agrupamos pelo
+  // nome amigável (ex.: "Até 1 S.M.") usando o mapeamento, e a remoção tira todos
+  // os valores originais daquele grupo de uma vez.
+  const activeFilterChips = useMemo(() => {
+    const chips = []
+    Object.entries(filters).forEach(([key, values]) => {
+      if (!values || values.length === 0) return
+      const label =
+        availableDemographics.find((d) => d.key === key)?.label ||
+        DEMOGRAPHIC_LABELS[key] ||
+        key
+
+      if (key === "PF13" && pf13ValueMapping?.toProcessed) {
+        const byGroup = new Map()
+        values.forEach((v) => {
+          const display = pf13ValueMapping.toProcessed[v] || v
+          if (!byGroup.has(display)) byGroup.set(display, [])
+          byGroup.get(display).push(v)
+        })
+        byGroup.forEach((originals, display) => {
+          chips.push({ key, label, display, valuesToRemove: originals })
+        })
+      } else {
+        values.forEach((v) => {
+          chips.push({ key, label, display: v, valuesToRemove: [v] })
+        })
+      }
+    })
+    return chips
+  }, [filters, availableDemographics, pf13ValueMapping])
 
   const filteredHistoricalData = useMemo(() => {
     let filtered = allHistoricalData
@@ -1033,6 +1080,59 @@ export default function Dashboard() {
         pageRef={pageRef}
         onMenuClick={() => setShowOffcanvas(true)}
       />
+
+      {/* Alerta de filtros aplicados - SOMENTE quando houver algum filtro selecionado */}
+      {activeFilterChips.length > 0 && (
+        <Box sx={{ px: 3, pt: 2 }}>
+          <Box
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              backgroundColor: "#eef5ff",
+              border: "1px solid #cfe0ff",
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 1,
+                flexWrap: "wrap",
+                mb: 1,
+              }}
+            >
+              <Box sx={{ fontSize: 13, fontWeight: 600, color: "#1565c0" }}>
+                Filtros aplicados
+              </Box>
+              <Button
+                size="small"
+                color="error"
+                onClick={handleClearFilters}
+                sx={{ textTransform: "none", fontSize: 12, minWidth: 0, py: 0.25 }}
+              >
+                Limpar todos
+              </Button>
+            </Box>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              {activeFilterChips.map((chip, index) => (
+                <Chip
+                  key={`${chip.key}-${chip.display}-${index}`}
+                  size="small"
+                  label={`${chip.label}: ${chip.display}`}
+                  onDelete={() => handleRemoveFilterValues(chip.key, chip.valuesToRemove)}
+                  sx={{
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #90caf9",
+                    color: "#0d47a1",
+                    fontSize: 12,
+                  }}
+                />
+              ))}
+            </Stack>
+          </Box>
+        </Box>
+      )}
 
       {/* Alerta de margem de erro - SOMENTE quando ultrapassar 10pp */}
       {marginOfErrorData.hasFilters && marginOfErrorData.isHighMargin && (
